@@ -1,0 +1,16 @@
+package com.github.wf.dsl;
+
+import java.util.List;
+import java.util.Map;
+
+public class NodeYaml {
+    public String id;
+    public String type;
+    public String name;
+    public String assignee;
+    public List<String> candidateGroups;
+    public String dynamicRouter;
+    public String handlerClass;
+    public Map<String, String> listeners;
+    public List<GatewayConditionYaml> conditions;
+}
