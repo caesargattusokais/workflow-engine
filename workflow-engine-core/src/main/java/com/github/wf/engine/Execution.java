@@ -19,6 +19,10 @@ public class Execution {
         this.status = ExecutionStatus.ACTIVE;
     }
 
+    public Execution(String id, String instanceId, String currentNodeId) {
+        this(id, instanceId, currentNodeId, null);
+    }
+
     public Execution(String instanceId, String currentNodeId) {
         this(null, instanceId, currentNodeId, null);
     }
