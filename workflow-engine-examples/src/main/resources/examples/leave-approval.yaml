@@ -1,0 +1,35 @@
+id: leave-approval
+name: 请假审批流程
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+  - id: apply
+    type: userTask
+    name: 提交请假申请
+    assignee: "${applicant}"
+  - id: gateway
+    type: exclusiveGateway
+    conditions:
+      - expr: "days > 3"
+        to: manager-approve
+      - default: true
+        to: department-manager
+  - id: manager-approve
+    type: userTask
+    name: 总经理审批
+    candidateGroups: ["manager"]
+  - id: department-manager
+    type: userTask
+    name: 部门经理审批
+  - id: end
+    type: endEvent
+transitions:
+  - from: start
+    to: apply
+  - from: apply
+    to: gateway
+  - from: manager-approve
+    to: end
+  - from: department-manager
+    to: end

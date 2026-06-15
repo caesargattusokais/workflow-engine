@@ -19,9 +19,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class WorkflowEngine {
 
-    final ProcessRepository processRepository;
-    final InstanceRepository instanceRepository;
-    final TaskRepository taskRepository;
+    public final ProcessRepository processRepository;
+    public final InstanceRepository instanceRepository;
+    public final TaskRepository taskRepository;
     final ExpressionEvaluator expressionEvaluator;
     final ConcurrentHashMap<String, ReentrantLock> instanceLocks = new ConcurrentHashMap<>();
 
@@ -54,6 +54,10 @@ public class WorkflowEngine {
     public void setProcessParser(ProcessParser processParser) { this.processParser = processParser; }
 
     public TaskQuery taskQuery() { return new TaskQuery(); }
+
+    public List<Task> queryTasks(TaskQuery query) {
+        return taskRepository.query(query);
+    }
 
     // === Public API ===
 
