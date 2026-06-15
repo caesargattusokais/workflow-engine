@@ -38,14 +38,16 @@ public class UserTaskRunner implements NodeRunner {
         // Create task
         Task task = new Task(null, exec.getInstanceId(), node.getId());
 
-        // Evaluate assignee expression
+        // Evaluate assignee expression or use literal
         if (userTask.getAssignee() != null) {
             String assigneeExpr = userTask.getAssignee();
             if (assigneeExpr.startsWith("${") && assigneeExpr.endsWith("}")) {
                 assigneeExpr = assigneeExpr.substring(2, assigneeExpr.length() - 1);
+                Object assignee = context.getExpressionEvaluator().evaluate(assigneeExpr, variables);
+                task.setAssignee(assignee != null ? assignee.toString() : null);
+            } else {
+                task.setAssignee(assigneeExpr);
             }
-            Object assignee = context.getExpressionEvaluator().evaluate(assigneeExpr, variables);
-            task.setAssignee(assignee != null ? assignee.toString() : null);
         }
 
         task.setCandidateGroups(userTask.getCandidateGroups());
