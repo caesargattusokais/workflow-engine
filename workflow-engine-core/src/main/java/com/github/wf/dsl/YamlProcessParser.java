@@ -124,6 +124,11 @@ public class YamlProcessParser implements ProcessParser {
         }
     }
 
+    public List<Transition> convertTransitionsPublic(List<TransitionYaml> tyList,
+                                                      Map<String, NodeYaml> nodeYamlMap) {
+        return convertTransitions(tyList, nodeYamlMap);
+    }
+
     private List<Transition> convertTransitions(List<TransitionYaml> transitionYamls,
                                                  Map<String, NodeYaml> nodeYamlMap) {
         List<Transition> result = new ArrayList<>();
