@@ -2,6 +2,7 @@ package com.github.wf.expression;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import java.util.HashMap;
 import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,8 +46,9 @@ class SpelExpressionEvaluatorTest {
 
     @Test
     void handlesNullVariable() {
-        boolean result = evaluator.evaluateToBoolean("approver == null",
-                Map.of("approver", (Object) null));
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("approver", null);
+        boolean result = evaluator.evaluateToBoolean("approver == null", vars);
         assertThat(result).isTrue();
     }
 }

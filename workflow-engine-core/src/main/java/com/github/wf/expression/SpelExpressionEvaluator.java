@@ -6,6 +6,8 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class SpelExpressionEvaluator implements ExpressionEvaluator {
 
@@ -18,8 +20,15 @@ public class SpelExpressionEvaluator implements ExpressionEvaluator {
             context.setVariable(entry.getKey(), entry.getValue());
         }
         String spelExpr = expression;
-        if (!expression.contains("#") && !expression.contains("'") && looksLikeVariable(expression)) {
-            spelExpr = "#" + expression;
+        if (!expression.contains("#")) {
+            if (!expression.contains("'") && looksLikeVariable(expression)) {
+                spelExpr = "#" + expression;
+            } else {
+                for (String varName : variables.keySet()) {
+                    spelExpr = spelExpr.replaceAll("\\b" + Pattern.quote(varName) + "\\b",
+                            Matcher.quoteReplacement("#" + varName));
+                }
+            }
         }
         return parser.parseExpression(spelExpr).getValue(context);
     }
