@@ -5,9 +5,14 @@ import com.github.wf.model.node.*;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.introspector.BeanAccess;
+import org.yaml.snakeyaml.introspector.Property;
+import org.yaml.snakeyaml.introspector.PropertyUtils;
 
 import java.io.Reader;
 import java.io.StringReader;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.util.*;
 
 public class YamlProcessParser implements ProcessParser {
@@ -20,9 +25,74 @@ public class YamlProcessParser implements ProcessParser {
     @Override
     public ProcessDefinition parse(Reader reader) {
         LoaderOptions options = new LoaderOptions();
-        Yaml yaml = new Yaml(new Constructor(ProcessYaml.class, options));
+        Constructor constructor = new Constructor(ProcessYaml.class, options);
+        constructor.setPropertyUtils(new FieldPropertyUtils());
+        Yaml yaml = new Yaml(constructor);
         ProcessYaml py = yaml.load(reader);
         return convert(py);
+    }
+
+    private static class FieldPropertyUtils extends PropertyUtils {
+
+        @Override
+        public Property getProperty(Class<? extends Object> type, String name) {
+            return getProperty(type, name, BeanAccess.FIELD);
+        }
+
+        @Override
+        protected Map<String, Property> getPropertiesMap(Class<?> type, BeanAccess bAccess) {
+            Map<String, Property> map = new LinkedHashMap<>(
+                    super.getPropertiesMap(type, BeanAccess.FIELD));
+            if (type == GatewayConditionYaml.class) {
+                Property isDefaultProp = map.remove("isDefault");
+                if (isDefaultProp != null) {
+                    try {
+                        Field f = GatewayConditionYaml.class.getField("isDefault");
+                        map.put("default", new AliasedFieldProperty("default", f));
+                    } catch (NoSuchFieldException ignored) {
+                    }
+                }
+            }
+            return map;
+        }
+    }
+
+    private static class AliasedFieldProperty extends Property {
+        private final Field field;
+
+        AliasedFieldProperty(String name, Field field) {
+            super(name, field.getType());
+            this.field = field;
+        }
+
+        @Override
+        public void set(Object obj, Object value) throws Exception {
+            field.set(obj, value);
+        }
+
+        @Override
+        public Object get(Object obj) {
+            try {
+                return field.get(obj);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public List<Annotation> getAnnotations() {
+            return List.of();
+        }
+
+        @Override
+        public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
+            return null;
+        }
+
+        @Override
+        public Class<?>[] getActualTypeArguments() {
+            return new Class<?>[0];
+        }
     }
 
     private ProcessDefinition convert(ProcessYaml py) {
