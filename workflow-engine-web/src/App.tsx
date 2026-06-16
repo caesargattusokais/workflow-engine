@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import DesignerPage from './designer/DesignerPage';
+import MonitorPage from './monitor/MonitorPage';
 
 export default function App() {
   const [tab, setTab] = useState<'designer' | 'monitor'>('designer');
@@ -16,8 +18,8 @@ export default function App() {
         >Monitor</button>
       </header>
       <main className="flex-1 overflow-hidden">
-        {tab === 'designer' ? <p className="p-8 text-gray-400">Designer — coming soon</p> : null}
-        {tab === 'monitor' ? <p className="p-8 text-gray-400">Monitor — coming soon</p> : null}
+        {tab === 'designer' ? <DesignerPage /> : null}
+        {tab === 'monitor' ? <MonitorPage /> : null}
       </main>
     </div>
   );
