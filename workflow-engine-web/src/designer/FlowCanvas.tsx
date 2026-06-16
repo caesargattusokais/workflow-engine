@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
   addEdge, Connection,
@@ -12,8 +12,8 @@ interface FlowCanvasProps {
   edges: Edge[];
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
-  setNodes: (nodes: Node[]) => void;
-  setEdges: (edges: Edge[]) => void;
+  setNodes: Dispatch<SetStateAction<Node[]>>;
+  setEdges: Dispatch<SetStateAction<Edge[]>>;
   onNodeSelect: (node: Node | null) => void;
 }
 
@@ -23,8 +23,8 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   const onConnect = useCallback((params: Connection) => {
-    setEdges(addEdge(params, edges));
-  }, [setEdges, edges]);
+    setEdges((eds: Edge[]) => addEdge(params, eds));
+  }, [setEdges]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
