@@ -13,4 +13,21 @@ public class NodeYaml {
     public String handlerClass;
     public Map<String, String> listeners;
     public List<GatewayConditionYaml> conditions;
+    public RetryYaml retry;
+    public List<RouteYaml> resultRouting;
+    public List<RouteYaml> exceptionRouting;
+
+    public static class RetryYaml {
+        public int maxAttempts = 1;
+        public long delayMs = 1000;
+        public double backoffMultiplier = 2.0;
+        public List<GatewayConditionYaml> retryOn;
+    }
+
+    public static class RouteYaml {
+        public String expr;
+        public String className;
+        public boolean isDefault;
+        public String to;
+    }
 }

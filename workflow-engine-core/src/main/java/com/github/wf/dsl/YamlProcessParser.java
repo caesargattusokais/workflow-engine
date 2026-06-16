@@ -2,6 +2,8 @@ package com.github.wf.dsl;
 
 import com.github.wf.model.*;
 import com.github.wf.model.node.*;
+import com.github.wf.model.RetryConfig;
+import com.github.wf.model.RoutingRule;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.LoaderOptions;
