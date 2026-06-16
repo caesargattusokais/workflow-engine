@@ -1,0 +1,83 @@
+<h2>What kind of interface do you want?</h2>
+<p class="subtitle">Designer: build &amp; edit workflows. Monitor: watch running flows.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A — Designer Mode</div>
+    <div class="mockup-body">
+      <div style="font-size:13px;color:#aaa;margin-bottom:12px;">Drag nodes from palette, connect them, edit properties</div>
+      <div style="display:flex;gap:12px;">
+        <div style="width:120px;background:#1e1e2e;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;border:1px solid #333;">
+          <div style="font-size:10px;color:#888;text-align:center;margin-bottom:4px;">Palette</div>
+          <div style="background:#2a2a3e;border-radius:6px;padding:6px 8px;font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="width:14px;height:14px;border-radius:50%;background:#4CAF50;display:inline-block;"></span> Start
+          </div>
+          <div style="background:#2a2a3e;border-radius:6px;padding:6px 8px;font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="width:14px;height:14px;border-radius:4px;background:#2196F3;display:inline-block;"></span> User Task
+          </div>
+          <div style="background:#2a2a3e;border-radius:6px;padding:6px 8px;font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="width:14px;height:14px;transform:rotate(45deg);background:#FF9800;display:inline-block;"></span> Gateway
+          </div>
+          <div style="background:#2a2a3e;border-radius:6px;padding:6px 8px;font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="width:14px;height:14px;border-radius:2px;background:#9C27B0;display:inline-block;"></span> Service
+          </div>
+          <div style="background:#2a2a3e;border-radius:6px;padding:6px 8px;font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="width:14px;height:14px;border-radius:50%;border:2px solid #f44336;display:inline-block;"></span> End
+          </div>
+        </div>
+        <div style="flex:1;background:#1e1e2e;border-radius:8px;padding:16px;border:1px solid #333;min-height:200px;position:relative;">
+          <div style="font-size:10px;color:#888;text-align:center;">Canvas</div>
+          <div style="position:absolute;top:50px;left:40px;width:24px;height:24px;border-radius:50%;background:#4CAF50;border:2px solid #4CAF50;"></div>
+          <div style="position:absolute;top:100px;left:40px;width:80px;height:26px;border-radius:6px;background:#2196F3;font-size:9px;line-height:26px;text-align:center;color:white;">审批</div>
+          <div style="position:absolute;top:74px;left:52px;width:2px;height:26px;background:#555;"></div>
+          <div style="position:absolute;top:130px;left:40px;width:22px;height:22px;transform:rotate(45deg);background:transparent;border:2px solid #FF9800;"></div>
+          <div style="position:absolute;top:74px;left:52px;width:40px;height:2px;background:#555;left:120px;top:110px;width:2px;height:20px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">B — Monitor Mode</div>
+    <div class="mockup-body">
+      <div style="font-size:13px;color:#aaa;margin-bottom:12px;">View running instances, active nodes highlighted, task status</div>
+      <div style="background:#1e1e2e;border-radius:8px;padding:16px;border:1px solid #333;min-height:200px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:11px;color:#aaa;">Instance #3a8f</span>
+          <span style="background:#4CAF50;padding:2px 8px;border-radius:10px;font-size:10px;">RUNNING</span>
+        </div>
+        <div style="position:relative;height:140px;">
+          <div style="position:absolute;top:10px;left:30px;width:22px;height:22px;border-radius:50%;background:#4CAF50;opacity:0.5;"></div>
+          <div style="position:absolute;top:15px;left:56px;font-size:9px;color:#666;">done</div>
+          <div style="position:absolute;top:50px;left:30px;width:80px;height:26px;border-radius:6px;background:#2196F3;animation:pulse 2s infinite;"></div>
+          <div style="position:absolute;top:55px;left:115px;font-size:9px;color:#4CAF50;">&larr; active</div>
+          <div style="position:absolute;top:90px;left:30px;width:22px;height:22px;transform:rotate(45deg);border:2px solid #666;"></div>
+          <div style="position:absolute;top:130px;left:30px;width:22px;height:22px;border-radius:50%;border:2px solid #666;"></div>
+          <div style="position:absolute;top:32px;left:40px;width:2px;height:18px;background:#555;"></div>
+          <div style="position:absolute;top:76px;left:40px;width:2px;height:16px;background:#555;"></div>
+          <div style="position:absolute;top:112px;left:40px;width:2px;height:18px;background:#555;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="content">
+      <h3>Designer only first</h3>
+      <p>Build the drag-and-drop workflow designer. Monitor later.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="content">
+      <h3>Monitor only first</h3>
+      <p>View running workflows with live state. Designer later.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="content">
+      <h3>Both together</h3>
+      <p>Design tab + Monitor tab in a single app. More work, full picture.</p>
+    </div>
+  </div>
+</div>
