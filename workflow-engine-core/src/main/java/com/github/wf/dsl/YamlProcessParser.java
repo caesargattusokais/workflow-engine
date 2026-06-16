@@ -55,6 +55,15 @@ public class YamlProcessParser implements ProcessParser {
                     }
                 }
             }
+            if (type == NodeYaml.RouteYaml.class) {
+                Property isDefaultProp = map.remove("isDefault");
+                if (isDefaultProp != null) {
+                    try {
+                        java.lang.reflect.Field f = NodeYaml.RouteYaml.class.getField("isDefault");
+                        map.put("default", new AliasedFieldProperty("default", f));
+                    } catch (NoSuchFieldException ignored) {}
+                }
+            }
             return map;
         }
     }
@@ -118,7 +127,12 @@ public class YamlProcessParser implements ProcessParser {
             case "startEvent": return new StartEvent(ny.id, ny.name, listeners);
             case "endEvent": return new EndEvent(ny.id, ny.name, listeners);
             case "userTask": return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, listeners);
-            case "serviceTask": return new ServiceTask(ny.id, ny.name, ny.handlerClass, listeners);
+            case "serviceTask":
+                RetryConfig retryConfig = buildRetryConfig(ny);
+                List<RoutingRule> resultRoutes = buildRoutes(ny.resultRouting);
+                List<RoutingRule> exceptionRoutes = buildRoutes(ny.exceptionRouting);
+                return new ServiceTask(ny.id, ny.name, ny.handlerClass, retryConfig,
+                        resultRoutes, exceptionRoutes, listeners);
             case "exclusiveGateway": return new ExclusiveGateway(ny.id, ny.name, listeners);
             case "parallelGateway": return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway": return new InclusiveGateway(ny.id, ny.name, listeners);
@@ -164,5 +178,33 @@ public class YamlProcessParser implements ProcessParser {
             }
         }
         return result;
+    }
+
+    private RetryConfig buildRetryConfig(NodeYaml ny) {
+        if (ny.retry == null) return null;
+        List<Condition> retryOn = new ArrayList<>();
+        if (ny.retry.retryOn != null) {
+            for (GatewayConditionYaml gcy : ny.retry.retryOn) {
+                if (gcy.className != null) retryOn.add(Condition.javaClass(gcy.className));
+                else if (gcy.expr != null) retryOn.add(Condition.expression(gcy.expr));
+            }
+        }
+        return new RetryConfig(ny.retry.maxAttempts, ny.retry.delayMs,
+                ny.retry.backoffMultiplier, retryOn);
+    }
+
+    private List<RoutingRule> buildRoutes(List<NodeYaml.RouteYaml> routeYamls) {
+        if (routeYamls == null || routeYamls.isEmpty()) return List.of();
+        List<RoutingRule> rules = new ArrayList<>();
+        for (NodeYaml.RouteYaml ry : routeYamls) {
+            if (ry.isDefault) {
+                rules.add(RoutingRule.defaultRule(ry.to));
+            } else if (ry.className != null) {
+                rules.add(RoutingRule.matched(Condition.javaClass(ry.className), ry.to));
+            } else if (ry.expr != null) {
+                rules.add(RoutingRule.matched(Condition.expression(ry.expr), ry.to));
+            }
+        }
+        return rules;
     }
 }
