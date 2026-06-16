@@ -10,6 +10,9 @@ public class Execution {
     private String currentNodeId;
     private final String parentExecutionId;
     private ExecutionStatus status;
+    private int retryAttempt = 0;
+    private long nextRetryAt = 0;    // epoch millis; 0 = no pending retry
+    private String retryState = null; // null = normal; "SUSPENDED" = suspend instance
 
     public Execution(String id, String instanceId, String currentNodeId, String parentExecutionId) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -17,6 +20,9 @@ public class Execution {
         this.currentNodeId = Objects.requireNonNull(currentNodeId);
         this.parentExecutionId = parentExecutionId;
         this.status = ExecutionStatus.ACTIVE;
+        this.retryAttempt = 0;
+        this.nextRetryAt = 0;
+        this.retryState = null;
     }
 
     public Execution(String id, String instanceId, String currentNodeId) {
@@ -40,4 +46,11 @@ public class Execution {
     public boolean isWaiting() { return status == ExecutionStatus.WAITING; }
     public boolean isCompleted() { return status == ExecutionStatus.COMPLETED; }
     public boolean isChild() { return parentExecutionId != null; }
+
+    public int getRetryAttempt() { return retryAttempt; }
+    public void setRetryAttempt(int retryAttempt) { this.retryAttempt = retryAttempt; }
+    public long getNextRetryAt() { return nextRetryAt; }
+    public void setNextRetryAt(long nextRetryAt) { this.nextRetryAt = nextRetryAt; }
+    public String getRetryState() { return retryState; }
+    public void setRetryState(String retryState) { this.retryState = retryState; }
 }

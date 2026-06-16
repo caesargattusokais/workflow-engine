@@ -31,7 +31,7 @@ public class ProcessInstance {
 
     public void setStatus(InstanceStatus status) {
         this.status = status;
-        if (status == InstanceStatus.COMPLETED || status == InstanceStatus.TERMINATED) {
+        if (status == InstanceStatus.COMPLETED || status == InstanceStatus.TERMINATED || status == InstanceStatus.SUSPENDED) {
             this.completedAt = Instant.now();
         }
     }
