@@ -4,6 +4,7 @@ import com.github.wf.dsl.ProcessParser;
 import com.github.wf.dsl.YamlProcessParser;
 import com.github.wf.engine.runner.*;
 import com.github.wf.expression.ExpressionEvaluator;
+import com.github.wf.ext.ServiceTaskHandler;
 import com.github.wf.model.*;
 import com.github.wf.model.node.*;
 import com.github.wf.spi.InstanceRepository;
@@ -52,6 +53,15 @@ public class WorkflowEngine {
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
 
     public void setProcessParser(ProcessParser processParser) { this.processParser = processParser; }
+
+    /**
+     * Register a service task handler for the given class name.
+     * Handlers registered this way take precedence over classpath instantiation.
+     */
+    public void registerServiceHandler(String className, ServiceTaskHandler handler) {
+        ServiceTaskRunner runner = (ServiceTaskRunner) runners.get(NodeType.SERVICE_TASK);
+        runner.registerHandler(className, handler);
+    }
 
     public TaskQuery taskQuery() { return new TaskQuery(); }
 
