@@ -99,6 +99,57 @@ public class JsonProcessParser implements ProcessParser {
                 ny.conditions.add(gcy);
             }
         }
+
+        // Parse retry config
+        if (jo.has("retry") && !jo.get("retry").isJsonNull()) {
+            JsonObject retryObj = jo.getAsJsonObject("retry");
+            ny.retry = new NodeYaml.RetryYaml();
+            if (retryObj.has("maxAttempts")) ny.retry.maxAttempts = retryObj.get("maxAttempts").getAsInt();
+            if (retryObj.has("delayMs")) ny.retry.delayMs = retryObj.get("delayMs").getAsLong();
+            if (retryObj.has("backoffMultiplier")) ny.retry.backoffMultiplier = retryObj.get("backoffMultiplier").getAsDouble();
+            if (retryObj.has("retryOn")) {
+                JsonArray retryOnArr = retryObj.getAsJsonArray("retryOn");
+                ny.retry.retryOn = new ArrayList<>();
+                for (JsonElement re : retryOnArr) {
+                    JsonObject rco = re.getAsJsonObject();
+                    GatewayConditionYaml gcy = new GatewayConditionYaml();
+                    gcy.expr = rco.has("expr") ? rco.get("expr").getAsString() : null;
+                    gcy.className = rco.has("className") ? rco.get("className").getAsString() : null;
+                    ny.retry.retryOn.add(gcy);
+                }
+            }
+        }
+
+        // Parse resultRouting
+        if (jo.has("resultRouting")) {
+            JsonArray rrArr = jo.getAsJsonArray("resultRouting");
+            ny.resultRouting = new ArrayList<>();
+            for (JsonElement re : rrArr) {
+                JsonObject rro = re.getAsJsonObject();
+                NodeYaml.RouteYaml ry = new NodeYaml.RouteYaml();
+                ry.to = rro.has("to") ? rro.get("to").getAsString() : null;
+                ry.expr = rro.has("expr") ? rro.get("expr").getAsString() : null;
+                ry.className = rro.has("className") ? rro.get("className").getAsString() : null;
+                ry.isDefault = rro.has("default") && rro.get("default").getAsBoolean();
+                ny.resultRouting.add(ry);
+            }
+        }
+
+        // Parse exceptionRouting
+        if (jo.has("exceptionRouting")) {
+            JsonArray erArr = jo.getAsJsonArray("exceptionRouting");
+            ny.exceptionRouting = new ArrayList<>();
+            for (JsonElement re : erArr) {
+                JsonObject ero = re.getAsJsonObject();
+                NodeYaml.RouteYaml ry = new NodeYaml.RouteYaml();
+                ry.to = ero.has("to") ? ero.get("to").getAsString() : null;
+                ry.expr = ero.has("expr") ? ero.get("expr").getAsString() : null;
+                ry.className = ero.has("className") ? ero.get("className").getAsString() : null;
+                ry.isDefault = ero.has("default") && ero.get("default").getAsBoolean();
+                ny.exceptionRouting.add(ry);
+            }
+        }
+
         return ny;
     }
 

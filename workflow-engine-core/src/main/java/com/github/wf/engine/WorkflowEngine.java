@@ -126,6 +126,16 @@ public class WorkflowEngine {
                     return;
                 }
 
+                // Reactivate executions whose retry timer has expired
+                for (Execution exec : executions) {
+                    if (exec.isWaiting() && exec.getNextRetryAt() > 0
+                            && System.currentTimeMillis() >= exec.getNextRetryAt()) {
+                        exec.setStatus(ExecutionStatus.ACTIVE);
+                        exec.setNextRetryAt(0);
+                        instanceRepository.updateExecution(exec);
+                    }
+                }
+
                 for (Execution exec : executions) {
                     if (!exec.isActive()) continue;
                     Node node = def.getNode(exec.getCurrentNodeId());
@@ -143,6 +153,13 @@ public class WorkflowEngine {
                                     HistoricActivity.nodeEnter(instanceId, node.getId(),
                                             node.getName(), node.getType()));
                             invokeListeners(node, instanceId, instance.getVariables(), true);
+
+                            // Check if runner signaled suspension
+                            if ("SUSPENDED".equals(exec.getRetryState())) {
+                                instance.setStatus(InstanceStatus.SUSPENDED);
+                                instanceRepository.update(instance);
+                                return;
+                            }
                         } catch (Exception e) {
                             System.err.println("Error running node " + node.getId() + ": " + e.getMessage());
                         }
@@ -292,6 +309,35 @@ public class WorkflowEngine {
             instanceRepository.saveHistoricActivity(new HistoricActivity(null, instanceId,
                     "system", "terminate", null, "system", "terminate", null, reason));
         }
+    }
+
+    /**
+     * Resume a suspended process instance. The failed service task will re-execute.
+     */
+    public void resume(String instanceId) {
+        ProcessInstance instance = instanceRepository.findById(instanceId);
+        if (instance == null || instance.getStatus() != InstanceStatus.SUSPENDED) {
+            throw new IllegalStateException("Instance not found or not suspended: " + instanceId);
+        }
+
+        instance.setStatus(InstanceStatus.RUNNING);
+        instance.setVariable("_suspendReason", null);
+        instance.setVariable("_suspendException", null);
+        instanceRepository.update(instance);
+
+        // Find the suspended execution and reactivate it
+        List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+        for (Execution exec : executions) {
+            if (exec.isWaiting() && "SUSPENDED".equals(exec.getRetryState())) {
+                exec.setRetryState(null);
+                exec.setRetryAttempt(0);
+                exec.setNextRetryAt(0);
+                exec.setStatus(ExecutionStatus.ACTIVE);
+                instanceRepository.updateExecution(exec);
+            }
+        }
+
+        trigger(instanceId);
     }
 
     public List<HistoricActivity> history(String instanceId) {
