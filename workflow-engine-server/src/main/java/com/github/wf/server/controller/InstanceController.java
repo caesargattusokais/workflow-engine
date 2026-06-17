@@ -26,10 +26,13 @@ public class InstanceController {
     public List<InstanceDetailResponse> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String definitionId) {
-        // Find all instances; filter by definitionId if provided
-        return engine.instanceRepository.findByDefinitionId(
-                definitionId != null ? definitionId : "")
-                .stream()
+        java.util.List<com.github.wf.model.ProcessInstance> all;
+        if (definitionId != null && !definitionId.isEmpty()) {
+            all = engine.instanceRepository.findByDefinitionId(definitionId);
+        } else {
+            all = engine.instanceRepository.findAll();
+        }
+        return all.stream()
                 .filter(i -> status == null || i.getStatus().name().equals(status))
                 .map(InstanceDetailResponse::new)
                 .toList();

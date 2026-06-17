@@ -30,6 +30,9 @@ public class InMemoryInstanceRepository implements InstanceRepository {
                 .filter(i -> definitionId.equals(i.getDefinitionId()))
                 .collect(Collectors.toList());
     }
+    public List<ProcessInstance> findAll() {
+        return new ArrayList<>(instances.values());
+    }
 
     @Override
     public void saveExecution(Execution execution) { executions.put(execution.getId(), execution); }

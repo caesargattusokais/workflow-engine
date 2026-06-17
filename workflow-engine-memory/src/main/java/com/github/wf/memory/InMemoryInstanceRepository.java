@@ -32,6 +32,11 @@ public class InMemoryInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public List<ProcessInstance> findAll() {
+        return new ArrayList<>(instances.values());
+    }
+
+    @Override
     public void saveExecution(Execution execution) { executions.put(execution.getId(), execution); }
 
     @Override

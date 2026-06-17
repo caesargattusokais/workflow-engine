@@ -10,6 +10,7 @@ public interface InstanceRepository {
     ProcessInstance findById(String id);
     void update(ProcessInstance instance);
     List<ProcessInstance> findByDefinitionId(String definitionId);
+    default List<ProcessInstance> findAll() { return List.of(); }
 
     void saveExecution(Execution execution);
     Execution findExecutionById(String id);
