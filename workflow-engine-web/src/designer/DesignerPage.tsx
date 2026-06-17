@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/react';
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
@@ -6,16 +6,36 @@ import PropertyPanel from './PropertyPanel';
 import { deployDefinition } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 
+const STORAGE_KEY = 'wf-designer-draft';
+
+function loadDraft(): { nodes: Node[]; edges: Edge[] } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveDraft(nodes: Node[], edges: Edge[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+  } catch {}
+}
+
 interface VarInfo {
   name: string;
   source: string;
 }
 
 export default function DesignerPage() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const draft = loadDraft();
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(draft?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(draft?.edges || []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showVars, setShowVars] = useState(false);
+
+  // Auto-save to localStorage on every change
+  useEffect(() => { saveDraft(nodes, edges); }, [nodes, edges]);
 
   const handleNodeSelect = useCallback((node: Node | null) => setSelectedNode(node), []);
 
@@ -84,6 +104,7 @@ export default function DesignerPage() {
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-1 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">Designer</span>
+          <span className="text-[10px] text-gray-600">auto-saved</span>
           {selectedNode && (
             <button onClick={handleDeleteNode}
               className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
