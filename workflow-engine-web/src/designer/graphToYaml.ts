@@ -46,16 +46,37 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workfl
         lines.push(`    handlerClass: "${data.handlerClass}"`);
       }
       if (data.url && data.httpMode) {
-        lines.push(`    url: "${data.url}"`);
-        if (data.method) lines.push(`    method: ${data.method}`);
-        const headers = data.headers as Record<string, string> | undefined;
-        if (headers && Object.keys(headers).length > 0) {
+        // Assemble URL with query params for GET/DELETE
+        const paramEntries = (data.paramEntries as Array<{key:string;value:string}>) || [];
+        const method = (data.method as string) || 'POST';
+        const urlStr = (data.url as string) || '';
+        if (['GET', 'DELETE'].includes(method) && paramEntries.length > 0) {
+          const qs = paramEntries
+            .filter(p => p.key)
+            .map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+          lines.push(`    url: "${urlStr}?${qs}"`);
+        } else {
+          lines.push(`    url: "${urlStr}"`);
+        }
+        if (data.method) lines.push(`    method: ${method}`);
+        // Headers from KV
+        const headerEntries = (data.headerEntries as Array<{key:string;value:string}>) || [];
+        if (headerEntries.length > 0) {
           lines.push('    headers:');
-          for (const [k, v] of Object.entries(headers)) {
-            lines.push(`      ${k}: "${v}"`);
+          for (const h of headerEntries) {
+            if (h.key) lines.push(`      ${h.key}: "${h.value}"`);
           }
         }
-        if (data.body) lines.push(`    body: "${data.body}"`);
+        // Body from KV for POST/PUT/PATCH
+        if (['POST', 'PUT', 'PATCH'].includes(method) && paramEntries.length > 0) {
+          const bodyObj: Record<string, string> = {};
+          for (const p of paramEntries) {
+            if (p.key) bodyObj[p.key] = p.value;
+          }
+          if (Object.keys(bodyObj).length > 0) {
+            lines.push(`    body: '${JSON.stringify(bodyObj)}'`);
+          }
+        }
       }
     }
 

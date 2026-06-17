@@ -142,23 +142,23 @@ export default function PropertyPanel({ node, onChange }: {
                   </select>
                 </label>
               </div>
-              <label className="block mb-2">
-                <span className="text-gray-400 text-xs">Headers (JSON)</span>
-                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
-                  value={JSON.stringify(node.data.headers || {})}
-                  placeholder='{"Authorization":"Bearer ${token}"}'
-                  onChange={e => {
-                    try { updateData('headers', JSON.parse(e.target.value)); }
-                    catch { /* invalid JSON, ignore */ }
-                  }} />
-              </label>
-              <label className="block mb-2">
-                <span className="text-gray-400 text-xs">Body Template</span>
-                <textarea className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
-                  rows={3} value={(node.data.body as string) || ''}
-                  placeholder='{"amount": ${amount}, "type": "risk"}'
-                  onChange={e => updateData('body', e.target.value)} />
-              </label>
+              {/* Headers KV editor */}
+              <KvEditor
+                label="Headers"
+                entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
+                onChange={v => updateData('headerEntries', v)}
+                keyPlaceholder="Content-Type"
+                valPlaceholder="application/json"
+              />
+
+              {/* Request Params KV editor */}
+              <KvEditor
+                label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? 'Query Params' : 'Body Params'}
+                entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
+                onChange={v => updateData('paramEntries', v)}
+                keyPlaceholder="amount"
+                valPlaceholder="${amount}"
+              />
             </>
           )}
         </div>
@@ -288,6 +288,51 @@ function VarEditor({ vars, onChange }: { vars: string[]; onChange: (v: string[])
       ))}
       <button onClick={add}
         className="text-xs text-green-400 hover:text-green-300 mt-1">+ Add variable</button>
+    </div>
+  );
+}
+
+// ── Key-Value pair editor (add/remove entries) ────
+function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder }: {
+    label: string;
+    entries: Array<{key: string; value: string}>;
+    onChange: (v: Array<{key: string; value: string}>) => void;
+    keyPlaceholder: string;
+    valPlaceholder: string;
+}) {
+  const add = () => onChange([...entries, { key: '', value: '' }]);
+  const remove = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
+  const updateKey = (i: number, k: string) => {
+    const copy = entries.map((e, idx) => idx === i ? { ...e, key: k } : e);
+    onChange(copy);
+  };
+  const updateVal = (i: number, v: string) => {
+    const copy = entries.map((e, idx) => idx === i ? { ...e, value: v } : e);
+    onChange(copy);
+  };
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-gray-400 text-xs">{label}</span>
+        <button onClick={add}
+          className="text-xs text-teal-400 hover:text-teal-300">+ Add</button>
+      </div>
+      {entries.length === 0 && (
+        <div className="text-[10px] text-gray-600 mb-1">No params yet</div>
+      )}
+      {entries.map((e, i) => (
+        <div key={i} className="flex gap-1 mb-1">
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            value={e.key} placeholder={keyPlaceholder}
+            onChange={ev => updateKey(i, ev.target.value)} />
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            value={e.value} placeholder={valPlaceholder}
+            onChange={ev => updateVal(i, ev.target.value)} />
+          <button onClick={() => remove(i)}
+            className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
+        </div>
+      ))}
     </div>
   );
 }
