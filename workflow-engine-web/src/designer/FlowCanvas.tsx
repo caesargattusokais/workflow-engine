@@ -1,7 +1,7 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
-  addEdge, Connection,
+  addEdge, Connection, MarkerType,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -23,7 +23,11 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   const onConnect = useCallback((params: Connection) => {
-    setEdges((eds: Edge[]) => addEdge(params, eds));
+    setEdges((eds: Edge[]) => addEdge({
+      ...params,
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+      style: { stroke: '#666', strokeWidth: 2 }
+    }, eds));
   }, [setEdges]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -65,6 +69,8 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
+        deleteKeyCode={['Backspace', 'Delete']}
+        multiSelectionKeyCode="Shift"
       >
         <Background />
         <Controls />
