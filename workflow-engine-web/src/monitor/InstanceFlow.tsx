@@ -33,8 +33,9 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
   }
 
   const safeNodes = nodes.map(n => ({
-    ...n,
-    position: { x: n.position?.x ?? 200, y: n.position?.y ?? 50 },
+    id: n.id,
+    type: n.type,
+    position: { x: (n as any).x ?? n.position?.x ?? 200, y: (n as any).y ?? n.position?.y ?? 50 },
     data: n.data || {},
     style: n.data?.active
       ? { border: '2px solid #3b82f6', boxShadow: '0 0 12px rgba(59,130,246,0.5)' }
