@@ -14,14 +14,7 @@ public class DraftController {
 
     @GetMapping
     public List<Map<String, Object>> list() {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (var entry : store.entrySet()) {
-            Map<String, Object> d = new LinkedHashMap<>(entry.getValue());
-            d.remove("nodes"); // don't send full data in list
-            d.remove("edges");
-            result.add(d);
-        }
-        return result;
+        return new ArrayList<>(store.values());
     }
 
     @GetMapping("/{id}")

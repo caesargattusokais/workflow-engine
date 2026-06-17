@@ -3,7 +3,7 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 
 interface Draft {
@@ -39,13 +39,14 @@ export default function DesignerPage() {
     }).catch(() => {}).finally(() => setLoaded(true));
   }, []);
 
-  // When switching drafts, load full data from server
+  // When switching drafts, load full data
   useEffect(() => {
     if (!activeId || !loaded) return;
-    import('../api/client').then(m => m.getDraft(activeId)).then(d => {
+    getDraft(activeId).then(d => {
       setNodes(d.nodes || []);
       setEdges(d.edges || []);
       setSelectedNode(null);
+      setDirty(false);
     }).catch(() => {});
   }, [activeId, loaded]);
 
@@ -92,7 +93,7 @@ export default function DesignerPage() {
 
   const delDraft = async (id: string) => {
     if (!confirm('删除这个草稿?')) return;
-    try { await deleteDraft(id); } catch {}
+    try { await removeDraft(id); } catch {}
     setDrafts(prev => {
       const u = prev.filter(d => d.id !== id);
       if (activeId === id) {
