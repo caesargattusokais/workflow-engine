@@ -23,7 +23,6 @@ export default function PropertyPanel({ node, onChange }: {
   };
 
   const conditions: ConditionItem[] = (node.data.conditions as ConditionItem[]) || [];
-  const isGateway = node.type === 'exclusiveGateway' || node.type === 'inclusiveGateway';
 
   const addCondition = () => {
     updateData('conditions', [...conditions, { expr: '', to: '', isDefault: false }]);
@@ -93,29 +92,24 @@ export default function PropertyPanel({ node, onChange }: {
         </label>
       )}
 
-      {/* ── Gateways: Conditions ──────────── */}
-      {isGateway && (
-        <div className="border-t border-gray-700 pt-3 mt-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400 text-xs">
-              {node.type === 'exclusiveGateway' ? '条件列表 (按顺序匹配)' : '条件列表 (可多选)'}
-            </span>
+      {/* ── ExclusiveGateway: 判断节点 ──── */}
+      {node.type === 'exclusiveGateway' && (
+        <div className="border-t border-orange-500/50 pt-3 mt-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-orange-400 text-xs font-semibold">条件判断 — 只走第一条命中的路</span>
             <button onClick={addCondition}
-              className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded">
+              className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-2 py-0.5 rounded">
               + Add
             </button>
           </div>
-
-          {conditions.length === 0 && (
-            <div className="text-xs text-gray-600 italic mb-2">
-              点击 + Add 添加条件
-            </div>
-          )}
+          <div className="text-[10px] text-gray-500 mb-2">从上到下依次判断，命中即停止，都不命中走 default</div>
 
           {conditions.map((c, i) => (
-            <div key={i} className="mb-3 p-2 bg-gray-750 rounded border border-gray-700">
+            <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-orange-800'}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-gray-500">条件 #{i + 1}</span>
+                <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-orange-400'}`}>
+                  {c.isDefault ? '默认 (兜底)' : `判断 ${i + 1}`}
+                </span>
                 <div className="flex gap-1 items-center">
                   <label className="text-[10px] text-gray-500 flex items-center gap-1">
                     <input type="checkbox" checked={c.isDefault}
@@ -128,12 +122,51 @@ export default function PropertyPanel({ node, onChange }: {
                 </div>
               </div>
               {!c.isDefault && (
-                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1"
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1 font-mono"
                   value={c.expr} placeholder="SpEL: days > 3"
                   onChange={e => updateCondition(i, 'expr', e.target.value)} />
               )}
-              {c.isDefault && (
-                <div className="text-[10px] text-gray-500 mb-1">Fallback — 无匹配时走此路</div>
+              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs"
+                value={c.to} placeholder="目标节点 ID"
+                onChange={e => updateCondition(i, 'to', e.target.value)} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── InclusiveGateway: 条件分支节点 ──── */}
+      {node.type === 'inclusiveGateway' && (
+        <div className="border-t border-purple-500/50 pt-3 mt-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-purple-400 text-xs font-semibold">条件分支 — 满足条件的全部并行</span>
+            <button onClick={addCondition}
+              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-0.5 rounded">
+              + Add
+            </button>
+          </div>
+          <div className="text-[10px] text-gray-500 mb-2">每条独立判断，满足就走对应分支，可能同时走多条</div>
+
+          {conditions.map((c, i) => (
+            <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-purple-800'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-purple-400'}`}>
+                  {c.isDefault ? '兜底 (无匹配时)' : `分支 ${i + 1}`}
+                </span>
+                <div className="flex gap-1 items-center">
+                  <label className="text-[10px] text-gray-500 flex items-center gap-1">
+                    <input type="checkbox" checked={c.isDefault}
+                      onChange={e => updateCondition(i, 'isDefault', e.target.checked)}
+                      className="accent-purple-500" />
+                    default
+                  </label>
+                  <button onClick={() => removeCondition(i)}
+                    className="text-[10px] text-red-400 hover:text-red-300 ml-1">&times;</button>
+                </div>
+              </div>
+              {!c.isDefault && (
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1 font-mono"
+                  value={c.expr} placeholder="SpEL: amount > 1000"
+                  onChange={e => updateCondition(i, 'expr', e.target.value)} />
               )}
               <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs"
                 value={c.to} placeholder="目标节点 ID"
