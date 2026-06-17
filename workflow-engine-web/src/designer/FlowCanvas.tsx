@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
   addEdge, Connection, MarkerType,
-  type Node, type Edge, type OnNodesChange, type OnEdgesChange
+  type Node, type Edge
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from './nodes';
@@ -10,27 +10,43 @@ import { nodeTypes } from './nodes';
 interface FlowCanvasProps {
   nodes: Node[];
   edges: Edge[];
-  onNodesChange: OnNodesChange;
-  onEdgesChange: OnEdgesChange;
-  setNodes: Dispatch<SetStateAction<Node[]>>;
-  setEdges: Dispatch<SetStateAction<Edge[]>>;
+  onNodesChange: any;
+  onEdgesChange: any;
+  setNodes: (nodes: Node[]) => void;
+  setEdges: (edges: Edge[]) => void;
   onNodeSelect: (node: Node | null) => void;
+}
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  type: 'node' | 'edge' | 'pane';
+  nodeId?: string;
+  edgeId?: string;
 }
 
 let nodeIdCounter = 0;
 
 export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
+
+  // Close menu on any click outside
+  useEffect(() => {
+    const close = () => setMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, []);
 
   const onConnect = useCallback((params: Connection) => {
-    setEdges((eds: Edge[]) => addEdge({
+    setEdges([...edges, {
       ...params,
+      id: `edge_${Date.now()}`,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
-      style: { stroke: '#666', strokeWidth: 2, cursor: 'pointer' },
+      style: { stroke: '#666', strokeWidth: 2 },
       interactionWidth: 20
-    }, eds));
-  }, [setEdges]);
+    } as Edge]);
+  }, [edges, setEdges]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -56,48 +72,60 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     setNodes([...nodes, newNode]);
   }, [nodes, setNodes]);
 
+  // ── Click handlers ──────────────────────────
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     onNodeSelect(node);
-    setSelectedEdgeId(null);
   }, [onNodeSelect]);
 
   const onPaneClick = useCallback(() => {
     onNodeSelect(null);
-    setSelectedEdgeId(null);
   }, [onNodeSelect]);
 
-  const onEdgeClick = useCallback((_: unknown, edge: Edge) => {
+  // ── Right-click → context menu ──────────────
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
+    e.preventDefault();
+    onNodeSelect(node);
+    setMenu({ x: e.clientX, y: e.clientY, type: 'node', nodeId: node.id });
+  }, [onNodeSelect]);
+
+  const onEdgeContextMenu = useCallback((e: React.MouseEvent, edge: Edge) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, type: 'edge', edgeId: edge.id });
+  }, []);
+
+  const onPaneContextMenu = useCallback((e: any) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, type: 'pane' });
+  }, []);
+
+  // ── Menu actions ────────────────────────────
+  const deleteNode = useCallback((nodeId: string) => {
+    setNodes(nodes.filter(n => n.id !== nodeId));
+    setEdges(edges.filter(e => e.source !== nodeId && e.target !== nodeId));
     onNodeSelect(null);
-    setSelectedEdgeId(edge.id);
-  }, [onNodeSelect]);
+    setMenu(null);
+  }, [nodes, edges, setNodes, setEdges, onNodeSelect]);
 
-  // Delete selected items
-  const deleteSelected = useCallback(() => {
-    if (selectedEdgeId) {
-      setEdges(eds => eds.filter(e => e.id !== selectedEdgeId));
-      setSelectedEdgeId(null);
-    }
-  }, [selectedEdgeId, setEdges]);
+  const deleteEdge = useCallback((edgeId: string) => {
+    setEdges(edges.filter(e => e.id !== edgeId));
+    setMenu(null);
+  }, [edges, setEdges]);
+
+  const duplicateNode = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const copy: Node = {
+      ...node,
+      id: `node_${++nodeIdCounter}`,
+      position: { x: node.position.x + 40, y: node.position.y + 40 },
+      selected: false
+    };
+    setNodes([...nodes, copy]);
+    setMenu(null);
+  }, [nodes, setNodes]);
 
   return (
     <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400 }}>
-      {/* Toolbar */}
-      <div className="absolute top-2 left-2 z-10 flex gap-1">
-        <button
-          onClick={deleteSelected}
-          disabled={!selectedEdgeId}
-          className={`text-xs px-2 py-1 rounded ${selectedEdgeId
-            ? 'bg-red-600 hover:bg-red-500 text-white'
-            : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
-          title="Delete selected edge (or press Delete key)"
-        >
-          Delete Edge
-        </button>
-        <span className="text-xs text-gray-500 self-center ml-2">
-          Click edge → Delete | Drag nodes | Backspace/Delete
-        </span>
-      </div>
-
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -107,14 +135,16 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
-        onEdgeClick={onEdgeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
         onPaneClick={onPaneClick}
+        onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
-          style: { stroke: '#666', strokeWidth: 2, cursor: 'pointer' },
+          style: { stroke: '#666', strokeWidth: 2 },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
           interactionWidth: 20
         }}
@@ -124,6 +154,55 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         <MiniMap nodeColor={n => n.type === 'userTask' ? '#2563eb' :
           n.type === 'startEvent' ? '#22c55e' : '#6b7280'} />
       </ReactFlow>
+
+      {/* ── Context Menu ──────────────────────── */}
+      {menu && (
+        <div
+          className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-xl py-1 min-w-[140px]"
+          style={{ left: menu.x, top: menu.y }}
+          onClick={e => e.stopPropagation()}
+        >
+          {menu.type === 'node' && (
+            <>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
+                Node: {nodes.find(n => n.id === menu.nodeId)?.type}
+              </div>
+              <button
+                onClick={() => duplicateNode(menu.nodeId!)}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
+                Duplicate
+              </button>
+              <button
+                onClick={() => deleteNode(menu.nodeId!)}
+                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors">
+                Delete
+              </button>
+            </>
+          )}
+          {menu.type === 'edge' && (
+            <>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
+                Edge
+              </div>
+              <button
+                onClick={() => deleteEdge(menu.edgeId!)}
+                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors">
+                Delete Edge
+              </button>
+            </>
+          )}
+          {menu.type === 'pane' && (
+            <>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
+                Canvas
+              </div>
+              <div className="px-3 py-1.5 text-sm text-gray-500">
+                Drag nodes from palette
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
