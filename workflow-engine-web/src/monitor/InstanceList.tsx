@@ -12,6 +12,7 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
       onDelete: (id: string) => void; }) {
 
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string,boolean>>({});
 
   useEffect(() => {
     const close = () => setMenu(null);
@@ -43,8 +44,11 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
       )}
       {Object.entries(grouped).map(([defId, insts]) => (
         <div key={defId} className="mb-2">
-          <div className="text-[10px] text-gray-500 px-1 mb-0.5 font-semibold truncate">{defId} ({insts.length})</div>
-          {insts.map(inst => (
+          <div className="text-[10px] text-gray-500 px-1 mb-0.5 font-semibold truncate cursor-pointer hover:text-gray-300"
+            onClick={() => setCollapsed(prev => ({...prev, [defId]: !prev[defId]}))}>
+            {collapsed[defId] ? '▸' : '▾'} {defId} ({insts.length})
+          </div>
+          {!collapsed[defId] && insts.map(inst => (
             <div key={inst.id}
               onClick={() => onSelect(inst.id)}
               onContextMenu={(e) => onContextMenu(e, inst)}
