@@ -3,9 +3,9 @@ const PALETTE_ITEMS = [
   { type: 'endEvent', label: 'End', color: 'border-2 border-red-500', shape: 'rounded-full' },
   { type: 'userTask', label: 'User Task', color: 'bg-blue-600', shape: 'rounded-lg' },
   { type: 'serviceTask', label: 'Service Task', color: 'bg-purple-700', shape: 'rounded-lg' },
-  { type: 'exclusiveGateway', label: 'Excl. Gate', color: 'bg-orange-500', shape: 'rotate-45' },
-  { type: 'parallelGateway', label: 'Par. Gate', color: 'bg-blue-600', shape: 'rotate-45' },
-  { type: 'inclusiveGateway', label: 'Incl. Gate', color: 'bg-purple-600', shape: 'rotate-45' },
+  { type: 'exclusiveGateway', label: '判断 (XOR)', color: 'bg-orange-500', shape: 'rotate-45' },
+  { type: 'parallelGateway', label: '并行 (AND)', color: 'bg-blue-600', shape: 'rotate-45' },
+  { type: 'inclusiveGateway', label: '条件 (OR)', color: 'bg-purple-600', shape: 'rotate-45' },
 ];
 
 export default function NodePalette() {
