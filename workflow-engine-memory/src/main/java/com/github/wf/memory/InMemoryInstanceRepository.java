@@ -37,6 +37,11 @@ public class InMemoryInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public void deleteById(String id) {
+        instances.remove(id);
+    }
+
+    @Override
     public void saveExecution(Execution execution) { executions.put(execution.getId(), execution); }
 
     @Override

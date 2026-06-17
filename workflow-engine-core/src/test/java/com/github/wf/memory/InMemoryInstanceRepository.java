@@ -33,6 +33,7 @@ public class InMemoryInstanceRepository implements InstanceRepository {
     public List<ProcessInstance> findAll() {
         return new ArrayList<>(instances.values());
     }
+    public void deleteById(String id) { instances.remove(id); }
 
     @Override
     public void saveExecution(Execution execution) { executions.put(execution.getId(), execution); }

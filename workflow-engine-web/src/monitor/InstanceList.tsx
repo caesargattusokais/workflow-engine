@@ -6,9 +6,10 @@ interface Instance {
   activeNodeIds: string[];
 }
 
-export default function InstanceList({ onSelect, selectedId, instances, onTerminate, onResume }:
+export default function InstanceList({ onSelect, selectedId, instances, onTerminate, onResume, onDelete }:
     { onSelect: (id: string) => void; selectedId: string | null; instances: Instance[];
-      onTerminate: (id: string) => void; onResume: (id: string) => void; }) {
+      onTerminate: (id: string) => void; onResume: (id: string) => void;
+      onDelete: (id: string) => void; }) {
 
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
 
@@ -66,8 +67,11 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
               Resume
             </button>
           )}
-          {menu.inst.status === 'COMPLETED' && (
-            <div className="px-3 py-1.5 text-sm text-gray-600">No actions available</div>
+          {(menu.inst.status === 'COMPLETED' || menu.inst.status === 'TERMINATED') && (
+            <button onClick={() => { onDelete(menu.inst.id); setMenu(null); }}
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-700">
+              Delete
+            </button>
           )}
         </div>
       )}

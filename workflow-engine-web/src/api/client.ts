@@ -35,6 +35,11 @@ export async function resumeInstance(instanceId: string) {
   return res.json();
 }
 
+export async function deleteInstance(instanceId: string) {
+  const res = await fetch(`${BASE}/instances/${instanceId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`deleteInstance failed: ${res.status}`);
+}
+
 export async function terminateInstance(instanceId: string, reason?: string) {
   const res = await fetch(`${BASE}/instances/${instanceId}/terminate`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

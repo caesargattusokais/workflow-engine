@@ -11,6 +11,7 @@ public interface InstanceRepository {
     void update(ProcessInstance instance);
     List<ProcessInstance> findByDefinitionId(String definitionId);
     default List<ProcessInstance> findAll() { return List.of(); }
+    default void deleteById(String id) {}
 
     void saveExecution(Execution execution);
     Execution findExecutionById(String id);

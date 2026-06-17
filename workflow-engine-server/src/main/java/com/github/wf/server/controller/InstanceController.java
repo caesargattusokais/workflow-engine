@@ -60,4 +60,12 @@ public class InstanceController {
     public void terminate(@PathVariable String id, @RequestBody Map<String, String> body) {
         engine.terminate(id, body.getOrDefault("reason", "terminated by user"));
     }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable String id) {
+        var inst = engine.instanceRepository.findById(id);
+        if (inst == null) throw new RuntimeException("Not found: " + id);
+        if (inst.isRunning()) throw new RuntimeException("Cannot delete running instance");
+        engine.instanceRepository.deleteById(id);
+    }
 }
