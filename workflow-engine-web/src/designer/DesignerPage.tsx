@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/react';
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 
 interface Draft {
@@ -13,101 +13,82 @@ interface Draft {
   edges: Edge[];
   createdAt: number;
 }
-const DRAFTS_KEY = 'wf-designer-drafts';
-const ACTIVE_KEY = 'wf-designer-active';
-
-function loadDrafts(): Draft[] {
-  try { const r = localStorage.getItem(DRAFTS_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
-}
-function saveDrafts(drafts: Draft[]) {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
-}
-function loadActiveId(): string | null {
-  return localStorage.getItem(ACTIVE_KEY);
-}
-function saveActiveId(id: string) {
-  localStorage.setItem(ACTIVE_KEY, id);
-}
 
 interface VarInfo { name: string; source: string; }
 
 export default function DesignerPage() {
-  const [drafts, setDrafts] = useState<Draft[]>(loadDrafts);
-  const [activeId, setActiveId] = useState<string | null>(() => {
-    const id = loadActiveId();
-    if (id && loadDrafts().some(d => d.id === id)) return id;
-    const all = loadDrafts();
-    return all.length > 0 ? all[0].id : null;
-  });
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const activeDraft = drafts.find(d => d.id === activeId) || null;
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(activeDraft?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(activeDraft?.edges || []);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showVars, setShowVars] = useState(false);
 
-  // When switching drafts, replace nodes/edges
+  // ── Load drafts from server on mount ──
   useEffect(() => {
-    if (activeDraft) {
-      setNodes(activeDraft.nodes);
-      setEdges(activeDraft.edges);
-      setSelectedNode(null);
-    }
-  }, [activeId]);
+    listDrafts().then(list => {
+      if (list.length > 0) {
+        setDrafts(list.map((d: any) => ({ ...d, nodes: d.nodes || [], edges: d.edges || [] })));
+      }
+    }).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
 
-  // Auto-save active draft
+  // When switching drafts, load full data from server
   useEffect(() => {
-    if (!activeId) return;
-    setDrafts(prev => {
-      const updated = prev.map(d => d.id === activeId ? { ...d, nodes, edges } : d);
-      saveDrafts(updated);
-      return updated;
-    });
+    if (!activeId || !loaded) return;
+    import('../api/client').then(m => m.getDraft(activeId)).then(d => {
+      setNodes(d.nodes || []);
+      setEdges(d.edges || []);
+      setSelectedNode(null);
+    }).catch(() => {});
+  }, [activeId, loaded]);
+
+  // Auto-save to server (debounced 1s)
+  useEffect(() => {
+    if (!activeId || !loaded) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      updateDraft(activeId, { nodes, edges }).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
 
   // ── Draft actions ─────────────────────
-  const newDraft = () => {
-    const draft: Draft = {
-      id: Date.now().toString(36),
-      name: `Draft ${drafts.length + 1}`,
-      nodes: [], edges: [],
-      createdAt: Date.now()
-    };
-    const updated = [...drafts, draft];
-    setDrafts(updated);
-    saveDrafts(updated);
-    setActiveId(draft.id);
-    saveActiveId(draft.id);
+  const newDraft = async () => {
+    try {
+      const d = await createDraft(`Draft ${drafts.length + 1}`);
+      setDrafts(prev => [...prev, { ...d, nodes: [], edges: [] }]);
+      setActiveId(d.id);
+    } catch { /* server unavailable */ }
   };
 
-  const renameDraft = (id: string) => {
+  const renameDraft = async (id: string) => {
     const name = prompt('草稿名称:');
     if (!name) return;
-    setDrafts(prev => {
-      const u = prev.map(d => d.id === id ? { ...d, name } : d);
-      saveDrafts(u);
-      return u;
-    });
+    try {
+      await updateDraft(id, { name });
+      setDrafts(prev => prev.map(d => d.id === id ? { ...d, name } : d));
+    } catch {}
   };
 
-  const deleteDraft = (id: string) => {
+  const delDraft = async (id: string) => {
     if (!confirm('删除这个草稿?')) return;
+    try { await deleteDraft(id); } catch {}
     setDrafts(prev => {
       const u = prev.filter(d => d.id !== id);
-      saveDrafts(u);
       if (activeId === id) {
         const next = u.length > 0 ? u[0].id : null;
         setActiveId(next);
-        saveActiveId(next || '');
       }
       return u;
     });
   };
 
-  const switchDraft = (id: string) => {
-    setActiveId(id);
-    saveActiveId(id);
-  };
+  const switchDraft = (id: string) => setActiveId(id);
 
   const handleNodeSelect = useCallback((node: Node | null) => setSelectedNode(node), []);
   const handleNodeChange = useCallback((updatedNode: Node) => {
@@ -222,7 +203,7 @@ export default function DesignerPage() {
                 <div className="hidden group-hover:flex gap-0.5 ml-1">
                   <button onClick={(e) => { e.stopPropagation(); renameDraft(d.id); }}
                     className="text-gray-500 hover:text-gray-300 text-[10px]" title="重命名">✎</button>
-                  <button onClick={(e) => { e.stopPropagation(); deleteDraft(d.id); }}
+                  <button onClick={(e) => { e.stopPropagation(); delDraft(d.id); }}
                     className="text-gray-500 hover:text-red-400 text-[10px]" title="删除">✕</button>
                 </div>
               </div>

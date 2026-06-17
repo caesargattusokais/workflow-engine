@@ -46,3 +46,39 @@ export async function deployDefinition(yaml: string) {
   if (!res.ok) throw new Error(`deployDefinition failed: ${res.status}`);
   return res.json();
 }
+
+// ── Drafts ─────────────────────────────
+export async function listDrafts() {
+  const res = await fetch(`${BASE}/drafts`);
+  if (!res.ok) throw new Error(`listDrafts failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getDraft(id: string) {
+  const res = await fetch(`${BASE}/drafts/${id}`);
+  if (!res.ok) throw new Error(`getDraft failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createDraft(name: string) {
+  const res = await fetch(`${BASE}/drafts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, nodes: [], edges: [] })
+  });
+  if (!res.ok) throw new Error(`createDraft failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateDraft(id: string, data: Record<string, unknown>) {
+  const res = await fetch(`${BASE}/drafts/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`updateDraft failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteDraft(id: string) {
+  const res = await fetch(`${BASE}/drafts/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`deleteDraft failed: ${res.status}`);
+}
