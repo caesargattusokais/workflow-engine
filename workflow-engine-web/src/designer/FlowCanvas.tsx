@@ -2,7 +2,6 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ReactFlow, Background, MiniMap,
   addEdge, Connection, MarkerType,
-  useReactFlow,
   type Node, type Edge
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -32,7 +31,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [locked, setLocked] = useState(false);
-  const { fitView } = useReactFlow();
+  const rfInstance = useRef<any>(null);
 
   // Close menu on any click outside
   useEffect(() => {
@@ -147,6 +146,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         nodesDraggable={!locked}
         nodesConnectable={!locked}
         elementsSelectable={!locked}
+        onInit={(rf: any) => { rfInstance.current = rf; }}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
@@ -161,7 +161,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
 
       {/* ── Bottom-left tools ─────────────────── */}
       <div className="absolute bottom-3 left-3 z-10 flex gap-1.5">
-        <button onClick={() => fitView({ duration: 300 })}
+        <button onClick={() => rfInstance.current?.fitView({ duration: 300 })}
           className="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-2.5 py-1.5
                      text-gray-300 text-xs transition-colors shadow-lg"
           title="定位 — 居中显示所有节点">
