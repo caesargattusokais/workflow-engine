@@ -17,9 +17,13 @@ export default function App() {
           Monitor
         </button>
       </header>
-      <main className="flex-1 overflow-hidden">
-        <div className={tab === 'designer' ? '' : 'hidden'}><DesignerPage onNavigate={setTab} /></div>
-        <div className={tab === 'monitor' ? '' : 'hidden'}><MonitorPage /></div>
+      <main className="flex-1 overflow-hidden relative">
+        <div className={tab === 'designer' ? 'absolute inset-0' : 'absolute inset-0 invisible'}>
+          <DesignerPage onNavigate={setTab} />
+        </div>
+        <div className={tab === 'monitor' ? 'absolute inset-0' : 'absolute inset-0 invisible'}>
+          <MonitorPage />
+        </div>
       </main>
     </div>
   );
