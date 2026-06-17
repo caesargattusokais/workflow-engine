@@ -72,14 +72,21 @@ export default function DesignerPage() {
       }
     }
 
-    // ServiceTask handlers — show handler class as source
+    // ServiceTask return values
     for (const node of nodes) {
       if (node.type === 'serviceTask') {
         const hc = node.data.handlerClass as string;
-        if (hc) {
-          // Add result.* hint
+        const label = hc ? hc.split('.').pop() : (node.data.httpMode ? 'HTTP' : 'Code');
+        const retVals = (node.data.returnValues as Array<{key:string;type:string}>) || [];
+        if (retVals.length > 0) {
+          for (const rv of retVals) {
+            if (rv.key && !vars.some(v => v.name === `result.${rv.key}`)) {
+              vars.push({ name: `result.${rv.key}`, source: `ServiceTask: ${label} (${rv.type})` });
+            }
+          }
+        } else {
           const exists = vars.some(v => v.name === 'result.*');
-          if (!exists) vars.push({ name: 'result.*', source: `ServiceTask: ${hc.split('.').pop()}` });
+          if (!exists) vars.push({ name: 'result.*', source: `ServiceTask: ${label}` });
         }
       }
     }

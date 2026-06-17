@@ -187,6 +187,11 @@ export default function PropertyPanel({ node, onChange }: {
                   keyPlaceholder="amount" valPlaceholder="${amount}" />
               </>
             )}
+            {/* Return Values — shared by both modes */}
+            <ReturnValueEditor
+              entries={(node.data.returnValues as Array<{key:string;type:string}>) || []}
+              onChange={v => updateData('returnValues', v)}
+            />
           </div>
         )}
 
@@ -312,6 +317,40 @@ function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder }: 
             value={e.key} placeholder={keyPlaceholder} onChange={ev => updateKey(i, ev.target.value)} />
           <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
             value={e.value} placeholder={valPlaceholder} onChange={ev => updateVal(i, ev.target.value)} />
+          <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── ReturnValue editor (key + type, add/remove) ────
+const TYPES = ['String', 'Number', 'Boolean', 'JSON', 'Object'];
+function ReturnValueEditor({ entries, onChange }: {
+    entries: Array<{key: string; type: string}>;
+    onChange: (v: Array<{key: string; type: string}>) => void;
+}) {
+  const add = () => onChange([...entries, { key: '', type: 'String' }]);
+  const remove = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
+  const updateKey = (i: number, k: string) => onChange(entries.map((e, idx) => idx === i ? { ...e, key: k } : e));
+  const updateType = (i: number, t: string) => onChange(entries.map((e, idx) => idx === i ? { ...e, type: t } : e));
+
+  return (
+    <div className="border-t border-gray-700 pt-3 mt-2">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-gray-400 text-xs">Return Values</span>
+        <button onClick={add} className="text-xs text-yellow-400 hover:text-yellow-300">+ Add</button>
+      </div>
+      <div className="text-[10px] text-gray-600 mb-1">Define what this handler returns. Accessible as result.xxx downstream.</div>
+      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">No return values defined</div>}
+      {entries.map((e, i) => (
+        <div key={i} className="flex gap-1 mb-1">
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            value={e.key} placeholder="fieldName" onChange={ev => updateKey(i, ev.target.value)} />
+          <select className="w-20 bg-gray-700 rounded px-1 py-1 text-white text-xs"
+            value={e.type} onChange={ev => updateType(i, ev.target.value)}>
+            {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
         </div>
       ))}
