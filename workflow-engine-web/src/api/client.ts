@@ -38,6 +38,15 @@ export async function terminateInstance(instanceId: string) {
   return res.json();
 }
 
+export async function startInstance(defId: string, vars: Record<string, unknown>) {
+  const res = await fetch(`${BASE}/instances`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ definitionId: defId, variables: vars })
+  });
+  if (!res.ok) throw new Error(`startInstance failed: ${res.status}`);
+  return res.json();
+}
+
 export async function deployDefinition(yaml: string) {
   const res = await fetch(`${BASE}/definitions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -3,7 +3,7 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 
 interface Draft {
@@ -16,7 +16,7 @@ interface Draft {
 
 interface VarInfo { name: string; source: string; }
 
-export default function DesignerPage() {
+export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designer'|'monitor') => void }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -29,6 +29,7 @@ export default function DesignerPage() {
   const [showVars, setShowVars] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
@@ -120,12 +121,18 @@ export default function DesignerPage() {
   }, [selectedNode, nodes, edges, setNodes, setEdges]);
 
   const handleDeploy = async () => {
-    if (nodes.length === 0) { alert('Add some nodes first'); return; }
+    if (nodes.length === 0) { setToast('Add some nodes first'); return; }
     try {
       const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow');
       const result = await deployDefinition(yaml);
-      alert(`Deployed: ${result.id} v${result.version}\n\nYAML:\n${yaml}`);
-    } catch (e: any) { alert('Deploy failed: ' + e.message); }
+      // Auto-start instance
+      try {
+        const inst = await startInstance(result.id, {});
+        setToast(`Deployed & started! Instance: ${inst.id.substring(0,8)} — `);
+      } catch {
+        setToast(`Deployed: ${result.id}`);
+      }
+    } catch (e: any) { setToast('Deploy failed: ' + e.message); }
   };
 
   // ── Variables ─────────────────────────
@@ -186,6 +193,22 @@ export default function DesignerPage() {
           Deploy
         </button>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="bg-green-900 border-b border-green-700 px-4 py-2 flex items-center justify-between text-sm">
+          <span className="text-green-300">{toast}</span>
+          <div className="flex gap-2">
+            {toast.includes('started') && (
+              <button onClick={() => onNavigate?.('monitor')}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                View in Monitor
+              </button>
+            )}
+            <button onClick={() => setToast(null)} className="text-gray-400 hover:text-white text-xs">✕</button>
+          </div>
+        </div>
+      )}
 
       {/* Variables Panel */}
       {showVars && (
