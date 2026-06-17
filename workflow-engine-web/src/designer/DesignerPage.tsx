@@ -307,6 +307,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
                 View YAML
               </button>
+              <button onClick={() => { setDraftMenu(null); renameDraft(draftMenu.draft.id); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
+                Rename
+              </button>
+              <button onClick={() => { setDraftMenu(null); delDraft(draftMenu.draft.id); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">
+                Delete
+              </button>
             </div>
           )}
         </div>
