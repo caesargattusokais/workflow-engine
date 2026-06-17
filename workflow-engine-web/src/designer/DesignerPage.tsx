@@ -27,6 +27,8 @@ export default function DesignerPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showVars, setShowVars] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
@@ -47,15 +49,28 @@ export default function DesignerPage() {
     }).catch(() => {});
   }, [activeId, loaded]);
 
-  // Auto-save to server (debounced 1s)
+  // Mark dirty on change
+  useEffect(() => { if (loaded && activeId) setDirty(true); }, [nodes, edges]);
+
+  // Auto-save to server (debounced 2s)
   useEffect(() => {
-    if (!activeId || !loaded) return;
+    if (!activeId || !loaded || !dirty) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      updateDraft(activeId, { nodes, edges }).catch(() => {});
-    }, 1000);
+      doSave();
+    }, 2000);
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
+
+  const doSave = async () => {
+    if (!activeId) return;
+    setSaving(true);
+    try {
+      await updateDraft(activeId, { nodes, edges });
+      setDirty(false);
+    } catch { alert('Save failed — server unreachable'); }
+    finally { setSaving(false); }
+  };
 
   // ── Draft actions ─────────────────────
   const newDraft = async () => {
@@ -145,6 +160,15 @@ export default function DesignerPage() {
           <span className="text-sm text-gray-400">
             {activeDraft ? activeDraft.name : 'No draft'}
           </span>
+          <span className={`text-[10px] ${dirty ? 'text-yellow-500' : 'text-gray-600'}`}>
+            {saving ? 'saving...' : dirty ? 'unsaved' : 'saved'}
+          </span>
+          {dirty && (
+            <button onClick={doSave}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+              Save
+            </button>
+          )}
           {selectedNode && (
             <button onClick={handleDeleteNode}
               className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
