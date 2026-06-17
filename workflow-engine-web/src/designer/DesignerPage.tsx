@@ -34,11 +34,21 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [deployedId, setDeployedId] = useState<string | null>(null);
   const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
 
+  const [instances, setInstances] = useState<any[]>([]);
+
   // Close draft context menu on click outside
   useEffect(() => {
     const close = () => setDraftMenu(null);
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
+  }, []);
+
+  // Poll instances to show counts per draft
+  useEffect(() => {
+    const poll = () => fetch('/api/instances').then(r => r.json()).then(setInstances).catch(() => {});
+    poll();
+    const t = setInterval(poll, 3000);
+    return () => clearInterval(t);
   }, []);
 
   // ── Load drafts from server on mount ──
@@ -275,7 +285,17 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                   ${d.id === activeId ? 'bg-blue-600/30 border-l-2 border-l-blue-500' : 'hover:bg-gray-700'}`}>
                 <div className="truncate flex-1">
                   <div className="text-gray-300 truncate">{d.name}</div>
-                  <div className="text-[10px] text-gray-600">{d.nodes.length} nodes</div>
+                  <div className="text-[10px] text-gray-600">
+                    {d.nodes.length} nodes
+                    {(() => {
+                      const count = instances.filter(i => i.definitionId === d.name).length;
+                      if (count > 0) {
+                        const running = instances.filter(i => i.definitionId === d.name && i.status === 'RUNNING').length;
+                        return <span className="ml-1">| <span className="text-green-500">{running} running</span> / {count} total</span>;
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
                 <div className="hidden group-hover:flex gap-0.5 ml-1">
                   <button onClick={(e) => { e.stopPropagation(); renameDraft(d.id); }}
