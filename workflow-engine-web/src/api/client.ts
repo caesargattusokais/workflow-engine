@@ -14,8 +14,11 @@ export async function queryTasks(params: { instanceId: string }) {
   return res.json();
 }
 
-export async function completeTask(taskId: string) {
-  const res = await fetch(`${BASE}/tasks/${taskId}/complete`, { method: 'POST' });
+export async function completeTask(taskId: string, vars?: Record<string,unknown>, comment?: string) {
+  const res = await fetch(`${BASE}/tasks/${taskId}/complete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ variables: vars || {}, comment: comment || '' })
+  });
   if (!res.ok) throw new Error(`completeTask failed: ${res.status}`);
   return res.json();
 }
