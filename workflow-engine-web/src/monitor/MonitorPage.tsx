@@ -115,7 +115,9 @@ export default function MonitorPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance} />
+        <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance}
+          onTerminate={async (id) => { await terminateInstance(id); listInstances().then(setInstances); }}
+          onResume={async (id) => { await resumeInstance(id); listInstances().then(setInstances); loadInstance(id); }} />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {/* Action bar */}
