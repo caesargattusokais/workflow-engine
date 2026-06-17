@@ -95,13 +95,73 @@ export default function PropertyPanel({ node, onChange }: {
 
       {/* ── ServiceTask ───────────────────── */}
       {node.type === 'serviceTask' && (
-        <label className="block mb-2">
-          <span className="text-gray-400 text-xs">Handler Class</span>
-          <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-            value={(node.data.handlerClass as string) || ''}
-            placeholder="com.myapp.Handler"
-            onChange={e => updateData('handlerClass', e.target.value)} />
-        </label>
+        <div className="border-t border-gray-700 pt-3 mt-2">
+          {/* Toggle: Code / HTTP */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-gray-400 text-xs">Type:</span>
+            <button
+              onClick={() => updateData('httpMode', false)}
+              className={`text-xs px-2 py-0.5 rounded ${!(node.data.httpMode as boolean)
+                ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
+              代码逻辑
+            </button>
+            <button
+              onClick={() => updateData('httpMode', true)}
+              className={`text-xs px-2 py-0.5 rounded ${(node.data.httpMode as boolean)
+                ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
+              HTTP 调用
+            </button>
+          </div>
+
+          {!(node.data.httpMode as boolean) ? (
+            <label className="block mb-2">
+              <span className="text-gray-400 text-xs">Handler Class</span>
+              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+                value={(node.data.handlerClass as string) || ''}
+                placeholder="com.myapp.Handler"
+                onChange={e => updateData('handlerClass', e.target.value)} />
+            </label>
+          ) : (
+            <>
+              <label className="block mb-2">
+                <span className="text-teal-400 text-xs">URL</span>
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                  value={(node.data.url as string) || ''}
+                  placeholder="https://api.example.com/check"
+                  onChange={e => updateData('url', e.target.value)} />
+              </label>
+              <div className="flex gap-2 mb-2">
+                <label className="flex-1">
+                  <span className="text-gray-400 text-xs">Method</span>
+                  <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                    value={(node.data.method as string) || 'POST'}
+                    onChange={e => updateData('method', e.target.value)}>
+                    {['GET','POST','PUT','DELETE','PATCH'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="block mb-2">
+                <span className="text-gray-400 text-xs">Headers (JSON)</span>
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                  value={JSON.stringify(node.data.headers || {})}
+                  placeholder='{"Authorization":"Bearer ${token}"}'
+                  onChange={e => {
+                    try { updateData('headers', JSON.parse(e.target.value)); }
+                    catch { /* invalid JSON, ignore */ }
+                  }} />
+              </label>
+              <label className="block mb-2">
+                <span className="text-gray-400 text-xs">Body Template</span>
+                <textarea className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                  rows={3} value={(node.data.body as string) || ''}
+                  placeholder='{"amount": ${amount}, "type": "risk"}'
+                  onChange={e => updateData('body', e.target.value)} />
+              </label>
+            </>
+          )}
+        </div>
       )}
 
       {/* ── ExclusiveGateway: 判断节点 ──── */}

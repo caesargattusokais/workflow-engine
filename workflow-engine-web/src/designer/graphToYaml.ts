@@ -41,8 +41,22 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workfl
     }
 
     // ServiceTask fields
-    if (data.handlerClass && node.type === 'serviceTask') {
-      lines.push(`    handlerClass: "${data.handlerClass}"`);
+    if (node.type === 'serviceTask') {
+      if (data.handlerClass && !data.httpMode) {
+        lines.push(`    handlerClass: "${data.handlerClass}"`);
+      }
+      if (data.url && data.httpMode) {
+        lines.push(`    url: "${data.url}"`);
+        if (data.method) lines.push(`    method: ${data.method}`);
+        const headers = data.headers as Record<string, string> | undefined;
+        if (headers && Object.keys(headers).length > 0) {
+          lines.push('    headers:');
+          for (const [k, v] of Object.entries(headers)) {
+            lines.push(`      ${k}: "${v}"`);
+          }
+        }
+        if (data.body) lines.push(`    body: "${data.body}"`);
+      }
     }
 
     // Candidate groups

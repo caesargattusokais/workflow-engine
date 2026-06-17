@@ -131,8 +131,9 @@ public class YamlProcessParser implements ProcessParser {
                 RetryConfig retryConfig = buildRetryConfig(ny);
                 List<RoutingRule> resultRoutes = buildRoutes(ny.resultRouting);
                 List<RoutingRule> exceptionRoutes = buildRoutes(ny.exceptionRouting);
-                return new ServiceTask(ny.id, ny.name, ny.handlerClass, retryConfig,
-                        resultRoutes, exceptionRoutes, listeners);
+                return new ServiceTask(ny.id, ny.name, ny.handlerClass,
+                        ny.url, ny.method, ny.headers, ny.body,
+                        retryConfig, resultRoutes, exceptionRoutes, listeners);
             case "exclusiveGateway": return new ExclusiveGateway(ny.id, ny.name, listeners);
             case "parallelGateway": return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway": return new InclusiveGateway(ny.id, ny.name, listeners);

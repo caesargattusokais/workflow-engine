@@ -11,6 +11,10 @@ public class NodeYaml {
     public List<String> candidateGroups;
     public String dynamicRouter;
     public String handlerClass;
+    public String url;               // HTTP proxy mode
+    public String method;             // GET/POST/PUT/DELETE
+    public Map<String, String> headers;
+    public String body;               // request body template
     public Map<String, String> listeners;
     public List<GatewayConditionYaml> conditions;
     public RetryYaml retry;
