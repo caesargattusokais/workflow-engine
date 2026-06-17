@@ -62,6 +62,18 @@ export default function PropertyPanel({ node, onChange }: {
           onChange={e => updateData('name', e.target.value)} />
       </label>
 
+      {/* ── StartEvent: Initial Variables ──── */}
+      {node.type === 'startEvent' && (
+        <div className="border-t border-green-500/50 pt-3 mt-2">
+          <span className="text-green-400 text-xs font-semibold">初始变量 (Initial Variables)</span>
+          <div className="text-[10px] text-gray-500 mb-2">启动流程时传入的变量，在条件中可用</div>
+          <VarEditor
+            vars={(node.data.initialVars as string[]) || []}
+            onChange={v => updateData('initialVars', v)}
+          />
+        </div>
+      )}
+
       {/* ── UserTask ──────────────────────── */}
       {node.type === 'userTask' && (
         <>
@@ -189,6 +201,33 @@ export default function PropertyPanel({ node, onChange }: {
       <div className="mt-4 pt-3 border-t border-gray-700">
         <span className="text-gray-500 text-xs">ID: {node.id}</span>
       </div>
+    </div>
+  );
+}
+
+// ── Reusable variable editor (add/remove text inputs) ────
+function VarEditor({ vars, onChange }: { vars: string[]; onChange: (v: string[]) => void }) {
+  const add = () => onChange([...vars, '']);
+  const remove = (i: number) => onChange(vars.filter((_, idx) => idx !== i));
+  const update = (i: number, val: string) => {
+    const copy = [...vars];
+    copy[i] = val;
+    onChange(copy);
+  };
+
+  return (
+    <div>
+      {vars.map((v, i) => (
+        <div key={i} className="flex gap-1 mb-1">
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            value={v} placeholder="e.g. applicant"
+            onChange={e => update(i, e.target.value)} />
+          <button onClick={() => remove(i)}
+            className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
+        </div>
+      ))}
+      <button onClick={add}
+        className="text-xs text-green-400 hover:text-green-300 mt-1">+ Add variable</button>
     </div>
   );
 }
