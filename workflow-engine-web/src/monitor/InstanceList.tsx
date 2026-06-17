@@ -6,10 +6,10 @@ interface Instance {
   activeNodeIds: string[];
 }
 
-export default function InstanceList({ onSelect, selectedId, instances, onTerminate, onResume, onDelete }:
+export default function InstanceList({ onSelect, selectedId, instances, onTerminate, onResume, onDelete, onRestart }:
     { onSelect: (id: string) => void; selectedId: string | null; instances: Instance[];
       onTerminate: (id: string) => void; onResume: (id: string) => void;
-      onDelete: (id: string) => void; }) {
+      onDelete: (id: string) => void; onRestart: (id: string) => void; }) {
 
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
   const [collapsed, setCollapsed] = useState<Record<string,boolean>>({});
@@ -85,10 +85,16 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
             </button>
           )}
           {(menu.inst.status === 'COMPLETED' || menu.inst.status === 'TERMINATED') && (
-            <button onClick={() => { onDelete(menu.inst.id); setMenu(null); }}
-              className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-700">
-              Delete
-            </button>
+            <>
+              <button onClick={() => { onRestart(menu.inst.id); setMenu(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-green-400 hover:bg-gray-700">
+                Restart
+              </button>
+              <button onClick={() => { onDelete(menu.inst.id); setMenu(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-700">
+                Delete
+              </button>
+            </>
           )}
         </div>
       )}

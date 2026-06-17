@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
-import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance } from '../api/client';
+import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance } from '../api/client';
 
 export default function MonitorPage() {
   const [instances, setInstances] = useState<any[]>([]);
@@ -118,7 +118,11 @@ export default function MonitorPage() {
         <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance}
           onTerminate={async (id) => { await terminateInstance(id); listInstances().then(setInstances); }}
           onResume={async (id) => { await resumeInstance(id); listInstances().then(setInstances); loadInstance(id); }}
-          onDelete={async (id) => { await deleteInstance(id); listInstances().then(setInstances); setSelectedId(null); }} />
+          onDelete={async (id) => { await deleteInstance(id); listInstances().then(setInstances); setSelectedId(null); }}
+          onRestart={async (id) => {
+            const inst = instances.find(i => i.id === id);
+            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); listInstances().then(setInstances); }
+          }} />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {/* Action bar */}
