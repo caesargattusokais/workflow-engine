@@ -32,6 +32,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [toast, setToast] = useState<string | null>(null);
   const [deployedYaml, setDeployedYaml] = useState<string | null>(null);
   const [deployedId, setDeployedId] = useState<string | null>(null);
+  const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
+
+  // Close draft context menu on click outside
+  useEffect(() => {
+    const close = () => setDraftMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, []);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
@@ -262,6 +270,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
             {drafts.map(d => (
               <div key={d.id}
                 onClick={() => switchDraft(d.id)}
+                onContextMenu={(e) => { e.preventDefault(); setDraftMenu({x:e.clientX, y:e.clientY, draft:d}); }}
                 className={`px-2 py-1.5 cursor-pointer border-b border-gray-800 text-xs flex justify-between items-center group
                   ${d.id === activeId ? 'bg-blue-600/30 border-l-2 border-l-blue-500' : 'hover:bg-gray-700'}`}>
                 <div className="truncate flex-1">
@@ -282,6 +291,24 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               </div>
             )}
           </div>
+          {/* Draft context menu */}
+          {draftMenu && (
+            <div className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-xl py-1 min-w-[130px]"
+              style={{ left: draftMenu.x, top: draftMenu.y }} onClick={e => e.stopPropagation()}>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
+                {draftMenu.draft.name}
+              </div>
+              <button onClick={() => {
+                const yaml = graphToYaml(draftMenu.draft.nodes, draftMenu.draft.edges, draftMenu.draft.name);
+                setDeployedYaml(yaml);
+                setToast(`YAML for: ${draftMenu.draft.name}`);
+                setDraftMenu(null);
+              }}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
+                View YAML
+              </button>
+            </div>
+          )}
         </div>
 
         <NodePalette />
