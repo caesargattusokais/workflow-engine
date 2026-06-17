@@ -37,12 +37,17 @@ public class ServiceTaskRunner implements NodeRunner {
                 result = getHandler(serviceTask.getHandlerClass()).execute(variables);
             }
 
-            // Success — merge result into instance variables
+            // Success — namespace result by node ID to avoid conflicts
             if (result != null) {
-                instance.setVariables(result);
+                String ns = node.getId() + ".";
+                for (Map.Entry<String, Object> e : result.entrySet()) {
+                    instance.setVariable(ns + e.getKey(), e.getValue());
+                    variables.put(ns + e.getKey(), e.getValue());
+                }
+                // Also store the full map for routing: nodeId.result['key']
+                variables.put(ns + "result", result);
+                instance.setVariable(ns + "result", result);
                 repo.update(instance);
-                // Put the full result map for expressions like result['key'] or result.key
-                variables.put("result", result);
             }
             exec.setRetryAttempt(0);
 
