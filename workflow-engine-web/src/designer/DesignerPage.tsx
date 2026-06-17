@@ -40,65 +40,37 @@ export default function DesignerPage() {
     } catch (e: any) { alert('Deploy failed: ' + e.message); }
   };
 
-  // ── Collect all known variables ────────────
+  // ── Collect all explicitly defined variables ──
   const allVars = useMemo<VarInfo[]>(() => {
     const vars: VarInfo[] = [];
 
-    // StartEvent initial variables
+    // StartEvent: initial variables
     for (const node of nodes) {
       if (node.type === 'startEvent') {
-        const initials = (node.data.initialVars as string[]) || [];
-        for (const v of initials) {
-          if (v.trim()) vars.push({ name: v.trim(), source: 'Start (初始变量)' });
+        for (const v of (node.data.initialVars as string[]) || []) {
+          if (v.trim()) vars.push({ name: v.trim(), source: 'Start' });
         }
       }
     }
 
-    // Gateway condition expressions — extract variable names
-    for (const node of nodes) {
-      if (node.type === 'exclusiveGateway' || node.type === 'inclusiveGateway') {
-        const conds = (node.data.conditions as any[]) || [];
-        for (const c of conds) {
-          if (!c.expr || c.isDefault) continue;
-          // Extract bare identifiers from SpEL like "days > 3" or "amount >= 5000"
-          const names = c.expr.match(/\b([a-zA-Z_]\w*)\b/g) || [];
-          for (const name of names) {
-            if (!['and', 'or', 'not', 'true', 'false', 'null', 'eq', 'ne', 'gt', 'lt'].includes(name.toLowerCase())) {
-              const exists = vars.some(v => v.name === name);
-              if (!exists) vars.push({ name, source: `Gateway expression` });
-            }
-          }
-        }
-      }
-    }
-
-    // ServiceTask return values
+    // ServiceTask: return values
     for (const node of nodes) {
       if (node.type === 'serviceTask') {
         const hc = node.data.handlerClass as string;
-        const label = hc ? hc.split('.').pop() : (node.data.httpMode ? 'HTTP' : 'Code');
+        const label = hc ? (hc.split('.').pop() || 'Code') : ((node.data.httpMode as boolean) ? 'HTTP' : 'Code');
         const retVals = (node.data.returnValues as Array<{key:string;type:string}>) || [];
-        if (retVals.length > 0) {
-          for (const rv of retVals) {
-            if (rv.key && !vars.some(v => v.name === `result.${rv.key}`)) {
-              vars.push({ name: `result.${rv.key}`, source: `ServiceTask: ${label} (${rv.type})` });
-            }
-          }
-        } else {
-          const exists = vars.some(v => v.name === 'result.*');
-          if (!exists) vars.push({ name: 'result.*', source: `ServiceTask: ${label}` });
+        for (const rv of retVals) {
+          if (rv.key) vars.push({ name: `result.${rv.key}`, source: `${label} → ${rv.type}` });
         }
       }
     }
 
-    // UserTask assignee expressions
+    // UserTask: assignee expression
     for (const node of nodes) {
       if (node.type === 'userTask') {
         const expr = (node.data.assignee as string) || '';
-        const match = expr.match(/\$\{(\w+)\}/);
-        if (match && !vars.some(v => v.name === match[1])) {
-          vars.push({ name: match[1], source: 'Assignee expression' });
-        }
+        const m = expr.match(/\$\{(\w+)\}/);
+        if (m && m[1]) vars.push({ name: m[1], source: 'Assignee' });
       }
     }
 
