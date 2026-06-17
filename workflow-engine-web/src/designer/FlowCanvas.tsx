@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import {
-  ReactFlow, Background, Controls, MiniMap,
+  ReactFlow, Background, Controls,
   addEdge, Connection, MarkerType,
   type Node, type Edge
 } from '@xyflow/react';
@@ -152,8 +152,6 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       >
         <Background color="#2a2a4a" gap={20} size={1} />
         <Controls className="!bg-gray-800 !border-gray-700 !fill-gray-300" />
-        <MiniMap nodeColor={n => n.type === 'userTask' ? '#2563eb' :
-          n.type === 'startEvent' ? '#22c55e' : '#6b7280'} />
       </ReactFlow>
 
       {/* ── Context Menu ──────────────────────── */}
