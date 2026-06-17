@@ -136,7 +136,24 @@ export default function MonitorPage() {
             const inst = instances.find(i => i.id === id);
             if (inst) { await startInstance(inst.definitionId, inst.variables || {}); listInstances().then(setInstances); }
           }} />
-        <div className="flex-1 flex flex-col">{/* flow area */}</div>
+        <div className="flex-1 flex flex-col">
+          <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
+          {selectedInst && (
+            <div className={`p-2 flex gap-2 border-t text-xs
+              ${selectedInst.status === 'SUSPENDED' ? 'bg-yellow-900 border-yellow-700' :
+                selectedInst.status === 'RUNNING' ? 'bg-gray-800 border-gray-700' : 'bg-gray-850 border-gray-700'}`}>
+              <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {selectedInst.status}</span>
+              <div className="flex-1" />
+              {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
+                <button onClick={handleTerminate} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">Terminate</button>
+              )}
+              {selectedInst.status === 'SUSPENDED' && (
+                <button onClick={handleResume} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">Resume</button>
+              )}
+            </div>
+          )}
+          <TaskPanel tasks={tasks} onComplete={handleComplete} onReject={handleReject} />
+        </div>
         {/* Detail sidebar */}
         {selectedInst && (
           <div className="w-56 bg-gray-800 border-l border-gray-700 p-3 text-xs overflow-y-auto">
@@ -178,29 +195,6 @@ export default function MonitorPage() {
             ))}
           </div>
         )}
-        <div className="flex-1 flex flex-col">
-          <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
-          {/* Action bar */}
-          {selectedInst && (
-            <div className={`p-2 flex gap-2 border-t text-xs
-              ${selectedInst.status === 'SUSPENDED' ? 'bg-yellow-900 border-yellow-700' :
-                selectedInst.status === 'RUNNING' ? 'bg-gray-800 border-gray-700' : 'bg-gray-850 border-gray-700'}`}>
-              <span className="text-gray-400 self-center">
-                {selectedInst.id.substring(0,8)} — {selectedInst.status}
-              </span>
-              <div className="flex-1" />
-              {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
-                <button onClick={handleTerminate}
-                  className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">Terminate</button>
-              )}
-              {selectedInst.status === 'SUSPENDED' && (
-                <button onClick={handleResume}
-                  className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">Resume</button>
-              )}
-            </div>
-          )}
-          <TaskPanel tasks={tasks} onComplete={handleComplete} onReject={handleReject} />
-        </div>
       </div>
     </div>
   );
