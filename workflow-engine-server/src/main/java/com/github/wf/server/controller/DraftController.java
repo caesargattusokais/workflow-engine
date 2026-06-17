@@ -18,7 +18,7 @@ public class DraftController {
     }
 
     @GetMapping("/{id}")
-    public Map<String, Object> get(@PathVariable String id) {
+    public Map<String, Object> get(@PathVariable("id") String id) {
         var d = store.get(id);
         if (d == null) throw new RuntimeException("Draft not found: " + id);
         return d;
@@ -38,7 +38,7 @@ public class DraftController {
     }
 
     @PutMapping("/{id}")
-    public Map<String, Object> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
+    public Map<String, Object> update(@PathVariable("id") String id, @RequestBody Map<String, Object> body) {
         var d = store.get(id);
         if (d == null) throw new RuntimeException("Draft not found: " + id);
         if (body.containsKey("name")) d.put("name", body.get("name"));
@@ -48,7 +48,7 @@ public class DraftController {
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         store.remove(id);
     }
 }
