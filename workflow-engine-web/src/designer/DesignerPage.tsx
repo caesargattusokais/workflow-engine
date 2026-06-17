@@ -18,6 +18,13 @@ export default function DesignerPage() {
     setSelectedNode(updatedNode);
   }, [nodes, setNodes]);
 
+  const handleDeleteNode = useCallback(() => {
+    if (!selectedNode) return;
+    setNodes(nodes.filter(n => n.id !== selectedNode.id));
+    setEdges(edges.filter(e => e.source !== selectedNode.id && e.target !== selectedNode.id));
+    setSelectedNode(null);
+  }, [selectedNode, nodes, edges, setNodes, setEdges]);
+
   const handleDeploy = async () => {
     if (nodes.length === 0) { alert('Add some nodes first'); return; }
     try {
@@ -30,7 +37,15 @@ export default function DesignerPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-1 flex justify-between items-center">
-        <span className="text-sm text-gray-400">Designer</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-400">Designer</span>
+          {selectedNode && (
+            <button onClick={handleDeleteNode}
+              className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
+              Delete Node
+            </button>
+          )}
+        </div>
         <button onClick={handleDeploy}
           className="bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-1 rounded">
           Deploy

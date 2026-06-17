@@ -1,4 +1,4 @@
-import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
   addEdge, Connection, MarkerType,
@@ -21,12 +21,14 @@ let nodeIdCounter = 0;
 
 export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   const onConnect = useCallback((params: Connection) => {
     setEdges((eds: Edge[]) => addEdge({
       ...params,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
-      style: { stroke: '#666', strokeWidth: 2 }
+      style: { stroke: '#666', strokeWidth: 2, cursor: 'pointer' },
+      interactionWidth: 20
     }, eds));
   }, [setEdges]);
 
@@ -47,16 +49,55 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       id: `node_${++nodeIdCounter}`,
       type,
       position,
-      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' }
+      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' },
+      draggable: true,
+      selectable: true
     };
     setNodes([...nodes, newNode]);
   }, [nodes, setNodes]);
 
-  const onNodeClick = useCallback((_: unknown, node: Node) => onNodeSelect(node), [onNodeSelect]);
-  const onPaneClick = useCallback(() => onNodeSelect(null), [onNodeSelect]);
+  const onNodeClick = useCallback((_: unknown, node: Node) => {
+    onNodeSelect(node);
+    setSelectedEdgeId(null);
+  }, [onNodeSelect]);
+
+  const onPaneClick = useCallback(() => {
+    onNodeSelect(null);
+    setSelectedEdgeId(null);
+  }, [onNodeSelect]);
+
+  const onEdgeClick = useCallback((_: unknown, edge: Edge) => {
+    onNodeSelect(null);
+    setSelectedEdgeId(edge.id);
+  }, [onNodeSelect]);
+
+  // Delete selected items
+  const deleteSelected = useCallback(() => {
+    if (selectedEdgeId) {
+      setEdges(eds => eds.filter(e => e.id !== selectedEdgeId));
+      setSelectedEdgeId(null);
+    }
+  }, [selectedEdgeId, setEdges]);
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full" style={{ minHeight: 400 }}>
+    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400 }}>
+      {/* Toolbar */}
+      <div className="absolute top-2 left-2 z-10 flex gap-1">
+        <button
+          onClick={deleteSelected}
+          disabled={!selectedEdgeId}
+          className={`text-xs px-2 py-1 rounded ${selectedEdgeId
+            ? 'bg-red-600 hover:bg-red-500 text-white'
+            : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+          title="Delete selected edge (or press Delete key)"
+        >
+          Delete Edge
+        </button>
+        <span className="text-xs text-gray-500 self-center ml-2">
+          Click edge → Delete | Drag nodes | Backspace/Delete
+        </span>
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -66,11 +107,17 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
+        defaultEdgeOptions={{
+          style: { stroke: '#666', strokeWidth: 2, cursor: 'pointer' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+          interactionWidth: 20
+        }}
       >
         <Background />
         <Controls />
