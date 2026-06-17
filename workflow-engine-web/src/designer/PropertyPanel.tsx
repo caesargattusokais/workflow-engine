@@ -114,13 +114,22 @@ export default function PropertyPanel({ node, onChange }: {
           </div>
 
           {!(node.data.httpMode as boolean) ? (
-            <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Handler Class</span>
-              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-                value={(node.data.handlerClass as string) || ''}
-                placeholder="com.myapp.Handler"
-                onChange={e => updateData('handlerClass', e.target.value)} />
-            </label>
+            <>
+              <label className="block mb-2">
+                <span className="text-gray-400 text-xs">Handler Class</span>
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+                  value={(node.data.handlerClass as string) || ''}
+                  placeholder="com.myapp.Handler"
+                  onChange={e => updateData('handlerClass', e.target.value)} />
+              </label>
+              <KvEditor
+                label="Input Parameters"
+                entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
+                onChange={v => updateData('paramEntries', v)}
+                keyPlaceholder="paramName"
+                valPlaceholder="${variable} or fixed"
+              />
+            </>
           ) : (
             <>
               <label className="block mb-2">
