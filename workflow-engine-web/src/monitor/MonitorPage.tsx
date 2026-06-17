@@ -11,6 +11,7 @@ export default function MonitorPage() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const poll = () => listInstances().then(setInstances).catch(() => {});
@@ -24,6 +25,7 @@ export default function MonitorPage() {
     const inst = instances.find(i => i.id === id);
     if (!inst) return;
 
+    setError(null);
     try {
       const graph = await getDefinitionGraph(inst.definitionId);
       const activeIds: string[] = inst.activeNodeIds || [];
@@ -32,7 +34,7 @@ export default function MonitorPage() {
         data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
       })));
       setEdges(graph.edges || []);
-    } catch { setNodes([]); setEdges([]); }
+    } catch (e: any) { setError(e.message); setNodes([]); setEdges([]); }
 
     try {
       const ts = await queryTasks({ instanceId: id });
@@ -78,7 +80,7 @@ export default function MonitorPage() {
       <div className="flex flex-1 overflow-hidden">
         <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance} />
         <div className="flex-1 flex flex-col">
-          <InstanceFlow nodes={nodes} edges={edges} />
+          <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {selectedInst && selectedInst.status === 'SUSPENDED' && (
             <div className="bg-yellow-900 border-t border-yellow-700 p-2 flex gap-2">
               <button onClick={handleResume}
