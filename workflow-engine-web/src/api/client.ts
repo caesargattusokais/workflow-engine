@@ -21,7 +21,7 @@ export async function completeTask(taskId: string) {
 }
 
 export async function getDefinitionGraph(definitionId: string) {
-  const res = await fetch(`${BASE}/definitions/${definitionId}/graph`);
+  const res = await fetch(`${BASE}/definitions/${encodeURIComponent(definitionId)}/graph`);
   if (!res.ok) throw new Error(`getDefinitionGraph failed: ${res.status}`);
   return res.json();
 }
