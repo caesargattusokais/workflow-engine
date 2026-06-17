@@ -41,6 +41,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   }, []);
 
   const onConnect = useCallback((params: Connection) => {
+    if (locked) return;
     setEdges([...edges, {
       ...params,
       id: `edge_${Date.now()}`,
@@ -48,7 +49,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       style: { stroke: '#666', strokeWidth: 2 },
       interactionWidth: 20
     } as Edge]);
-  }, [edges, setEdges]);
+  }, [edges, setEdges, locked]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -57,6 +58,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    if (locked) return;
     const type = e.dataTransfer.getData('application/reactflow');
     if (!type || !reactFlowWrapper.current) return;
 
@@ -70,7 +72,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' }
     };
     setNodes([...nodes, newNode]);
-  }, [nodes, setNodes]);
+  }, [nodes, setNodes, locked]);
 
   // ── Click handlers ──────────────────────────
   const onNodeClick = useCallback((_: unknown, node: Node) => {
