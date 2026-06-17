@@ -125,7 +125,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   }, [nodes, setNodes]);
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400 }}>
+    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400, background: '#1a1a2e' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -144,13 +144,14 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
-          style: { stroke: '#666', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+          style: { stroke: '#555', strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#555' },
           interactionWidth: 20
         }}
+        style={{ background: '#1a1a2e' }}
       >
-        <Background />
-        <Controls />
+        <Background color="#2a2a4a" gap={20} size={1} />
+        <Controls className="!bg-gray-800 !border-gray-700 !fill-gray-300" />
         <MiniMap nodeColor={n => n.type === 'userTask' ? '#2563eb' :
           n.type === 'startEvent' ? '#22c55e' : '#6b7280'} />
       </ReactFlow>
