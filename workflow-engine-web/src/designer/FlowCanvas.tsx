@@ -67,9 +67,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       id: `node_${++nodeIdCounter}`,
       type,
       position,
-      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' },
-      draggable: true,
-      selectable: true
+      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' }
     };
     setNodes([...nodes, newNode]);
   }, [nodes, setNodes]);
@@ -146,6 +144,8 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         nodesDraggable={!locked}
         nodesConnectable={!locked}
         elementsSelectable={!locked}
+        panOnDrag={!locked}
+        zoomOnScroll={!locked}
         onInit={(rf: any) => { rfInstance.current = rf; }}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
