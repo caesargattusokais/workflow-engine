@@ -32,8 +32,11 @@ export async function resumeInstance(instanceId: string) {
   return res.json();
 }
 
-export async function terminateInstance(instanceId: string) {
-  const res = await fetch(`${BASE}/instances/${instanceId}/terminate`, { method: 'POST' });
+export async function terminateInstance(instanceId: string, reason?: string) {
+  const res = await fetch(`${BASE}/instances/${instanceId}/terminate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason || 'terminated by user' })
+  });
   if (!res.ok) throw new Error(`terminateInstance failed: ${res.status}`);
   return res.json();
 }
