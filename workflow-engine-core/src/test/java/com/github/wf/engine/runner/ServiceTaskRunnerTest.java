@@ -65,7 +65,7 @@ class ServiceTaskRunnerTest {
         assertThat(exec.getCurrentNodeId()).isEqualTo("end");
 
         ProcessInstance updated = instanceRepo.findById("inst-1");
-        assertThat(updated.getVariable("svc.amount")).isEqualTo(200);
+        assertThat(updated.getVariable("svc_amount")).isEqualTo(200);
     }
 
     @Test
@@ -80,12 +80,12 @@ class ServiceTaskRunnerTest {
         runner.run(def.getNode("svc"), ctx);
 
         ProcessInstance updated = instanceRepo.findById("inst-1");
-        assertThat(updated.getVariable("svc.result")).isEqualTo(Map.of("result", "ok"));
+        assertThat(updated.getVariable("svc_result")).isEqualTo(Map.of("result", "ok"));
     }
 
     @Test
     void resultRoutingMatchesAndRoutesToTargetNode() {
-        RoutingRule passRule = RoutingRule.matched(Condition.expression("svc.result['status'] == 'PASS'"), "approved");
+        RoutingRule passRule = RoutingRule.matched(Condition.expression("svc_result['status'] == 'PASS'"), "approved");
         RoutingRule fallback = RoutingRule.defaultRule("rejected");
 
         ServiceTask svc = new ServiceTask("svc", "风控", "com.test.RiskHandler",

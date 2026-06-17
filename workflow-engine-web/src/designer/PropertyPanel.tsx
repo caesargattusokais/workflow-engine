@@ -341,7 +341,7 @@ function ReturnValueEditor({ entries, onChange }: {
         <span className="text-gray-400 text-xs">Return Values</span>
         <button onClick={add} className="text-xs text-yellow-400 hover:text-yellow-300">+ Add</button>
       </div>
-      <div className="text-[10px] text-gray-600 mb-1">Accessible as nodeName.result.xxx, e.g. risk-check.result.status</div>
+      <div className="text-[10px] text-gray-600 mb-1">Fields accessible as nodeName_fieldName. Full map: nodeName_result['field']</div>
       {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">No return values defined</div>}
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1 mb-1">

@@ -39,7 +39,7 @@ public class ServiceTaskRunner implements NodeRunner {
 
             // Success — namespace result by node ID to avoid conflicts
             if (result != null) {
-                String ns = node.getId() + ".";
+                String ns = node.getId() + "_";
                 for (Map.Entry<String, Object> e : result.entrySet()) {
                     instance.setVariable(ns + e.getKey(), e.getValue());
                     variables.put(ns + e.getKey(), e.getValue());

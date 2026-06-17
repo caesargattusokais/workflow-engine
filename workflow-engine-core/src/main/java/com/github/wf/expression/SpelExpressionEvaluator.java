@@ -25,14 +25,8 @@ public class SpelExpressionEvaluator implements ExpressionEvaluator {
                 spelExpr = "#" + expression;
             } else {
                 for (String varName : variables.keySet()) {
-                    if (varName.contains(".")) {
-                        // Dotted names must use bracket notation: #this['svc.result']
-                        spelExpr = spelExpr.replaceAll("\\b" + Pattern.quote(varName) + "\\b",
-                                Matcher.quoteReplacement("#this['" + varName + "']"));
-                    } else {
-                        spelExpr = spelExpr.replaceAll("\\b" + Pattern.quote(varName) + "\\b",
-                                Matcher.quoteReplacement("#" + varName));
-                    }
+                    spelExpr = spelExpr.replaceAll("\\b" + Pattern.quote(varName) + "\\b",
+                            Matcher.quoteReplacement("#" + varName));
                 }
             }
         }

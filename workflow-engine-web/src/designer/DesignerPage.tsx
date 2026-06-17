@@ -61,7 +61,7 @@ export default function DesignerPage() {
         const nodeName = (node.data.name as string) || node.id;
         const retVals = (node.data.returnValues as Array<{key:string;type:string}>) || [];
         for (const rv of retVals) {
-          if (rv.key) vars.push({ name: `${nodeName}.result.${rv.key}`, source: `${label} → ${rv.type}` });
+          if (rv.key) vars.push({ name: `${nodeName}_${rv.key}`, source: `${label} → ${rv.type}` });
         }
       }
     }

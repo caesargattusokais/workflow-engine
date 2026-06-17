@@ -92,7 +92,7 @@ class ServiceTaskRoutingIntegrationTest {
                     name: 风控检查
                     handlerClass: "com.test.RiskHandler"
                     resultRouting:
-                      - expr: "check.result['risk'] == 'LOW'"
+                      - expr: "check_result['risk'] == 'LOW'"
                         to: auto-end
                       - default: true
                         to: manual-end
