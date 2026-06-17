@@ -206,12 +206,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           <div className="flex items-center justify-between">
             <span className="text-green-300">{toast}</span>
             <div className="flex gap-2">
-              {deployedId && (
-                <button onClick={() => onNavigate?.('monitor')}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-                  View in Monitor
-                </button>
-              )}
               {deployedYaml && (
                 <button onClick={() => setDeployedYaml(deployedYaml ? null : deployedYaml)}
                   className="bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
