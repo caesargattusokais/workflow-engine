@@ -30,6 +30,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [deployedYaml, setDeployedYaml] = useState<string | null>(null);
+  const [deployedId, setDeployedId] = useState<string | null>(null);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
@@ -125,12 +127,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     try {
       const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow');
       const result = await deployDefinition(yaml);
+      setDeployedYaml(yaml);
+      setDeployedId(result.id);
       // Auto-start instance
       try {
         const inst = await startInstance(result.id, {});
-        setToast(`Deployed & started! Instance: ${inst.id.substring(0,8)} — `);
+        setToast(`Deployed & started! Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
       } catch {
-        setToast(`Deployed: ${result.id}`);
+        setToast(`Deployed: ${result.id} (auto-start failed)`);
       }
     } catch (e: any) { setToast('Deploy failed: ' + e.message); }
   };
@@ -194,19 +198,33 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         </button>
       </div>
 
-      {/* Toast notification */}
+      {/* Toast + YAML preview */}
       {toast && (
-        <div className="bg-green-900 border-b border-green-700 px-4 py-2 flex items-center justify-between text-sm">
-          <span className="text-green-300">{toast}</span>
-          <div className="flex gap-2">
-            {toast.includes('started') && (
-              <button onClick={() => onNavigate?.('monitor')}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-                View in Monitor
-              </button>
-            )}
-            <button onClick={() => setToast(null)} className="text-gray-400 hover:text-white text-xs">✕</button>
+        <div className="bg-green-900 border-b border-green-700 px-4 py-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-green-300">{toast}</span>
+            <div className="flex gap-2">
+              {deployedId && (
+                <button onClick={() => onNavigate?.('monitor')}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                  View in Monitor
+                </button>
+              )}
+              {deployedYaml && (
+                <button onClick={() => setDeployedYaml(deployedYaml ? null : deployedYaml)}
+                  className="bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
+                  {deployedYaml ? 'Hide YAML' : 'Show YAML'}
+                </button>
+              )}
+              <button onClick={() => { setToast(null); setDeployedYaml(null); }}
+                className="text-gray-400 hover:text-white text-xs">✕</button>
+            </div>
           </div>
+          {deployedYaml && (
+            <pre className="mt-2 bg-gray-900 rounded p-2 text-xs text-green-400 overflow-auto max-h-48 font-mono">
+              {deployedYaml}
+            </pre>
+          )}
         </div>
       )}
 
