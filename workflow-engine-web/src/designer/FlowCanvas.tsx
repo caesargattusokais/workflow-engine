@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ReactFlow, Background, MiniMap,
   addEdge, Connection, MarkerType,
+  useReactFlow,
   type Node, type Edge
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -30,6 +31,8 @@ let nodeIdCounter = 0;
 export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [locked, setLocked] = useState(false);
+  const { fitView } = useReactFlow();
 
   // Close menu on any click outside
   useEffect(() => {
@@ -141,6 +144,9 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         fitView
+        nodesDraggable={!locked}
+        nodesConnectable={!locked}
+        elementsSelectable={!locked}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
@@ -152,6 +158,22 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       >
         <Background color="#2a2a4a" gap={20} size={1} />
       </ReactFlow>
+
+      {/* ── Bottom-left tools ─────────────────── */}
+      <div className="absolute bottom-3 left-3 z-10 flex gap-1.5">
+        <button onClick={() => fitView({ duration: 300 })}
+          className="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-2.5 py-1.5
+                     text-gray-300 text-xs transition-colors shadow-lg"
+          title="定位 — 居中显示所有节点">
+          &#8982; 定位
+        </button>
+        <button onClick={() => setLocked(!locked)}
+          className={`border rounded px-2.5 py-1.5 text-xs transition-colors shadow-lg
+            ${locked ? 'bg-red-900 border-red-600 text-red-300' : 'bg-gray-800 hover:bg-gray-700 border-gray-600 text-gray-300'}`}
+          title={locked ? '解锁编辑' : '锁定画布'}>
+          {locked ? '🔒 锁定' : '🔓'}
+        </button>
+      </div>
 
       {/* ── Context Menu ──────────────────────── */}
       {menu && (
