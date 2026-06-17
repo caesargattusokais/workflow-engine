@@ -47,10 +47,10 @@ export async function startInstance(defId: string, vars: Record<string, unknown>
   return res.json();
 }
 
-export async function deployDefinition(yaml: string) {
+export async function deployDefinition(yaml: string, positions?: Record<string, {x:number;y:number}>) {
   const res = await fetch(`${BASE}/definitions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ yaml })
+    body: JSON.stringify({ yaml, positions })
   });
   if (!res.ok) throw new Error(`deployDefinition failed: ${res.status}`);
   return res.json();

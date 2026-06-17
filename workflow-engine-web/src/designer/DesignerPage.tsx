@@ -126,7 +126,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     if (nodes.length === 0) { setToast('Add some nodes first'); return; }
     try {
       const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow');
-      const result = await deployDefinition(yaml);
+      const positions: Record<string, {x:number;y:number}> = {};
+      for (const n of nodes) positions[n.id] = n.position;
+      const result = await deployDefinition(yaml, positions);
       setDeployedYaml(yaml);
       setDeployedId(result.id);
       // Auto-start instance

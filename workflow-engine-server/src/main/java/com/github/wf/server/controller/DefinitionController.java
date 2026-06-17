@@ -17,6 +17,7 @@ public class DefinitionController {
 
     private final WorkflowEngine engine;
     private final Map<String, ProcessDefinition> store = new LinkedHashMap<>();
+    private final Map<String, Map<String, Map<String, Double>>> positionsStore = new LinkedHashMap<>();
 
     public DefinitionController(WorkflowEngine engine) {
         this.engine = engine;
@@ -27,6 +28,9 @@ public class DefinitionController {
     public ProcessDefinition deploy(@RequestBody DeployRequest req) {
         ProcessDefinition def = engine.deploy(req.getYaml());
         store.put(def.getId(), def);
+        if (req.getPositions() != null) {
+            positionsStore.put(def.getId(), req.getPositions());
+        }
         return def;
     }
 
@@ -36,25 +40,26 @@ public class DefinitionController {
     }
 
     @GetMapping("/{id}")
-    public ProcessDefinition get(@PathVariable String id) {
+    public ProcessDefinition get(@PathVariable("id") String id) {
         ProcessDefinition def = store.get(id);
         if (def == null) throw new RuntimeException("Not found: " + id);
         return def;
     }
 
     @GetMapping("/{id}/graph")
-    public GraphResponse graph(@PathVariable String id) {
+    public GraphResponse graph(@PathVariable("id") String id) {
         ProcessDefinition def = store.get(id);
         if (def == null) throw new RuntimeException("Not found: " + id);
-        return convertToGraph(def);
+        return convertToGraph(def, positionsStore.get(id));
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         store.remove(id);
+        positionsStore.remove(id);
     }
 
-    private GraphResponse convertToGraph(ProcessDefinition def) {
+    private GraphResponse convertToGraph(ProcessDefinition def, Map<String, Map<String, Double>> positions) {
         List<GraphResponse.GraphNode> nodes = new ArrayList<>();
         List<GraphResponse.GraphEdge> edges = new ArrayList<>();
         Map<String, Node> nodeMap = def.getNodes();
@@ -64,7 +69,16 @@ public class DefinitionController {
             String nid = nodeIds.get(i);
             Node n = nodeMap.get(nid);
             String rft = mapNodeType(n.getType());
-            double x = 200, y = 50 + i * 120;
+            // Use stored positions or auto-layout
+            double x, y;
+            if (positions != null && positions.containsKey(nid)) {
+                var pos = positions.get(nid);
+                x = pos.getOrDefault("x", 200.0);
+                y = pos.getOrDefault("y", 50.0 + i * 120.0);
+            } else {
+                x = 200;
+                y = 50 + i * 120;
+            }
             GraphResponse.GraphNode gn = new GraphResponse.GraphNode(nid, rft, x, y);
             Map<String, Object> data = new HashMap<>();
             data.put("name", n.getName() != null ? n.getName() : nid);
