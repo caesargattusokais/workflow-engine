@@ -62,8 +62,11 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     const type = e.dataTransfer.getData('application/reactflow');
     if (!type || !reactFlowWrapper.current) return;
 
-    const bounds = reactFlowWrapper.current.getBoundingClientRect();
-    const position = { x: e.clientX - bounds.left - 60, y: e.clientY - bounds.top - 20 };
+    const rf = rfInstance.current;
+    // Convert screen coords to flow coords (accounts for zoom/pan)
+    const position = rf
+      ? rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      : { x: e.clientX - reactFlowWrapper.current.getBoundingClientRect().left - 60, y: e.clientY - reactFlowWrapper.current.getBoundingClientRect().top - 20 };
 
     const newNode: Node = {
       id: `node_${++nodeIdCounter}`,
