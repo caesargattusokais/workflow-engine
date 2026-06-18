@@ -63,7 +63,7 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', ver
     }
 
     // Retry
-    if (node.type === 'serviceTask' && data.retryEnabled) {
+    if (node.type === 'serviceTask' && (data.retryMaxAttempts as number) && (data.retryMaxAttempts as number) > 1) {
       lines.push('    retry:');
       lines.push(`      maxAttempts: ${data.retryMaxAttempts || 3}`);
       lines.push(`      delayMs: ${data.retryDelayMs || 1000}`);

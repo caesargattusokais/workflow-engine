@@ -190,28 +190,13 @@ export default function PropertyPanel({ node, onChange }: {
             )}
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
-            <div className="border-t border-gray-700 pt-2 mt-2">
-              <button
-                onClick={() => {
-                  const enabled = !(node.data.retryEnabled as boolean);
-                  updateData('retryEnabled', enabled);
-                  if (enabled) {
-                    updateData('retryMaxAttempts', 3);
-                    updateData('retryDelayMs', 1000);
-                    updateData('retryBackoff', 2);
-                  }
-                }}
-                className={`relative z-20 text-xs px-2 py-0.5 rounded mb-2 ${
-                  node.data.retryEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'
-                }`}>
-                {node.data.retryEnabled ? 'Retry: ON' : 'Retry: OFF'}
-              </button>
-              {(node.data.retryEnabled as boolean) && (<>
+            <CollapsibleSection title="Retry Config" defaultOpen={false}>
+              <div className="text-[10px] text-gray-500 mb-1">Set maxAttempts &gt; 1 to enable retry. Leave at 1 for no retry.</div>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Max Attempts</span>
-                <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
-                  value={(node.data.retryMaxAttempts as number) || 3}
-                  onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||3)} />
+                <input type="number" min="1" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                  value={(node.data.retryMaxAttempts as number) || 1}
+                  onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||1)} />
               </label>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Delay (ms)</span>
@@ -228,8 +213,7 @@ export default function PropertyPanel({ node, onChange }: {
               <div className="text-gray-400 text-xs mb-1">Retry On (empty = retry all exceptions)</div>
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
                 onChange={v => updateData('retryOn', v)} />
-              </>)}
-            </div>
+            </CollapsibleSection>
 
             {/* ── Result Routing ─────────────── */}
             <CollapsibleSection title="Result Routing" defaultOpen={false}>
