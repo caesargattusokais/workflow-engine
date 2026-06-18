@@ -52,7 +52,8 @@ export default function PropertyPanel({ node, onChange }: {
   }
 
   const updateData = (key: string, value: unknown) => {
-    onChange({ ...node, data: { ...node.data, [key]: value } });
+    const newData = { ...(node.data || {}), [key]: value };
+    onChange({ id: node.id, type: node.type, position: node.position, data: newData } as Node);
   };
 
   const conditions: ConditionItem[] = (node.data.conditions as ConditionItem[]) || [];
