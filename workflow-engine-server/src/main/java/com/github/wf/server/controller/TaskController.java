@@ -17,10 +17,10 @@ public class TaskController {
 
     @GetMapping
     public List<Map<String, Object>> list(
-            @RequestParam(required = false) String assignee,
-            @RequestParam(required = false) String candidateGroup,
-            @RequestParam(required = false) String instanceId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(value = "assignee", required = false) String assignee,
+            @RequestParam(value = "candidateGroup", required = false) String candidateGroup,
+            @RequestParam(value = "instanceId", required = false) String instanceId,
+            @RequestParam(value = "status", required = false) String status) {
 
         var q = engine.taskQuery();
         if (assignee != null) q.assignee(assignee);

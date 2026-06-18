@@ -28,8 +28,8 @@ public class InstanceController {
     @GetMapping
     public List<InstanceDetailResponse> list(
             @RequestHeader("X-User-Id") String userId,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String definitionId) {
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "definitionId", required = false) String definitionId) {
         java.util.List<com.github.wf.model.ProcessInstance> all;
         if (definitionId != null && !definitionId.isEmpty()) {
             all = engine.instanceRepository.findByDefinitionId(definitionId);
