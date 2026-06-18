@@ -22,6 +22,7 @@ public class ServiceTask extends Node {
 
     /** Full constructor */
     public ServiceTask(String id, String name, String handlerClass,
+                       boolean httpMode,
                        String url, String method, Map<String, String> headers, String body,
                        RetryConfig retryConfig,
                        List<RoutingRule> resultRouting,
@@ -29,8 +30,7 @@ public class ServiceTask extends Node {
                        List<String> listeners) {
         super(id, name, NodeType.SERVICE_TASK, listeners);
         this.handlerClass = handlerClass;
-        // httpMode is inferred: true if URL is set, or if handlerClass is absent and it's not a code task
-        this.httpMode = handlerClass == null || (url != null && !url.isBlank());
+        this.httpMode = httpMode;
         this.url = url;
         this.method = method != null ? method : "POST";
         this.headers = headers != null ? Collections.unmodifiableMap(headers) : Collections.emptyMap();
@@ -46,18 +46,18 @@ public class ServiceTask extends Node {
                        List<RoutingRule> resultRouting,
                        List<RoutingRule> exceptionRouting,
                        List<String> listeners) {
-        this(id, name, handlerClass, null, null, null, null,
+        this(id, name, handlerClass, false, null, null, null, null,
                 retryConfig, resultRouting, exceptionRouting, listeners);
     }
 
     /** Backward-compatible constructor (no routing/retry) */
     public ServiceTask(String id, String name, String handlerClass, List<String> listeners) {
-        this(id, name, handlerClass, null, null, null, null,
+        this(id, name, handlerClass, false, null, null, null, null,
                 null, null, null, listeners);
     }
 
     public String getHandlerClass() { return handlerClass; }
-    public boolean isHttpTask() { return httpMode || (url != null && !url.isBlank()); }
+    public boolean isHttpTask() { return httpMode; }
     public String getUrl() { return url; }
     public String getMethod() { return method; }
     public Map<String, String> getHeaders() { return headers; }

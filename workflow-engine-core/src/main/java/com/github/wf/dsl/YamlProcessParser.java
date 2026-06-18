@@ -132,6 +132,7 @@ public class YamlProcessParser implements ProcessParser {
                 List<RoutingRule> resultRoutes = buildRoutes(ny.resultRouting);
                 List<RoutingRule> exceptionRoutes = buildRoutes(ny.exceptionRouting);
                 return new ServiceTask(ny.id, ny.name, ny.handlerClass,
+                        ny.httpMode,
                         ny.url, ny.method, ny.headers, ny.body,
                         retryConfig, resultRoutes, exceptionRoutes, listeners);
             case "exclusiveGateway": return new ExclusiveGateway(ny.id, ny.name, listeners);
