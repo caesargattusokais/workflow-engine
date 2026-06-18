@@ -41,6 +41,7 @@ public class DraftController {
         draft.put("nodes", body.getOrDefault("nodes", List.of()));
         draft.put("edges", body.getOrDefault("edges", List.of()));
         draft.put("createdAt", System.currentTimeMillis());
+        draft.put("version", 1);
         store.put(key(userId, id), draft);
         return draft;
     }
@@ -52,6 +53,8 @@ public class DraftController {
         var d = store.get(key(userId, id));
         if (d == null) throw new RuntimeException("Draft not found: " + id);
         if (body.containsKey("name")) d.put("name", body.get("name"));
+        int currentVersion = d.get("version") instanceof Number ? ((Number)d.get("version")).intValue() : 1;
+        d.put("version", currentVersion + 1);
         if (body.containsKey("nodes")) d.put("nodes", body.get("nodes"));
         if (body.containsKey("edges")) d.put("edges", body.get("edges"));
         return d;

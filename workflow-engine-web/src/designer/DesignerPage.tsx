@@ -9,6 +9,7 @@ import { graphToYaml } from './graphToYaml';
 interface Draft {
   id: string;
   name: string;
+  version: number;
   nodes: Node[];
   edges: Edge[];
   createdAt: number;
@@ -140,7 +141,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const handleDeploy = async () => {
     if (nodes.length === 0) { setToast('Add some nodes first'); return; }
     try {
-      const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow');
+      const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow', activeDraft?.version || 1);
       const positions: Record<string, {x:number;y:number}> = {};
       for (const n of nodes) positions[n.id] = n.position;
       const result = await deployDefinition(yaml, positions);
@@ -282,7 +283,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 className={`px-2 py-1.5 cursor-pointer border-b border-gray-800 text-xs flex justify-between items-center group
                   ${d.id === activeId ? 'bg-blue-600/30 border-l-2 border-l-blue-500' : 'hover:bg-gray-700'}`}>
                 <div className="truncate flex-1">
-                  <div className="text-gray-300 truncate">{d.name}</div>
+                  <div className="text-gray-300 truncate">{d.name} <span className="text-[10px] text-gray-600">v{d.version || 1}</span></div>
                   <div className="text-[10px] text-gray-600">
                     {d.nodes.length} nodes
                     {(() => {

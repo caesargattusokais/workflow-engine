@@ -6,10 +6,10 @@ interface ConditionItem {
   isDefault: boolean;
 }
 
-export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workflow'): string {
+export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workflow', version: number = 1): string {
   const lines: string[] = [];
   lines.push(`id: ${name}`);
-  lines.push('version: 1');
+  lines.push(`version: ${version}`);
   lines.push('nodes:');
 
   for (const node of nodes) {
