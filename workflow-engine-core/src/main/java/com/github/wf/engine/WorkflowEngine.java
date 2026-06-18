@@ -129,16 +129,16 @@ public class WorkflowEngine {
 
     static class DelayedTrigger implements Delayed {
         final String instanceId;
-        final long triggerTime;
+        final long deadline; // System.nanoTime() — monotonic
         DelayedTrigger(String iid, long delayMs) {
             this.instanceId = iid;
-            this.triggerTime = System.currentTimeMillis() + delayMs;
+            this.deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(delayMs);
         }
         public long getDelay(TimeUnit unit) {
-            return unit.convert(triggerTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            return unit.convert(deadline - System.nanoTime(), TimeUnit.NANOSECONDS);
         }
         public int compareTo(Delayed o) {
-            return Long.compare(triggerTime, ((DelayedTrigger)o).triggerTime);
+            return Long.compare(deadline, ((DelayedTrigger)o).deadline);
         }
     }
 
