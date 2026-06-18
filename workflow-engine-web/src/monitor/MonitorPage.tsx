@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
-import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, authHeaders } from '../api/client';
+import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, authHeaders, getInstance } from '../api/client';
 
 export default function MonitorPage() {
   const [instances, setInstances] = useState<any[]>([]);
@@ -21,6 +21,41 @@ export default function MonitorPage() {
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-refresh selected instance detail every 3s
+  useEffect(() => {
+    if (!selectedId) return;
+    const refresh = async () => {
+      try {
+        const inst = await getInstance(selectedId);
+        if (!inst) return;
+        // Update the instance in the list
+        setInstances(prev => prev.map(i => i.id === inst.id ? inst : i));
+        // Refresh graph with active nodes
+        try {
+          const graph = await getDefinitionGraph(inst.definitionId);
+          const activeIds: string[] = inst.activeNodeIds || [];
+          setNodes((graph.nodes || []).map((n: any) => ({
+            ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
+          })));
+          setEdges(graph.edges || []);
+        } catch {}
+        // Refresh tasks
+        try {
+          const ts = await queryTasks({ instanceId: selectedId });
+          setTasks(ts.filter((t: any) => t.status === 'PENDING'));
+        } catch {}
+        // Refresh history
+        try {
+          const h = await apiGet(`/instances/${selectedId}/history`);
+          setHistory(h || []);
+        } catch {}
+      } catch {}
+    };
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => clearInterval(interval);
+  }, [selectedId]);
 
   const loadInstance = useCallback(async (id: string) => {
     setSelectedId(id);
