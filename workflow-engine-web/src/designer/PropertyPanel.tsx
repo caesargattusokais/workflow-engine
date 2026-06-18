@@ -190,6 +190,20 @@ export default function PropertyPanel({ node, onChange }: {
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
             <CollapsibleSection title="Retry Config" defaultOpen={false}>
+              <label className="flex items-center gap-2 mb-2">
+                <input type="checkbox" checked={!!(node.data.retryEnabled as boolean)}
+                  onChange={e => {
+                    updateData('retryEnabled', e.target.checked);
+                    if (e.target.checked) {
+                      updateData('retryMaxAttempts', 3);
+                      updateData('retryDelayMs', 1000);
+                      updateData('retryBackoff', 2);
+                    }
+                  }}
+                  className="accent-blue-500" />
+                <span className="text-gray-400 text-xs">Enable Retry</span>
+              </label>
+              {(node.data.retryEnabled as boolean) && (<>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Max Attempts</span>
                 <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
@@ -211,6 +225,7 @@ export default function PropertyPanel({ node, onChange }: {
               <div className="text-gray-400 text-xs mb-1">Retry On (empty = retry all exceptions)</div>
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
                 onChange={v => updateData('retryOn', v)} />
+              </>)}
             </CollapsibleSection>
 
             {/* ── Result Routing ─────────────── */}
