@@ -42,10 +42,14 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workfl
 
     // ServiceTask fields
     if (node.type === 'serviceTask') {
-      if (data.handlerClass && !data.httpMode) {
+      const httpMode = data.httpMode as boolean;
+      if (httpMode) {
+        lines.push('    httpMode: true');
+      }
+      if (data.handlerClass && !httpMode) {
         lines.push(`    handlerClass: "${data.handlerClass}"`);
       }
-      if (data.url && data.httpMode) {
+      if (data.url && httpMode) {
         // Assemble URL with query params for GET/DELETE
         const paramEntries = (data.paramEntries as Array<{key:string;value:string}>) || [];
         const method = (data.method as string) || 'POST';

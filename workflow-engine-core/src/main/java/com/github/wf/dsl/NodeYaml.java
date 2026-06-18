@@ -11,6 +11,7 @@ public class NodeYaml {
     public List<String> candidateGroups;
     public String dynamicRouter;
     public String handlerClass;
+    public boolean httpMode;
     public String url;               // HTTP proxy mode
     public String method;             // GET/POST/PUT/DELETE
     public Map<String, String> headers;

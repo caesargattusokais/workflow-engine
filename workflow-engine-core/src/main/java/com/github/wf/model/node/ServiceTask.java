@@ -11,6 +11,7 @@ import java.util.Map;
 
 public class ServiceTask extends Node {
     private final String handlerClass;
+    private final boolean httpMode;
     private final String url;         // HTTP proxy mode
     private final String method;      // GET/POST/PUT/DELETE
     private final Map<String, String> headers;
@@ -28,6 +29,8 @@ public class ServiceTask extends Node {
                        List<String> listeners) {
         super(id, name, NodeType.SERVICE_TASK, listeners);
         this.handlerClass = handlerClass;
+        // httpMode is inferred: true if URL is set, or if handlerClass is absent and it's not a code task
+        this.httpMode = handlerClass == null || (url != null && !url.isBlank());
         this.url = url;
         this.method = method != null ? method : "POST";
         this.headers = headers != null ? Collections.unmodifiableMap(headers) : Collections.emptyMap();
@@ -54,11 +57,11 @@ public class ServiceTask extends Node {
     }
 
     public String getHandlerClass() { return handlerClass; }
+    public boolean isHttpTask() { return httpMode || (url != null && !url.isBlank()); }
     public String getUrl() { return url; }
     public String getMethod() { return method; }
     public Map<String, String> getHeaders() { return headers; }
     public String getBody() { return body; }
-    public boolean isHttpTask() { return url != null && !url.isBlank(); }
     public RetryConfig getRetryConfig() { return retryConfig; }
     public List<RoutingRule> getResultRouting() { return resultRouting; }
     public List<RoutingRule> getExceptionRouting() { return exceptionRouting; }
