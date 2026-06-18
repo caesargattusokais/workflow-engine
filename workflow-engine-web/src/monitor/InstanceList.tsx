@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 interface Instance {
-  id: string; definitionId: string; status: string;
+  id: string; definitionId: string; definitionVersion: number; status: string;
   variables: Record<string, unknown>;
   activeNodeIds: string[];
 }
@@ -59,6 +59,7 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
                 <span className={`w-2 h-2 rounded-full inline-block ${statusDot(inst.status)}`} />
                 <span className="text-gray-300">{inst.id.substring(0, 7)}</span>
                 <span className="text-[10px] text-gray-500">{inst.status}</span>
+                {inst.definitionVersion > 0 && <span className="text-[9px] text-gray-600 ml-0.5">v{inst.definitionVersion}</span>}
               </div>
             </div>
           ))}

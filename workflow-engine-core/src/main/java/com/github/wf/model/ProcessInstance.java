@@ -6,6 +6,7 @@ import java.util.*;
 public class ProcessInstance {
     private final String id;
     private final String definitionId;
+    private final int definitionVersion;
     private InstanceStatus status;
     private final Map<String, Object> variables;
     private Set<String> activeNodeIds;
@@ -13,8 +14,13 @@ public class ProcessInstance {
     private Instant completedAt;
 
     public ProcessInstance(String id, String definitionId, Map<String, Object> variables) {
+        this(id, definitionId, 0, variables);
+    }
+
+    public ProcessInstance(String id, String definitionId, int definitionVersion, Map<String, Object> variables) {
         this.id = id != null ? id : UUID.randomUUID().toString();
         this.definitionId = Objects.requireNonNull(definitionId);
+        this.definitionVersion = definitionVersion;
         this.status = InstanceStatus.RUNNING;
         this.variables = new HashMap<>(variables != null ? variables : Map.of());
         this.activeNodeIds = new HashSet<>();
@@ -23,6 +29,7 @@ public class ProcessInstance {
 
     public String getId() { return id; }
     public String getDefinitionId() { return definitionId; }
+    public int getDefinitionVersion() { return definitionVersion; }
     public InstanceStatus getStatus() { return status; }
     public Map<String, Object> getVariables() { return Collections.unmodifiableMap(variables); }
     public Set<String> getActiveNodeIds() { return Collections.unmodifiableSet(activeNodeIds); }

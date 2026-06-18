@@ -99,7 +99,7 @@ public class WorkflowEngine {
         ProcessDefinition def = processRepository.findLatestById(definitionId);
         if (def == null) throw new IllegalArgumentException("Process definition not found: " + definitionId);
 
-        ProcessInstance instance = new ProcessInstance(null, definitionId, variables);
+        ProcessInstance instance = new ProcessInstance(null, definitionId, def.getVersion(), variables);
         instanceRepository.save(instance);
 
         Node startNode = def.getStartNode();

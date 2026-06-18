@@ -7,6 +7,7 @@ import java.util.Set;
 
 public class InstanceDetailResponse {
     private String id, definitionId, status;
+    private int definitionVersion;
     private Map<String, Object> variables;
     private Set<String> activeNodeIds;
     private Instant createdAt, completedAt;
@@ -14,6 +15,7 @@ public class InstanceDetailResponse {
     public InstanceDetailResponse(ProcessInstance inst) {
         this.id = inst.getId();
         this.definitionId = inst.getDefinitionId();
+        this.definitionVersion = inst.getDefinitionVersion();
         this.status = inst.getStatus().name();
         this.variables = inst.getVariables();
         this.activeNodeIds = inst.getActiveNodeIds();
@@ -23,6 +25,7 @@ public class InstanceDetailResponse {
 
     public String getId() { return id; }
     public String getDefinitionId() { return definitionId; }
+    public int getDefinitionVersion() { return definitionVersion; }
     public String getStatus() { return status; }
     public Map<String, Object> getVariables() { return variables; }
     public Set<String> getActiveNodeIds() { return activeNodeIds; }

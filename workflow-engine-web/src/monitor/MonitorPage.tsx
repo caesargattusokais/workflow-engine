@@ -153,7 +153,7 @@ export default function MonitorPage() {
           <div className="w-56 bg-gray-800 border-l border-gray-700 p-3 text-xs overflow-y-auto">
             <div className="text-gray-400 font-semibold mb-2">Instance Detail</div>
             <div className="text-gray-500 mb-1">ID: <span className="text-gray-300">{selectedInst.id.substring(0,8)}</span></div>
-            <div className="text-gray-500 mb-1">Def: <span className="text-gray-300">{selectedInst.definitionId}</span></div>
+            <div className="text-gray-500 mb-1">Def: <span className="text-gray-300">{selectedInst.definitionId}</span> <span className="text-gray-600">v{selectedInst.definitionVersion||0}</span></div>
             <div className="mb-2">
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold
                 ${selectedInst.status==='RUNNING'?'bg-green-900 text-green-400':
