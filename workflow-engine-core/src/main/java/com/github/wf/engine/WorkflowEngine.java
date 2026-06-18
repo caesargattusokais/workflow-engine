@@ -73,8 +73,8 @@ public class WorkflowEngine {
 
     public ProcessDefinition deploy(String yaml) {
         ProcessDefinition def = processParser.parse(yaml);
-        ProcessDefinition existing = processRepository.findLatestById(def.getId());
-        int version = (existing != null) ? existing.getVersion() + 1 : def.getVersion();
+        // Use the version from the YAML; if that exact version exists, return it (idempotent)
+        int version = def.getVersion();
         ProcessDefinition versioned = new ProcessDefinition(def.getId(), def.getName(), version,
                 new ArrayList<>(def.getNodes().values()), def.getTransitions());
         processRepository.save(versioned);
@@ -84,9 +84,7 @@ public class WorkflowEngine {
     public ProcessDefinition deploy(java.io.File file) {
         try (java.io.FileReader reader = new java.io.FileReader(file)) {
             ProcessDefinition def = processParser.parse(reader);
-            ProcessDefinition existing = processRepository.findLatestById(def.getId());
-            int version = (existing != null) ? existing.getVersion() + 1 : def.getVersion();
-            ProcessDefinition versioned = new ProcessDefinition(def.getId(), def.getName(), version,
+            ProcessDefinition versioned = new ProcessDefinition(def.getId(), def.getName(), def.getVersion(),
                     new ArrayList<>(def.getNodes().values()), def.getTransitions());
             processRepository.save(versioned);
             return versioned;
