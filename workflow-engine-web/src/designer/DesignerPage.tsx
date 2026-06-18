@@ -43,13 +43,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     return () => window.removeEventListener('click', close);
   }, []);
 
-  // Poll instances to show counts per draft (only when drafts exist)
+  // Fetch instances once when drafts change (for count display)
   useEffect(() => {
-    if (drafts.length === 0) { setInstances([]); return; }
-    const poll = () => listInstances().then(setInstances).catch(() => {});
-    poll();
-    const t = setInterval(poll, 10000);
-    return () => clearInterval(t);
+    if (drafts.length > 0) listInstances().then(setInstances).catch(() => {});
   }, [drafts.length]);
 
   // ── Load drafts from server on mount ──
@@ -154,6 +150,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       try {
         const inst = await startInstance(result.id, {});
         setToast(`Deployed & started! Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
+        listInstances().then(setInstances).catch(() => {});
       } catch {
         setToast(`Deployed: ${result.id} (auto-start failed)`);
       }
