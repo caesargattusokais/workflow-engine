@@ -90,6 +90,11 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workfl
       lines.push(`      maxAttempts: ${data.retryMaxAttempts}`);
       lines.push(`      delayMs: ${data.retryDelayMs || 1000}`);
       lines.push(`      backoffMultiplier: ${data.retryBackoff || 2}`);
+      const retryOn = data.retryOn as any[] | undefined;
+      if (retryOn && retryOn.length > 0) {
+        lines.push('      retryOn:');
+        for (const r of retryOn) { if (r.expr) lines.push(`        - expr: "${r.expr}"`); }
+      }
     }
     // Result routes
     const resultRoutes = data.resultRoutes as any[] | undefined;
