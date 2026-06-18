@@ -2,10 +2,13 @@ package com.github.wf.engine.runner;
 
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
+import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.ext.ServiceTaskHandler;
 import com.github.wf.model.*;
 import com.github.wf.model.node.ServiceTask;
 import com.github.wf.spi.InstanceRepository;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ServiceTaskRunner implements NodeRunner {
 
+    private static final Log log = LogFactory.getLog(ServiceTaskRunner.class);
     private final Map<String, ServiceTaskHandler> handlerRegistry = new ConcurrentHashMap<>();
     private final java.util.function.BiConsumer<String, Long> retryScheduler;
 
@@ -36,6 +40,8 @@ public class ServiceTaskRunner implements NodeRunner {
 
         ProcessInstance instance = repo.findById(context.getInstanceId());
         Map<String, Object> variables = new HashMap<>(instance.getVariables());
+
+        log.warn("Running ServiceTask " + exec.getInstanceId());
 
         try {
             boolean httpMode = serviceTask.isHttpTask();
@@ -107,6 +113,7 @@ public class ServiceTaskRunner implements NodeRunner {
                     repo.update(instance);
                     if (retryScheduler != null) {
                         retryScheduler.accept(exec.getInstanceId(), delay);
+                        log.warn("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");
                     }
                     exec.setStatus(ExecutionStatus.WAITING);
                     exec.setRetryState("RETRY_PENDING");

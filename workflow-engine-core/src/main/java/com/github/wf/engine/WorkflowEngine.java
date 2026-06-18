@@ -13,6 +13,8 @@ import com.github.wf.spi.TaskRepository;
 import com.github.wf.task.Task;
 import com.github.wf.task.TaskQuery;
 import com.github.wf.task.TaskStatus;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -20,6 +22,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class WorkflowEngine {
 
+    private static final Log log = LogFactory.getLog(WorkflowEngine.class);
     public final ProcessRepository processRepository;
     public final InstanceRepository instanceRepository;
     public final TaskRepository taskRepository;
@@ -45,6 +48,7 @@ public class WorkflowEngine {
                 try {
                     DelayedTrigger dt = retryQueue.take();
                     trigger(dt.instanceId);
+                    log.warn("Retrying instance " + dt.instanceId);
                 } catch (InterruptedException e) { break; }
             }
         }, "wf-retry-daemon");
@@ -154,24 +158,25 @@ public class WorkflowEngine {
             ProcessDefinition def = processRepository.findLatestById(instance.getDefinitionId());
             if (def == null) return;
 
+            // Reactivate retry-pending executions BEFORE the loop (only from daemon wake-ups)
+            List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+            for (Execution exec : executions) {
+                if (exec.isWaiting() && "RETRY_PENDING".equals(exec.getRetryState())) {
+                    exec.setStatus(ExecutionStatus.ACTIVE);
+                    exec.setRetryState(null);
+                    instanceRepository.updateExecution(exec);
+                }
+            }
+
             boolean advanced;
             do {
                 advanced = false;
-                List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+                executions = instanceRepository.findActiveExecutions(instanceId);
 
                 if (executions.isEmpty()) {
                     instance.setStatus(InstanceStatus.COMPLETED);
                     instanceRepository.update(instance);
                     return;
-                }
-
-                // Reactivate retry-pending executions (woken by DelayQueue daemon)
-                for (Execution exec : executions) {
-                    if (exec.isWaiting() && "RETRY_PENDING".equals(exec.getRetryState())) {
-                        exec.setStatus(ExecutionStatus.ACTIVE);
-                        exec.setRetryState(null);
-                        instanceRepository.updateExecution(exec);
-                    }
                 }
 
                 for (Execution exec : executions) {
