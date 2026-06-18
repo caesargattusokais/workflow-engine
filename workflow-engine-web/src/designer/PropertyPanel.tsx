@@ -189,8 +189,8 @@ export default function PropertyPanel({ node, onChange }: {
             )}
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
-            <CollapsibleSection title="Retry Config" defaultOpen={false}>
-              <label className="flex items-center gap-2 mb-2">
+            <div className="border-t border-gray-700 pt-2 mt-2">
+              <label className="flex items-center gap-2 mb-1 cursor-pointer">
                 <input type="checkbox" checked={!!(node.data.retryEnabled as boolean)}
                   onChange={e => {
                     updateData('retryEnabled', e.target.checked);
@@ -207,8 +207,8 @@ export default function PropertyPanel({ node, onChange }: {
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Max Attempts</span>
                 <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
-                  value={(node.data.retryMaxAttempts as number) || 1}
-                  onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||1)} />
+                  value={(node.data.retryMaxAttempts as number) || 3}
+                  onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||3)} />
               </label>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Delay (ms)</span>
@@ -226,7 +226,7 @@ export default function PropertyPanel({ node, onChange }: {
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
                 onChange={v => updateData('retryOn', v)} />
               </>)}
-            </CollapsibleSection>
+            </div>
 
             {/* ── Result Routing ─────────────── */}
             <CollapsibleSection title="Result Routing" defaultOpen={false}>
