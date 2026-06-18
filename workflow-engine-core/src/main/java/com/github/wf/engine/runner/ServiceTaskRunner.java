@@ -34,7 +34,9 @@ public class ServiceTaskRunner implements NodeRunner {
             if (serviceTask.isHttpTask()) {
                 result = executeHttp(serviceTask, variables);
             } else {
-                result = getHandler(serviceTask.getHandlerClass()).execute(variables);
+                String hc = serviceTask.getHandlerClass();
+                if (hc == null || hc.isEmpty()) throw new RuntimeException("handlerClass is required for code-mode serviceTask");
+                result = getHandler(hc).execute(variables);
             }
 
             // Success — namespace result by node ID to avoid conflicts
