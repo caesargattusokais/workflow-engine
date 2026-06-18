@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
-import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance } from '../api/client';
+import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, authHeaders } from '../api/client';
 
 export default function MonitorPage() {
   const [instances, setInstances] = useState<any[]>([]);
@@ -43,7 +43,7 @@ export default function MonitorPage() {
       setTasks(ts.filter((t: any) => t.status === 'PENDING'));
     } catch { setTasks([]); }
     try {
-      const h = await fetch(`/api/instances/${id}/history`).then(r => r.json());
+      const h = await apiGet(`/instances/${id}/history`);
       setHistory(h || []);
     } catch { setHistory([]); }
     // Build node name map from graph
@@ -62,10 +62,7 @@ export default function MonitorPage() {
 
   const handleReject = async (taskId: string) => {
     try {
-      await fetch(`/api/tasks/${taskId}/reject`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: 'rejected' })
-      });
+      await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' });
     } catch {}
     if (selectedId) loadInstance(selectedId);
   };
@@ -88,17 +85,14 @@ export default function MonitorPage() {
   const [startVars, setStartVars] = useState('');
 
   useEffect(() => {
-    fetch('/api/definitions').then(r => r.json()).then(setDefinitions).catch(() => {});
+    apiGet('/definitions').then(setDefinitions).catch(() => {});
   }, [instances]);
 
   const handleStart = async () => {
     if (!startDefId) return;
     try {
       const vars = startVars ? JSON.parse(startVars) : {};
-      await fetch('/api/instances', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ definitionId: startDefId, variables: vars })
-      });
+      await startInstance(startDefId, vars);
       setStartVars('');
       listInstances().then(setInstances);
     } catch (e: any) { alert('Start failed: ' + e.message); }

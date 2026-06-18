@@ -75,4 +75,5 @@ export async function updateDraft(id: string, data: Record<string, unknown>) {
 }
 export async function deleteDraft(id: string) { return apiDelete(`/drafts/${id}`); }
 
-export { userId };
+
+export { userId, authHeaders, apiGet, apiPost };

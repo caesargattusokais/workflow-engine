@@ -3,7 +3,7 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, listInstances } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 
 interface Draft {
@@ -45,7 +45,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   // Poll instances to show counts per draft
   useEffect(() => {
-    const poll = () => fetch('/api/instances').then(r => r.json()).then(setInstances).catch(() => {});
+    const poll = () => listInstances().then(setInstances).catch(() => {});
     poll();
     const t = setInterval(poll, 3000);
     return () => clearInterval(t);
