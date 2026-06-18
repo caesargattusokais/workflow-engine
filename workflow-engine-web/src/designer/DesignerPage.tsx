@@ -145,6 +145,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const positions: Record<string, {x:number;y:number}> = {};
       for (const n of nodes) positions[n.id] = n.position;
       const result = await deployDefinition(yaml, positions);
+      // Bump draft version after deploy
+      if (activeId) updateDraft(activeId, { version: (activeDraft?.version || 1) + 1 }).catch(() => {});
+      setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: (d.version||1)+1} : d));
       setDeployedYaml(yaml);
       setDeployedId(result.id);
       // Auto-start instance

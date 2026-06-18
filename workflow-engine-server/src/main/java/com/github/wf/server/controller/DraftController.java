@@ -53,8 +53,6 @@ public class DraftController {
         var d = store.get(key(userId, id));
         if (d == null) throw new RuntimeException("Draft not found: " + id);
         if (body.containsKey("name")) d.put("name", body.get("name"));
-        int currentVersion = d.get("version") instanceof Number ? ((Number)d.get("version")).intValue() : 1;
-        d.put("version", currentVersion + 1);
         if (body.containsKey("nodes")) d.put("nodes", body.get("nodes"));
         if (body.containsKey("edges")) d.put("edges", body.get("edges"));
         return d;
