@@ -190,7 +190,8 @@ export default function PropertyPanel({ node, onChange }: {
             )}
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
-            <CollapsibleSection title="Retry Config" defaultOpen={false}>
+            <div className="border-t border-gray-700 pt-2 mt-2">
+              <span className="text-gray-400 text-xs font-semibold">Retry Config</span>
               <div className="text-[10px] text-gray-500 mb-1">Set maxAttempts &gt; 1 to enable retry. Leave at 1 for no retry.</div>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Max Attempts</span>
@@ -213,19 +214,23 @@ export default function PropertyPanel({ node, onChange }: {
               <div className="text-gray-400 text-xs mb-1">Retry On (empty = retry all exceptions)</div>
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
                 onChange={v => updateData('retryOn', v)} />
-            </CollapsibleSection>
+            </div>
 
             {/* ── Result Routing ─────────────── */}
-            <CollapsibleSection title="Result Routing" defaultOpen={false}>
+            <div className="border-t border-gray-700 pt-2 mt-2">
+              <span className="text-gray-400 text-xs font-semibold">Result Routing</span>
+              <div className="text-[10px] text-gray-500 mb-1">Use result.xxx in expressions, e.g. result.status == 'OK'</div>
               <RouteEditor entries={(node.data.resultRoutes as any[]) || []}
                 onChange={v => updateData('resultRoutes', v)} label="result" />
-            </CollapsibleSection>
+            </div>
 
             {/* ── Exception Routing ──────────── */}
-            <CollapsibleSection title="Exception Routing" defaultOpen={false}>
+            <div className="border-t border-gray-700 pt-2 mt-2">
+              <span className="text-gray-400 text-xs font-semibold">Exception Routing</span>
+              <div className="text-[10px] text-gray-500 mb-1">Use exception.type/message in expressions</div>
               <RouteEditor entries={(node.data.exceptionRoutes as any[]) || []}
                 onChange={v => updateData('exceptionRoutes', v)} label="exception" />
-            </CollapsibleSection>
+            </div>
 
             <ReturnValueEditor
               entries={(node.data.returnValues as Array<{key:string;type:string}>) || []}
