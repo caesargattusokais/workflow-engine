@@ -201,7 +201,7 @@ export default function PropertyPanel({ node, onChange }: {
                     updateData('retryBackoff', 2);
                   }
                 }}
-                className={`text-xs px-2 py-0.5 rounded mb-2 ${
+                className={`relative z-20 text-xs px-2 py-0.5 rounded mb-2 ${
                   node.data.retryEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'
                 }`}>
                 {node.data.retryEnabled ? 'Retry: ON' : 'Retry: OFF'}
