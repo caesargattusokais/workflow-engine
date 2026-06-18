@@ -77,7 +77,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     if (!activeId || !loaded || !dirty) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      doSave();
+      // Auto-save doesn't bump version
+      updateDraft(activeId, { nodes, edges }).catch(() => {});
+      setDirty(false);
     }, 2000);
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
@@ -86,7 +88,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     if (!activeId) return;
     setSaving(true);
     try {
-      await updateDraft(activeId, { nodes, edges });
+      const newVersion = (activeDraft?.version || 1) + 1;
+      await updateDraft(activeId, { nodes, edges, version: newVersion });
+      setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
       setDirty(false);
     } catch { alert('Save failed — server unreachable'); }
     finally { setSaving(false); }
@@ -145,9 +149,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const positions: Record<string, {x:number;y:number}> = {};
       for (const n of nodes) positions[n.id] = n.position;
       const result = await deployDefinition(yaml, positions);
-      // Bump draft version after deploy
-      if (activeId) updateDraft(activeId, { version: (activeDraft?.version || 1) + 1 }).catch(() => {});
-      setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: (d.version||1)+1} : d));
       setDeployedYaml(yaml);
       setDeployedId(result.id);
       // Auto-start instance
