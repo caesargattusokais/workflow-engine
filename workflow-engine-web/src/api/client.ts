@@ -1,104 +1,78 @@
 const BASE = '/api';
 
-export async function listInstances() {
-  const res = await fetch(`${BASE}/instances`);
-  if (!res.ok) throw new Error(`listInstances failed: ${res.status}`);
+function userId(): string {
+  return localStorage.getItem('userId') || 'anonymous';
+}
+
+function authHeaders(extra?: Record<string,string>): Record<string,string> {
+  return { 'X-User-Id': userId(), ...(extra || {}) };
+}
+
+async function apiGet(path: string) {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
   return res.json();
 }
+
+async function apiPost(path: string, body?: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  return res.json();
+}
+
+async function apiPut(path: string, body: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(path: string) {
+  const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+}
+
+export async function listInstances() { return apiGet('/instances'); }
+export async function startInstance(defId: string, vars: Record<string, unknown>) {
+  return apiPost('/instances', { definitionId: defId, variables: vars });
+}
+export async function getInstance(id: string) { return apiGet(`/instances/${id}`); }
+export async function resumeInstance(id: string) { return apiPost(`/instances/${id}/resume`); }
+export async function terminateInstance(id: string, reason?: string) {
+  return apiPost(`/instances/${id}/terminate`, { reason: reason || 'terminated by user' });
+}
+export async function deleteInstance(id: string) { return apiDelete(`/instances/${id}`); }
 
 export async function queryTasks(params: { instanceId: string }) {
-  const url = new URL(`${BASE}/tasks`, window.location.origin);
-  url.searchParams.set('instanceId', params.instanceId);
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`queryTasks failed: ${res.status}`);
-  return res.json();
+  const q = new URLSearchParams(params).toString();
+  return apiGet(`/tasks?${q}`);
 }
-
 export async function completeTask(taskId: string, vars?: Record<string,unknown>, comment?: string) {
-  const res = await fetch(`${BASE}/tasks/${taskId}/complete`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ variables: vars || {}, comment: comment || '' })
-  });
-  if (!res.ok) throw new Error(`completeTask failed: ${res.status}`);
-  return res.json();
-}
-
-export async function getDefinitionGraph(definitionId: string) {
-  const res = await fetch(`${BASE}/definitions/${encodeURIComponent(definitionId)}/graph`);
-  if (!res.ok) throw new Error(`getDefinitionGraph failed: ${res.status}`);
-  return res.json();
-}
-
-export async function resumeInstance(instanceId: string) {
-  const res = await fetch(`${BASE}/instances/${instanceId}/resume`, { method: 'POST' });
-  if (!res.ok) throw new Error(`resumeInstance failed: ${res.status}`);
-  return res.json();
-}
-
-export async function deleteInstance(instanceId: string) {
-  const res = await fetch(`${BASE}/instances/${instanceId}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error(`deleteInstance failed: ${res.status}`);
-}
-
-export async function terminateInstance(instanceId: string, reason?: string) {
-  const res = await fetch(`${BASE}/instances/${instanceId}/terminate`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reason: reason || 'terminated by user' })
-  });
-  if (!res.ok) throw new Error(`terminateInstance failed: ${res.status}`);
-  return res.json();
-}
-
-export async function startInstance(defId: string, vars: Record<string, unknown>) {
-  const res = await fetch(`${BASE}/instances`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ definitionId: defId, variables: vars })
-  });
-  if (!res.ok) throw new Error(`startInstance failed: ${res.status}`);
-  return res.json();
+  return apiPost(`/tasks/${taskId}/complete`, { variables: vars || {}, comment: comment || '' });
 }
 
 export async function deployDefinition(yaml: string, positions?: Record<string, {x:number;y:number}>) {
-  const res = await fetch(`${BASE}/definitions`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ yaml, positions })
-  });
-  if (!res.ok) throw new Error(`deployDefinition failed: ${res.status}`);
-  return res.json();
+  return apiPost('/definitions', { yaml, positions });
+}
+export async function getDefinitionGraph(definitionId: string) {
+  return apiGet(`/definitions/${encodeURIComponent(definitionId)}/graph`);
 }
 
-// ── Drafts ─────────────────────────────
-export async function listDrafts() {
-  const res = await fetch(`${BASE}/drafts`);
-  if (!res.ok) throw new Error(`listDrafts failed: ${res.status}`);
-  return res.json();
-}
-
-export async function getDraft(id: string) {
-  const res = await fetch(`${BASE}/drafts/${id}`);
-  if (!res.ok) throw new Error(`getDraft failed: ${res.status}`);
-  return res.json();
-}
-
+export async function listDrafts() { return apiGet('/drafts'); }
+export async function getDraft(id: string) { return apiGet(`/drafts/${id}`); }
 export async function createDraft(name: string) {
-  const res = await fetch(`${BASE}/drafts`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, nodes: [], edges: [] })
-  });
-  if (!res.ok) throw new Error(`createDraft failed: ${res.status}`);
-  return res.json();
+  return apiPost('/drafts', { name, nodes: [], edges: [] });
 }
-
 export async function updateDraft(id: string, data: Record<string, unknown>) {
-  const res = await fetch(`${BASE}/drafts/${id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  if (!res.ok) throw new Error(`updateDraft failed: ${res.status}`);
-  return res.json();
+  return apiPut(`/drafts/${id}`, data);
 }
+export async function deleteDraft(id: string) { return apiDelete(`/drafts/${id}`); }
 
-export async function deleteDraft(id: string) {
-  const res = await fetch(`${BASE}/drafts/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error(`deleteDraft failed: ${res.status}`);
-}
+export { userId };

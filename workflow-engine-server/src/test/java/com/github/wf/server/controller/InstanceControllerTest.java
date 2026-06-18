@@ -46,12 +46,12 @@ class InstanceControllerTest {
                   - from: t
                     to: e
                 """);
-        defCtrl.deploy(dr);
+        defCtrl.deploy("test-user", dr);
 
         StartInstanceRequest sir = new StartInstanceRequest();
         sir.setDefinitionId("f");
         sir.setVariables(Map.of("x", 1));
-        var inst = instCtrl.start(sir);
+        var inst = instCtrl.start("test-user", sir);
         assertThat(inst.getStatus()).isEqualTo("RUNNING");
 
         var tasks = taskCtrl.list("user1", null, inst.getId(), null);

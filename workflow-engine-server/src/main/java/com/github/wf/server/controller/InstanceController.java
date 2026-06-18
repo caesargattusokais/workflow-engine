@@ -16,14 +16,18 @@ public class InstanceController {
     public InstanceController(WorkflowEngine engine) { this.engine = engine; }
 
     @PostMapping
-    public InstanceDetailResponse start(@RequestBody StartInstanceRequest req) {
-        ProcessInstance inst = engine.start(req.getDefinitionId(),
-                req.getVariables() != null ? req.getVariables() : Map.of());
+    public InstanceDetailResponse start(@RequestHeader("X-User-Id") String userId,
+                                         @RequestBody StartInstanceRequest req) {
+        Map<String, Object> vars = req.getVariables() != null
+                ? new HashMap<>(req.getVariables()) : new HashMap<>();
+        vars.put("_userId", userId);
+        ProcessInstance inst = engine.start(req.getDefinitionId(), vars);
         return new InstanceDetailResponse(inst);
     }
 
     @GetMapping
     public List<InstanceDetailResponse> list(
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String definitionId) {
         java.util.List<com.github.wf.model.ProcessInstance> all;
@@ -33,6 +37,7 @@ public class InstanceController {
             all = engine.instanceRepository.findAll();
         }
         return all.stream()
+                .filter(i -> userId.equals(i.getVariable("_userId")))
                 .filter(i -> status == null || i.getStatus().name().equals(status))
                 .map(InstanceDetailResponse::new)
                 .toList();
