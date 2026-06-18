@@ -202,12 +202,15 @@ export default function PropertyPanel({ node, onChange }: {
                   value={(node.data.retryDelayMs as number) || 1000}
                   onChange={e => updateData('retryDelayMs', parseInt(e.target.value)||1000)} />
               </label>
-              <label className="block mb-1">
+              <label className="block mb-2">
                 <span className="text-gray-400 text-xs">Backoff Multiplier</span>
                 <input type="number" step="0.5" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                   value={(node.data.retryBackoff as number) || 2}
                   onChange={e => updateData('retryBackoff', parseFloat(e.target.value)||2)} />
               </label>
+              <div className="text-gray-400 text-xs mb-1">Retry On (empty = retry all exceptions)</div>
+              <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
+                onChange={v => updateData('retryOn', v)} />
             </CollapsibleSection>
 
             {/* ── Result Routing ─────────────── */}
@@ -433,6 +436,29 @@ function RouteEditor({ entries, onChange, label }: { entries: any[]; onChange: (
         </div>
       ))}
       <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300 mt-0.5">+ Add route</button>
+    </div>
+  );
+}
+
+// ── RetryOn editor (simple SpEL expressions) ──
+function RetryOnEditor({ entries, onChange }: { entries: any[]; onChange: (v: any[]) => void }) {
+  const add = () => onChange([...entries, { expr: '' }]);
+  const remove = (i: number) => onChange(entries.filter((_:any,idx:number) => idx !== i));
+  const update = (i: number, v: string) => {
+    const copy = entries.map((e:any,idx:number) => idx===i ? {...e, expr:v} : e);
+    onChange(copy);
+  };
+  return (
+    <div>
+      {entries.map((e:any,i:number) => (
+        <div key={i} className="flex gap-1 mb-1">
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            value={e.expr||''} placeholder="exception.type.contains('TimeoutException')"
+            onChange={ev => update(i, ev.target.value)} />
+          <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
+        </div>
+      ))}
+      <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">+ Add condition</button>
     </div>
   );
 }
