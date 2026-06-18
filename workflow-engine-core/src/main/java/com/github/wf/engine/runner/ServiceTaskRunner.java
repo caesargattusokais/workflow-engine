@@ -23,6 +23,7 @@ public class ServiceTaskRunner implements NodeRunner {
     @Override
     public boolean run(Node node, ExecutionContext context) {
         ServiceTask serviceTask = (ServiceTask) node;
+        String ns = node.getId() + "_";
         Execution exec = context.getExecution();
         InstanceRepository repo = context.getInstanceRepository();
 
@@ -49,7 +50,6 @@ public class ServiceTaskRunner implements NodeRunner {
 
             // Success — namespace result by node ID to avoid conflicts
             if (result != null) {
-                String ns = node.getId() + "_";
                 for (Map.Entry<String, Object> e : result.entrySet()) {
                     instance.setVariable(ns + e.getKey(), e.getValue());
                     variables.put(ns + e.getKey(), e.getValue());
@@ -130,8 +130,8 @@ public class ServiceTaskRunner implements NodeRunner {
             repo.updateExecution(exec);
 
             // Set suspend reason in instance variables
-            instance.setVariable("_suspendReason", ei.getMessage());
-            instance.setVariable("_suspendException", ei.getType());
+            instance.setVariable(ns+"suspendReason", ei.getMessage());
+            instance.setVariable(ns+"suspendException", ei.getType());
             repo.update(instance);
 
             return true;
