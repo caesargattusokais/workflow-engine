@@ -92,15 +92,14 @@ public class ServiceTaskRunner implements NodeRunner {
             ExceptionInfo ei = new ExceptionInfo(e);
             variables.put("exception", ei);
 
-            // Check retry
+            // Check retry — inline sleep, no external scheduler needed
             RetryConfig rc = serviceTask.getRetryConfig();
             if (rc != null && exec.getRetryAttempt() < rc.getMaxAttempts()) {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
-                    exec.setNextRetryAt(System.currentTimeMillis() + delay);
-                    exec.setStatus(ExecutionStatus.WAITING);
-                    repo.updateExecution(exec);
-                    return true; // waiting for retry timer
+                    try { Thread.sleep(delay); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    // Stay at current node, let trigger loop re-execute
+                    return true;
                 }
             }
 
