@@ -84,6 +84,32 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name: string = 'workfl
       }
     }
 
+    // Retry config
+    if (node.type === 'serviceTask' && data.retryMaxAttempts) {
+      lines.push('    retry:');
+      lines.push(`      maxAttempts: ${data.retryMaxAttempts}`);
+      lines.push(`      delayMs: ${data.retryDelayMs || 1000}`);
+      lines.push(`      backoffMultiplier: ${data.retryBackoff || 2}`);
+    }
+    // Result routes
+    const resultRoutes = data.resultRoutes as any[] | undefined;
+    if (resultRoutes && resultRoutes.length > 0) {
+      lines.push('    resultRouting:');
+      for (const r of resultRoutes) {
+        if (r.isDefault) { lines.push(`      - default: true`); lines.push(`        to: ${r.to}`); }
+        else { lines.push(`      - expr: "${r.expr}"`); lines.push(`        to: ${r.to}`); }
+      }
+    }
+    // Exception routes
+    const exceptionRoutes = data.exceptionRoutes as any[] | undefined;
+    if (exceptionRoutes && exceptionRoutes.length > 0) {
+      lines.push('    exceptionRouting:');
+      for (const r of exceptionRoutes) {
+        if (r.isDefault) { lines.push(`      - default: true`); lines.push(`        to: ${r.to}`); }
+        else { lines.push(`      - expr: "${r.expr}"`); lines.push(`        to: ${r.to}`); }
+      }
+    }
+
     // Candidate groups
     const groups = data.candidateGroups as string[] | undefined;
     if (groups && groups.length > 0) {
