@@ -190,19 +190,21 @@ export default function PropertyPanel({ node, onChange }: {
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
             <div className="border-t border-gray-700 pt-2 mt-2">
-              <label className="flex items-center gap-2 mb-1 cursor-pointer">
-                <input type="checkbox" checked={!!(node.data.retryEnabled as boolean)}
-                  onChange={e => {
-                    updateData('retryEnabled', e.target.checked);
-                    if (e.target.checked) {
-                      updateData('retryMaxAttempts', 3);
-                      updateData('retryDelayMs', 1000);
-                      updateData('retryBackoff', 2);
-                    }
-                  }}
-                  className="accent-blue-500" />
-                <span className="text-gray-400 text-xs">Enable Retry</span>
-              </label>
+              <button
+                onClick={() => {
+                  const enabled = !(node.data.retryEnabled as boolean);
+                  updateData('retryEnabled', enabled);
+                  if (enabled) {
+                    updateData('retryMaxAttempts', 3);
+                    updateData('retryDelayMs', 1000);
+                    updateData('retryBackoff', 2);
+                  }
+                }}
+                className={`text-xs px-2 py-0.5 rounded mb-2 ${
+                  node.data.retryEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'
+                }`}>
+                {node.data.retryEnabled ? 'Retry: ON' : 'Retry: OFF'}
+              </button>
               {(node.data.retryEnabled as boolean) && (<>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Max Attempts</span>
