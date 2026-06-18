@@ -104,6 +104,8 @@ public class ServiceTaskRunner implements NodeRunner {
             if (rc != null && exec.getRetryAttempt() < rc.getMaxAttempts()) {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
+                    System.out.println("[WF] Retry #" + exec.getRetryAttempt() + " for " + exec.getInstanceId()
+                            + " node=" + node.getId() + " delay=" + delay + "ms");
                     if (retryScheduler != null) {
                         retryScheduler.accept(exec.getInstanceId(), delay);
                     }
