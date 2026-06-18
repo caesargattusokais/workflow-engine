@@ -188,6 +188,40 @@ export default function PropertyPanel({ node, onChange }: {
               </>
             )}
             {/* Return Values — shared by both modes */}
+            {/* ── Retry Config ──────────────── */}
+            <CollapsibleSection title="Retry Config" defaultOpen={false}>
+              <label className="block mb-1">
+                <span className="text-gray-400 text-xs">Max Attempts</span>
+                <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                  value={(node.data.retryMaxAttempts as number) || 1}
+                  onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||1)} />
+              </label>
+              <label className="block mb-1">
+                <span className="text-gray-400 text-xs">Delay (ms)</span>
+                <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                  value={(node.data.retryDelayMs as number) || 1000}
+                  onChange={e => updateData('retryDelayMs', parseInt(e.target.value)||1000)} />
+              </label>
+              <label className="block mb-1">
+                <span className="text-gray-400 text-xs">Backoff Multiplier</span>
+                <input type="number" step="0.5" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                  value={(node.data.retryBackoff as number) || 2}
+                  onChange={e => updateData('retryBackoff', parseFloat(e.target.value)||2)} />
+              </label>
+            </CollapsibleSection>
+
+            {/* ── Result Routing ─────────────── */}
+            <CollapsibleSection title="Result Routing" defaultOpen={false}>
+              <RouteEditor entries={(node.data.resultRoutes as any[]) || []}
+                onChange={v => updateData('resultRoutes', v)} label="result" />
+            </CollapsibleSection>
+
+            {/* ── Exception Routing ──────────── */}
+            <CollapsibleSection title="Exception Routing" defaultOpen={false}>
+              <RouteEditor entries={(node.data.exceptionRoutes as any[]) || []}
+                onChange={v => updateData('exceptionRoutes', v)} label="exception" />
+            </CollapsibleSection>
+
             <ReturnValueEditor
               entries={(node.data.returnValues as Array<{key:string;type:string}>) || []}
               onChange={v => updateData('returnValues', v)}
@@ -354,6 +388,51 @@ function ReturnValueEditor({ entries, onChange }: {
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Collapsible section ────────────────────
+function CollapsibleSection({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <div className="border-t border-gray-700 pt-2 mt-2">
+      <div className="flex items-center justify-between cursor-pointer" onClick={() => setOpen(!open)}>
+        <span className="text-gray-400 text-xs">{title}</span>
+        <span className="text-gray-500 text-xs">{open ? '▾' : '▸'}</span>
+      </div>
+      {open && <div className="mt-2">{children}</div>}
+    </div>
+  );
+}
+
+// ── Route editor (result/exception routing) ──
+function RouteEditor({ entries, onChange, label }: { entries: any[]; onChange: (v: any[]) => void; label: string }) {
+  const add = () => onChange([...entries, { expr: '', to: '', isDefault: false }]);
+  const remove = (i: number) => onChange(entries.filter((_:any,idx:number) => idx !== i));
+  const update = (i: number, f: string, v: any) => {
+    const copy = entries.map((e:any,idx:number) => idx===i ? {...e, [f]:v} : e);
+    if (f==='isDefault' && v===true) copy.forEach((e:any,idx:number) => { if(idx!==i) e.isDefault=false; });
+    onChange(copy);
+  };
+  return (
+    <div>
+      <div className="text-[10px] text-gray-500 mb-1">Use {"{" + "}"}{label}.xxx in expressions, e.g. {label}.status == &apos;OK&apos;</div>
+      {entries.map((e:any,i:number) => (
+        <div key={i} className="mb-1.5 p-1.5 bg-gray-750 rounded border border-gray-700">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] text-gray-500">#{i+1}</span>
+            <div className="flex gap-1 items-center">
+              <label className="text-[9px] text-gray-500"><input type="checkbox" checked={e.isDefault} onChange={ev => update(i,'isDefault',ev.target.checked)} className="accent-orange-500" /> default</label>
+              <button onClick={() => remove(i)} className="text-[10px] text-red-400">&times;</button>
+            </div>
+          </div>
+          {!e.isDefault && <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px] mb-0.5 font-mono" value={e.expr||''} placeholder={`${label}.status == 'PASS'`} onChange={ev => update(i,'expr',ev.target.value)} />}
+          {e.isDefault && <div className="text-[9px] text-gray-500 mb-0.5">Fallback</div>}
+          <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px]" value={e.to||''} placeholder="target node id" onChange={ev => update(i,'to',ev.target.value)} />
+        </div>
+      ))}
+      <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300 mt-0.5">+ Add route</button>
     </div>
   );
 }
