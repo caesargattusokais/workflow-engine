@@ -30,12 +30,16 @@ public class ServiceTaskRunner implements NodeRunner {
         Map<String, Object> variables = new HashMap<>(instance.getVariables());
 
         try {
+            String hc = serviceTask.getHandlerClass();
+            boolean hasUrl = serviceTask.getUrl() != null && !serviceTask.getUrl().isBlank();
+            if (!hasUrl && (hc == null || hc.isEmpty())) {
+                throw new RuntimeException("ServiceTask must have either handlerClass (code mode) or url (HTTP mode)");
+            }
+
             Map<String, Object> result;
-            if (serviceTask.isHttpTask()) {
+            if (hasUrl) {
                 result = executeHttp(serviceTask, variables);
             } else {
-                String hc = serviceTask.getHandlerClass();
-                if (hc == null || hc.isEmpty()) throw new RuntimeException("handlerClass is required for code-mode serviceTask");
                 result = getHandler(hc).execute(variables);
             }
 
