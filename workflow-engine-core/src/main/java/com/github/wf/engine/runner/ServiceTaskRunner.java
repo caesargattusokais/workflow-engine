@@ -108,6 +108,7 @@ public class ServiceTaskRunner implements NodeRunner {
                         retryScheduler.accept(exec.getInstanceId(), delay);
                     }
                     exec.setStatus(ExecutionStatus.WAITING);
+                    exec.setRetryState("RETRY_PENDING");
                     repo.updateExecution(exec);
                     return true;
                 }

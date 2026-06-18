@@ -165,12 +165,11 @@ public class WorkflowEngine {
                     return;
                 }
 
-                // Reactivate executions whose retry timer has expired
+                // Reactivate retry-pending executions (woken by DelayQueue daemon)
                 for (Execution exec : executions) {
-                    if (exec.isWaiting() && exec.getNextRetryAt() > 0
-                            && System.currentTimeMillis() >= exec.getNextRetryAt()) {
+                    if (exec.isWaiting() && "RETRY_PENDING".equals(exec.getRetryState())) {
                         exec.setStatus(ExecutionStatus.ACTIVE);
-                        exec.setNextRetryAt(0);
+                        exec.setRetryState(null);
                         instanceRepository.updateExecution(exec);
                     }
                 }
