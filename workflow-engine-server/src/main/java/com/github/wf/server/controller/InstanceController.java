@@ -44,30 +44,30 @@ public class InstanceController {
     }
 
     @GetMapping("/{id}")
-    public InstanceDetailResponse get(@PathVariable String id) {
+    public InstanceDetailResponse get(@PathVariable("id") String id) {
         ProcessInstance inst = engine.instanceRepository.findById(id);
         if (inst == null) throw new RuntimeException("Not found: " + id);
         return new InstanceDetailResponse(inst);
     }
 
     @GetMapping("/{id}/history")
-    public List<HistoricActivity> history(@PathVariable String id) {
+    public List<HistoricActivity> history(@PathVariable("id") String id) {
         return engine.history(id);
     }
 
     @PostMapping("/{id}/resume")
-    public InstanceDetailResponse resume(@PathVariable String id) {
+    public InstanceDetailResponse resume(@PathVariable("id") String id) {
         engine.resume(id);
         return new InstanceDetailResponse(engine.instanceRepository.findById(id));
     }
 
     @PostMapping("/{id}/terminate")
-    public void terminate(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public void terminate(@PathVariable("id") String id, @RequestBody Map<String, String> body) {
         engine.terminate(id, body.getOrDefault("reason", "terminated by user"));
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         var inst = engine.instanceRepository.findById(id);
         if (inst == null) throw new RuntimeException("Not found: " + id);
         if (inst.isRunning()) throw new RuntimeException("Cannot delete running instance");

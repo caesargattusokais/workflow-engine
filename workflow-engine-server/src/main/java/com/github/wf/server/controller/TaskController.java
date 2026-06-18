@@ -43,17 +43,17 @@ public class TaskController {
     }
 
     @PostMapping("/{id}/complete")
-    public void complete(@PathVariable String id, @RequestBody CompleteTaskRequest req) {
+    public void complete(@PathVariable("id") String id, @RequestBody CompleteTaskRequest req) {
         engine.completeTask(id, req.getVariables(), req.getComment());
     }
 
     @PostMapping("/{id}/reject")
-    public void reject(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public void reject(@PathVariable("id") String id, @RequestBody Map<String, String> body) {
         engine.rejectTask(id, body.getOrDefault("comment", ""));
     }
 
     @PostMapping("/{id}/delegate")
-    public void delegate(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public void delegate(@PathVariable("id") String id, @RequestBody Map<String, String> body) {
         engine.delegateTask(id, body.get("newAssignee"));
     }
 }
