@@ -115,7 +115,7 @@ class ServiceTaskRoutingIntegrationTest {
     }
 
     @Test
-    void exceptionRoutingAfterRetryExhaustion() {
+    void exceptionRoutingAfterRetryExhaustion() throws Exception {
         engine.deploy("""
                 id: retry-test
                 version: 1
@@ -145,13 +145,15 @@ class ServiceTaskRoutingIntegrationTest {
         });
 
         ProcessInstance instance = engine.start("retry-test", Map.of());
+        // Retry is async via daemon — wait for it to process
+        Thread.sleep(100);
         // Should have failed twice, then routed to error-end
         assertThat(instanceStore.get(instance.getId()).getStatus())
                 .isEqualTo(InstanceStatus.COMPLETED);
     }
 
     @Test
-    void noRoutingMatchSuspendsInstance() {
+    void noRoutingMatchSuspendsInstance() throws Exception {
         engine.deploy("""
                 id: suspend-test
                 version: 1
