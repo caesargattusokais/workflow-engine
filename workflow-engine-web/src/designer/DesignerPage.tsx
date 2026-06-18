@@ -43,13 +43,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     return () => window.removeEventListener('click', close);
   }, []);
 
-  // Poll instances to show counts per draft
+  // Poll instances to show counts per draft (only when drafts exist)
   useEffect(() => {
+    if (drafts.length === 0) { setInstances([]); return; }
     const poll = () => listInstances().then(setInstances).catch(() => {});
     poll();
-    const t = setInterval(poll, 3000);
+    const t = setInterval(poll, 10000);
     return () => clearInterval(t);
-  }, []);
+  }, [drafts.length]);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {

@@ -18,7 +18,7 @@ export default function MonitorPage() {
   useEffect(() => {
     const poll = () => listInstances().then(setInstances).catch(() => {});
     poll();
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, []);
 
