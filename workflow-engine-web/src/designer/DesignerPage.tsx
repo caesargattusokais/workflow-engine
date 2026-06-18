@@ -29,7 +29,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showVars, setShowVars] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deployedYaml, setDeployedYaml] = useState<string | null>(null);
   const [deployedId, setDeployedId] = useState<string | null>(null);
@@ -65,22 +64,16 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setNodes(d.nodes || []);
       setEdges(d.edges || []);
       setSelectedNode(null);
-      setDirty(false);
     }).catch(() => {});
   }, [activeId, loaded]);
 
-  // Mark dirty on change
-  useEffect(() => { if (loaded && activeId) setDirty(true); }, [nodes, edges]);
-
-  // Auto-save to server (debounced 2s)
+  // Auto-save to server (debounced 10s, no version bump)
   useEffect(() => {
-    if (!activeId || !loaded || !dirty) return;
+    if (!activeId || !loaded) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      // Auto-save doesn't bump version
       updateDraft(activeId, { nodes, edges }).catch(() => {});
-      setDirty(false);
-    }, 2000);
+    }, 10000);
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
 
@@ -91,7 +84,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const newVersion = (activeDraft?.version || 1) + 1;
       await updateDraft(activeId, { nodes, edges, version: newVersion });
       setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
-      setDirty(false);
+      setToast(`Saved as v${newVersion}`);
     } catch { alert('Save failed — server unreachable'); }
     finally { setSaving(false); }
   };
@@ -193,17 +186,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-1 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">
-            {activeDraft ? activeDraft.name : 'No draft'}
+            {activeDraft ? `${activeDraft.name} v${activeDraft.version || 1}` : 'No draft'}
           </span>
-          <span className={`text-[10px] ${dirty ? 'text-yellow-500' : 'text-gray-600'}`}>
-            {saving ? 'saving...' : dirty ? 'unsaved' : 'saved'}
-          </span>
-          {dirty && (
-            <button onClick={doSave}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-              Save
-            </button>
-          )}
+          <button onClick={doSave}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
           {selectedNode && (
             <button onClick={handleDeleteNode}
               className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
