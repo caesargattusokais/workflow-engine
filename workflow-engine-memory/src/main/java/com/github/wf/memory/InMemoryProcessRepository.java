@@ -13,6 +13,10 @@ public class InMemoryProcessRepository implements ProcessRepository {
 
     @Override
     public void save(ProcessDefinition definition) {
+        if (definition.getId() == null) {
+            System.err.println("WARN: skipping save of ProcessDefinition with null id");
+            return;
+        }
         String key = definition.getId() + ":" + definition.getVersion();
         store.put(key, definition);
         latestVersion.merge(definition.getId(), definition.getVersion(), Math::max);
