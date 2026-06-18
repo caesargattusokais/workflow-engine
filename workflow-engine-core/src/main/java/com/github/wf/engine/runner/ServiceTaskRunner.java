@@ -15,6 +15,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServiceTaskRunner implements NodeRunner {
 
     private final Map<String, ServiceTaskHandler> handlerRegistry = new ConcurrentHashMap<>();
+    private final java.util.function.BiConsumer<String, Long> retryScheduler;
+
+    public ServiceTaskRunner() { this.retryScheduler = null; }
+
+    public ServiceTaskRunner(java.util.function.BiConsumer<String, Long> retryScheduler) {
+        this.retryScheduler = retryScheduler;
+    }
 
     public void registerHandler(String className, ServiceTaskHandler handler) {
         handlerRegistry.put(className, handler);
@@ -92,13 +99,16 @@ public class ServiceTaskRunner implements NodeRunner {
             ExceptionInfo ei = new ExceptionInfo(e);
             variables.put("exception", ei);
 
-            // Check retry — inline sleep, no external scheduler needed
+            // Check retry — schedule via delay queue, non-blocking
             RetryConfig rc = serviceTask.getRetryConfig();
             if (rc != null && exec.getRetryAttempt() < rc.getMaxAttempts()) {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
-                    try { Thread.sleep(delay); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-                    // Stay at current node, let trigger loop re-execute
+                    if (retryScheduler != null) {
+                        retryScheduler.accept(exec.getInstanceId(), delay);
+                    }
+                    exec.setStatus(ExecutionStatus.WAITING);
+                    repo.updateExecution(exec);
                     return true;
                 }
             }

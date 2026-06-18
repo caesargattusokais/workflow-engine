@@ -135,8 +135,7 @@ class ServiceTaskRunnerTest {
 
         runner.run(def.getNode("svc"), ctx);
 
-        // After inline-sleep retry, exec stays ACTIVE at same node
-        assertThat(exec.isActive()).isTrue();
+        assertThat(exec.isWaiting()).isTrue();
         assertThat(exec.getRetryAttempt()).isEqualTo(1);
         assertThat(exec.getCurrentNodeId()).isEqualTo("svc");
     }

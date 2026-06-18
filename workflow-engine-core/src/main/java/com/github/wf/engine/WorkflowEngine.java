@@ -15,7 +15,7 @@ import com.github.wf.task.TaskQuery;
 import com.github.wf.task.TaskStatus;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class WorkflowEngine {
@@ -24,6 +24,7 @@ public class WorkflowEngine {
     public final InstanceRepository instanceRepository;
     public final TaskRepository taskRepository;
     final ExpressionEvaluator expressionEvaluator;
+    final DelayQueue<DelayedTrigger> retryQueue = new DelayQueue<>();
     final ConcurrentHashMap<String, ReentrantLock> instanceLocks = new ConcurrentHashMap<>();
 
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
@@ -38,13 +39,24 @@ public class WorkflowEngine {
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
         registerDefaultRunners();
+        // Retry daemon: waits on delay queue, wakes instances when timers expire
+        Thread retryDaemon = new Thread(() -> {
+            while (true) {
+                try {
+                    DelayedTrigger dt = retryQueue.take();
+                    trigger(dt.instanceId);
+                } catch (InterruptedException e) { break; }
+            }
+        }, "wf-retry-daemon");
+        retryDaemon.setDaemon(true);
+        retryDaemon.start();
     }
 
     private void registerDefaultRunners() {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
         runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository));
-        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner());
+        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleRetry));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
@@ -109,6 +121,25 @@ public class WorkflowEngine {
 
         trigger(instance.getId());
         return instanceRepository.findById(instance.getId());
+    }
+
+    public void scheduleRetry(String instanceId, long delayMs) {
+        retryQueue.put(new DelayedTrigger(instanceId, delayMs));
+    }
+
+    static class DelayedTrigger implements Delayed {
+        final String instanceId;
+        final long triggerTime;
+        DelayedTrigger(String iid, long delayMs) {
+            this.instanceId = iid;
+            this.triggerTime = System.currentTimeMillis() + delayMs;
+        }
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(triggerTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        }
+        public int compareTo(Delayed o) {
+            return Long.compare(triggerTime, ((DelayedTrigger)o).triggerTime);
+        }
     }
 
     // === Trigger Loop ===
