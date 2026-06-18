@@ -105,8 +105,7 @@ public class ServiceTaskRunner implements NodeRunner {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
                     instance.setVariable("_retryAttempt", exec.getRetryAttempt());
-                    instance.setVariable("_retryDelay", delay);
-                    instance.setVariable("_retryAt", java.time.Instant.now().plusMillis(delay).toString());
+                    instance.setVariable("_retryDelayMs", delay);
                     repo.update(instance);
                     if (retryScheduler != null) {
                         retryScheduler.accept(exec.getInstanceId(), delay);
