@@ -55,6 +55,7 @@ public class DraftController {
         if (body.containsKey("name")) d.put("name", body.get("name"));
         if (body.containsKey("nodes")) d.put("nodes", body.get("nodes"));
         if (body.containsKey("edges")) d.put("edges", body.get("edges"));
+        if (body.containsKey("version")) d.put("version", body.get("version"));
         return d;
     }
 
