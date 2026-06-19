@@ -68,6 +68,13 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     }).catch(() => {});
   }, [activeId, loaded]);
 
+  // Live-refresh YAML panel while open
+  useEffect(() => {
+    if (showYaml && activeDraft) {
+      setDeployedYaml(graphToYaml(nodes, edges, activeDraft.name, activeDraft.version || 1));
+    }
+  }, [nodes, edges, showYaml]);
+
   // Auto-save to server (debounced 10s, no version bump)
   useEffect(() => {
     if (!activeId || !loaded) return;
