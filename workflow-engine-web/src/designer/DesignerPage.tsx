@@ -279,7 +279,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 <div className="truncate flex-1">
                   <div className="text-gray-300 truncate">{d.name} <span className="text-[10px] text-gray-600">v{d.version || 1}</span></div>
                   <div className="text-[10px] text-gray-600">
-                    {(d.id === activeId ? nodes.length : d.nodes.length)} nodes
+                    {d.nodes.length} nodes
                     {(() => {
                       const count = instances.filter(i => i.definitionId === d.name).length;
                       if (count > 0) {
