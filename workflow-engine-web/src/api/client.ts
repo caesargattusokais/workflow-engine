@@ -75,5 +75,9 @@ export async function updateDraft(id: string, data: Record<string, unknown>) {
 }
 export async function deleteDraft(id: string) { return apiDelete(`/drafts/${id}`); }
 
+export async function copyDraft(id: string) { return apiPost(`/drafts/${id}/copy`); }
+export async function importDraft(name: string, nodes: unknown[], edges: unknown[]) {
+  return apiPost('/drafts/import', { name, nodes, edges });
+}
 
 export { userId, authHeaders, apiGet, apiPost };

@@ -64,4 +64,34 @@ public class DraftController {
                        @PathVariable("id") String id) {
         store.remove(key(userId, id));
     }
+
+    @PostMapping("/{id}/copy")
+    public Map<String, Object> copy(@RequestHeader("X-User-Id") String userId,
+                                     @PathVariable("id") String id) {
+        var original = store.get(key(userId, id));
+        if (original == null) throw new RuntimeException("Draft not found: " + id);
+        String newId = UUID.randomUUID().toString().substring(0, 8);
+        Map<String, Object> copy = new LinkedHashMap<>(original);
+        copy.put("id", newId);
+        copy.put("name", original.get("name") + " (Copy)");
+        copy.put("version", 1);
+        copy.put("createdAt", System.currentTimeMillis());
+        store.put(key(userId, newId), copy);
+        return copy;
+    }
+
+    @PostMapping("/import")
+    public Map<String, Object> importYaml(@RequestHeader("X-User-Id") String userId,
+                                           @RequestBody Map<String, Object> body) {
+        String id = UUID.randomUUID().toString().substring(0, 8);
+        Map<String, Object> draft = new LinkedHashMap<>();
+        draft.put("id", id);
+        draft.put("name", body.getOrDefault("name", "Imported"));
+        draft.put("nodes", body.getOrDefault("nodes", List.of()));
+        draft.put("edges", body.getOrDefault("edges", List.of()));
+        draft.put("createdAt", System.currentTimeMillis());
+        draft.put("version", 1);
+        store.put(key(userId, id), draft);
+        return draft;
+    }
 }

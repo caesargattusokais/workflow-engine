@@ -3,8 +3,9 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, listInstances } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, listInstances, copyDraft, importDraft } from '../api/client';
 import { graphToYaml } from './graphToYaml';
+import { yamlToGraph } from './yamlToGraph';
 
 interface Draft {
   id: string;
@@ -126,6 +127,47 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       }
       return u;
     });
+  };
+
+  const copyDraftAction = async (id: string) => {
+    try {
+      const copy = await copyDraft(id);
+      setDrafts(prev => [...prev, { ...copy, nodes: copy.nodes || [], edges: copy.edges || [] }]);
+      setToast(`Copied: ${copy.name}`);
+    } catch { alert('Copy failed'); }
+  };
+
+  const downloadYaml = (draft: Draft) => {
+    const d = draft.id === activeId ? { ...draft, nodes, edges } : draft;
+    const yaml = graphToYaml(d.nodes, d.edges, d.name);
+    const blob = new Blob([yaml], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${d.name.replace(/\s+/g, '_')}.yaml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importYamlAction = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.yaml,.yml,.txt';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const { name, nodes: importedNodes, edges: importedEdges } = yamlToGraph(text);
+        const d = await importDraft(name, importedNodes, importedEdges);
+        setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
+        setActiveId(d.id);
+        setToast(`Imported: ${name} (${importedNodes.length} nodes)`);
+      } catch (e: any) {
+        alert('Import failed: ' + e.message);
+      }
+    };
+    input.click();
   };
 
   const switchDraft = (id: string) => setActiveId(id);
@@ -269,8 +311,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       <div className="flex flex-1 overflow-hidden">
         {/* Draft List Sidebar */}
         <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
-          <div className="p-2 border-b border-gray-700 flex justify-between items-center">
-            <span className="text-xs text-gray-500">草稿列表</span>
+          <div className="p-2 border-b border-gray-700 flex items-center gap-1">
+            <span className="text-xs text-gray-500 flex-1">草稿列表</span>
+            <button onClick={importYamlAction}
+              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title="导入 YAML">
+              Import
+            </button>
             <button onClick={newDraft}
               className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded">
               + New
@@ -328,6 +374,15 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
                 View YAML
+              </button>
+              <button onClick={() => { setDraftMenu(null); downloadYaml(draftMenu.draft); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
+                Download YAML
+              </button>
+              <div className="border-t border-gray-700" />
+              <button onClick={() => { setDraftMenu(null); copyDraftAction(draftMenu.draft.id); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
+                Copy
               </button>
               <button onClick={() => { setDraftMenu(null); renameDraft(draftMenu.draft.id); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
