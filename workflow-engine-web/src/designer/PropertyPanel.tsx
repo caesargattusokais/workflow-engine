@@ -135,12 +135,30 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             </label>
             <div className="border-t border-orange-500/50 pt-2 mt-2">
               <span className="text-orange-400 text-xs font-semibold">Timeout (Boundary Timer)</span>
-              <div className="text-[10px] text-gray-500 mb-1">Draw a timeout edge to set the target node</div>
+              <div className="text-[10px] text-gray-500 mb-2">Draw a timeout edge to set the target node. Duration takes priority.</div>
               <label className="block mb-1">
                 <span className="text-gray-400 text-xs">Duration</span>
-                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
-                  value={(node.data.boundaryTimer as string) || ''} placeholder="PT30M"
-                  onChange={e => updateData('boundaryTimer', e.target.value)} />
+                <div className="flex gap-1 mt-0.5">
+                  <input type="number" min="1" className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+                    value={parseDurationValue(node.data.boundaryTimer as string)}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 0;
+                      const unit = (node.data._bndUnit as string) || 'M';
+                      if (val > 0) updateData('boundaryTimer', `PT${val}${unit}`);
+                      else updateData('boundaryTimer', '');
+                    }} placeholder="30" />
+                  <select className="w-16 bg-gray-700 rounded px-1 py-1 text-white text-xs"
+                    value={(node.data._bndUnit as string) || 'M'}
+                    onChange={e => {
+                      updateData('_bndUnit', e.target.value);
+                      const val = parseDurationValue(node.data.boundaryTimer as string);
+                      if (val > 0) updateData('boundaryTimer', `PT${val}${e.target.value}`);
+                    }}>
+                    <option value="S">秒</option>
+                    <option value="M">分</option>
+                    <option value="H">时</option>
+                  </select>
+                </div>
               </label>
             </div>
           </>
