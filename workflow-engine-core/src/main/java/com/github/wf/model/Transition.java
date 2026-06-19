@@ -30,6 +30,18 @@ public class Transition {
         return new Transition(null, from, to, TransitionType.DEFAULT, null);
     }
 
+    public static Transition result(String from, String to, Condition condition) {
+        return new Transition(null, from, to, TransitionType.RESULT, condition);
+    }
+
+    public static Transition exception(String from, String to, Condition condition) {
+        return new Transition(null, from, to, TransitionType.EXCEPTION, condition);
+    }
+
+    public static Transition timeout(String from, String to) {
+        return new Transition(null, from, to, TransitionType.TIMEOUT, null);
+    }
+
     public Transition withTo(String to) {
         return new Transition(this.id, this.from, to, this.type, this.condition);
     }

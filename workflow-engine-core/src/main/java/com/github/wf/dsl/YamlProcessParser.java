@@ -162,6 +162,14 @@ public class YamlProcessParser implements ProcessParser {
                     result.add(Transition.conditional(ty.from, cond).withTo(ty.to));
                 } else if ("default".equals(ty.type)) {
                     result.add(Transition.defaultTransition(ty.from, ty.to));
+                } else if ("result".equals(ty.type)) {
+                    Condition cond = buildEdgeCondition(ty);
+                    result.add(Transition.result(ty.from, ty.to, cond));
+                } else if ("exception".equals(ty.type)) {
+                    Condition cond = buildEdgeCondition(ty);
+                    result.add(Transition.exception(ty.from, ty.to, cond));
+                } else if ("timeout".equals(ty.type)) {
+                    result.add(Transition.timeout(ty.from, ty.to));
                 } else {
                     result.add(Transition.direct(ty.from, ty.to));
                 }
@@ -209,5 +217,11 @@ public class YamlProcessParser implements ProcessParser {
             }
         }
         return rules;
+    }
+
+    private static Condition buildEdgeCondition(TransitionYaml ty) {
+        if (ty.conditionClass != null) return Condition.javaClass(ty.conditionClass);
+        if (ty.expr != null && !ty.expr.isBlank()) return Condition.expression(ty.expr);
+        return null; // no condition = always match (catch-all)
     }
 }
