@@ -46,23 +46,19 @@ public class TimerRunner implements NodeRunner {
     }
 
     private long computeDelay(TimerNode timer) {
-        // Priority: deadline > duration
+        long delay = Long.MAX_VALUE;
+
         if (timer.getDeadline() != null && !timer.getDeadline().isBlank()) {
             try {
-                Instant deadline = Instant.parse(timer.getDeadline());
-                long ms = deadline.toEpochMilli() - System.currentTimeMillis();
-                return Math.max(0, ms);
-            } catch (Exception e) {
-                // Invalid format — treat as 0
-            }
+                long ms = Instant.parse(timer.getDeadline()).toEpochMilli() - System.currentTimeMillis();
+                delay = Math.min(delay, Math.max(0, ms));
+            } catch (Exception ignored) {}
         }
         if (timer.getDuration() != null && !timer.getDuration().isBlank()) {
             try {
-                return Duration.parse(timer.getDuration()).toMillis();
-            } catch (Exception e) {
-                // Invalid format — treat as 0
-            }
+                delay = Math.min(delay, Duration.parse(timer.getDuration()).toMillis());
+            } catch (Exception ignored) {}
         }
-        return 0;
+        return delay == Long.MAX_VALUE ? 0 : delay;
     }
 }
