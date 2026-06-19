@@ -74,48 +74,54 @@ public class ServiceTaskRunner implements NodeRunner {
             }
             exec.setRetryAttempt(0);
 
-            // Result routing — from edges (primary)
+            // ── Routing priority (success path) ─────────────────
+            // 1. Result edges (with condition evaluation)
+            // 2. Node-level result routes (backward compat)
+            // 3. Direct edge — last resort fallback
+
+            boolean matched = false;
+
+            // 1. Result routing — from edges
             for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
-                if (t.isResult()) {
-                    if (t.isDefault()) {
+                if (!t.isResult()) continue;
+                if (t.getCondition() != null) {
+                    if (evaluateCondition(t.getCondition(), variables, context)) {
                         exec.setCurrentNodeId(t.getTo());
-                        return true;
-                    } else if (t.getCondition() != null) {
-                        if (evaluateCondition(t.getCondition(), variables, context)) {
-                            exec.setCurrentNodeId(t.getTo());
-                            return true;
-                        }
-                    } else {
-                        exec.setCurrentNodeId(t.getTo());
-                        return true;
+                        matched = true;
+                        break;
                     }
+                } else {
+                    // No condition = unconditional result match
+                    exec.setCurrentNodeId(t.getTo());
+                    matched = true;
+                    break;
                 }
             }
 
-            // Result routing — from node (backward compat)
-            List<RoutingRule> resultRoutes = serviceTask.getResultRouting();
-            if (!resultRoutes.isEmpty()) {
+            // 2. Result routing — from node (backward compat)
+            if (!matched) {
+                List<RoutingRule> resultRoutes = serviceTask.getResultRouting();
                 for (RoutingRule rule : resultRoutes) {
-                    boolean match;
-                    if (rule.isDefault()) {
-                        match = true;
-                    } else {
-                        match = evaluateCondition(rule.getCondition(), variables, context);
-                    }
+                    boolean match = rule.isDefault() || evaluateCondition(rule.getCondition(), variables, context);
                     if (match) {
                         exec.setCurrentNodeId(rule.getTo());
-                        return true;
+                        matched = true;
+                        break;
                     }
                 }
             }
 
-            // No result routing match → static direct transition
-            for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
-                if (t.isDirect()) {
-                    exec.setCurrentNodeId(t.getTo());
-                    return true;
+            // 3. Direct edge — absolute last resort
+            if (!matched) {
+                for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
+                    if (t.isDirect()) {
+                        exec.setCurrentNodeId(t.getTo());
+                        matched = true;
+                        break;
+                    }
                 }
             }
+
             return true;
 
         } catch (Exception e) {
