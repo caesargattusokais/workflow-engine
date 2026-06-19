@@ -277,7 +277,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 <div className="truncate flex-1">
                   <div className="text-gray-300 truncate">{d.name} <span className="text-[10px] text-gray-600">v{d.version || 1}</span></div>
                   <div className="text-[10px] text-gray-600">
-                    {d.nodes.length} nodes
+                    {(d.id === activeId ? nodes.length : d.nodes.length)} nodes
                     {(() => {
                       const count = instances.filter(i => i.definitionId === d.name).length;
                       if (count > 0) {
@@ -310,8 +310,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 {draftMenu.draft.name}
               </div>
               <button onClick={() => {
-                const yaml = graphToYaml(draftMenu.draft.nodes, draftMenu.draft.edges, draftMenu.draft.name);
-                setDeployedYaml(yaml);
+                const d = draftMenu.draft.id === activeId ? { ...draftMenu.draft, nodes, edges } : draftMenu.draft;
+                const yaml = graphToYaml(d.nodes, d.edges, d.name);
                 setToast(`YAML for: ${draftMenu.draft.name}`);
                 setDraftMenu(null);
               }}
