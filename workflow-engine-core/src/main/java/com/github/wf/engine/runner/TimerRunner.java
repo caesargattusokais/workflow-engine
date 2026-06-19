@@ -29,7 +29,7 @@ public class TimerRunner implements NodeRunner {
         String firedKey = node.getId() + "_timerFired";
         // If re-entering after daemon wake-up, advance immediately
         if (Boolean.TRUE.equals(instance.getVariable(firedKey))) {
-            instance.setVariable(firedKey, null);
+            instance.removeVariable(firedKey);
             context.getInstanceRepository().update(instance);
             List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
             if (!outgoing.isEmpty()) {

@@ -46,6 +46,7 @@ public class ProcessInstance {
     public void setVariable(String name, Object value) { this.variables.put(name, value); }
     public void setVariables(Map<String, Object> vars) { this.variables.putAll(vars); }
     public Object getVariable(String name) { return this.variables.get(name); }
+    public void removeVariable(String name) { this.variables.remove(name); }
     public void setActiveNodeIds(Set<String> activeNodeIds) { this.activeNodeIds = new HashSet<>(activeNodeIds); }
     public boolean isRunning() { return status == InstanceStatus.RUNNING; }
 }
