@@ -26,9 +26,10 @@ public class TimerRunner implements NodeRunner {
         Execution exec = context.getExecution();
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
 
+        String firedKey = node.getId() + "_timerFired";
         // If re-entering after daemon wake-up, advance immediately
-        if (Boolean.TRUE.equals(instance.getVariable("_timerFired"))) {
-            instance.setVariable("_timerFired", null);
+        if (Boolean.TRUE.equals(instance.getVariable(firedKey))) {
+            instance.setVariable(firedKey, null);
             context.getInstanceRepository().update(instance);
             List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
             if (!outgoing.isEmpty()) {
@@ -47,7 +48,7 @@ public class TimerRunner implements NodeRunner {
         }
 
         // First entry: mark and schedule
-        instance.setVariable("_timerFired", true);
+        instance.setVariable(firedKey, true);
         context.getInstanceRepository().update(instance);
         if (scheduler != null) {
             scheduler.accept(exec.getInstanceId(), delayMs);
