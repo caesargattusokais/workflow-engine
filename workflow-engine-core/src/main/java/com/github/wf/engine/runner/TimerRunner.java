@@ -36,7 +36,7 @@ public class TimerRunner implements NodeRunner {
             return true;
         }
 
-        // Schedule wake-up via existing retry infrastructure
+        // Schedule wake-up via shared delay infrastructure
         if (scheduler != null) {
             scheduler.accept(exec.getInstanceId(), delayMs);
         }
