@@ -9,6 +9,8 @@ import com.github.wf.model.Transition;
 import com.github.wf.model.node.UserTask;
 import com.github.wf.spi.TaskRepository;
 import com.github.wf.task.Task;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.time.Duration;
 import java.util.Map;
@@ -16,6 +18,8 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 
 public class UserTaskRunner implements NodeRunner {
+
+    private static final Log log = LogFactory.getLog(UserTaskRunner.class);
 
     private final TaskRepository taskRepository;
     private final BiConsumer<String, Long> scheduler;
@@ -40,22 +44,19 @@ public class UserTaskRunner implements NodeRunner {
         String timerKey = node.getId() + "_boundaryTimerFired";
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
         if (Boolean.TRUE.equals(instance.getVariable(timerKey))) {
-            System.err.println("[UserTaskRunner] TIMEOUT re-entry detected! node=" + node.getId() + " instance=" + context.getInstanceId());
+            log.warn("Boundary timer fired for node=" + node.getId() + " instance=" + context.getInstanceId());
             instance.removeVariable(timerKey);
             context.getInstanceRepository().update(instance);
             // Route via timeout edge
-            int totalOut = context.getDefinition().getOutgoingTransitions(node.getId()).size();
-            System.err.println("[UserTaskRunner] Outgoing transitions: " + totalOut);
             for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
-                System.err.println("[UserTaskRunner]   edge: from=" + t.getFrom() + " to=" + t.getTo() + " type=" + t.getType());
                 if (t.isTimeout()) {
-                    System.err.println("[UserTaskRunner] TIMEOUT edge matched! routing to " + t.getTo());
+                    log.warn("Timeout edge matched, routing to " + t.getTo());
                     exec.setCurrentNodeId(t.getTo());
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     return true;
                 }
             }
-            System.err.println("[UserTaskRunner] No timeout edge found among " + totalOut + " outgoing transitions — falling through");
+            log.warn("No timeout edge found for node=" + node.getId() + " — falling through");
             // If no timeout edge, fall through and create task normally
         }
 
@@ -95,6 +96,7 @@ public class UserTaskRunner implements NodeRunner {
             try {
                 long delayMs = Duration.parse(userTask.getBoundaryTimer()).toMillis();
                 if (delayMs > 0) {
+                    log.warn("Scheduling boundary timer for node=" + node.getId() + " delay=" + delayMs + "ms");
                     instance.setVariable(timerKey, true);
                     context.getInstanceRepository().update(instance);
                     scheduler.accept(exec.getInstanceId(), delayMs);
