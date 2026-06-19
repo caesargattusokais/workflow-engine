@@ -47,6 +47,7 @@ public class WorkflowEngine {
             while (true) {
                 try {
                     DelayedTrigger dt = delayQueue.take();
+                    log.warn("Delayed trigger: " + dt.instanceId);
                     trigger(dt.instanceId);
                 } catch (InterruptedException e) { break; }
             }
