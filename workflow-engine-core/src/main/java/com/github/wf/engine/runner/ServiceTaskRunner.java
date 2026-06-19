@@ -19,12 +19,12 @@ public class ServiceTaskRunner implements NodeRunner {
 
     private static final Log log = LogFactory.getLog(ServiceTaskRunner.class);
     private final Map<String, ServiceTaskHandler> handlerRegistry = new ConcurrentHashMap<>();
-    private final java.util.function.BiConsumer<String, Long> retryScheduler;
+    private final java.util.function.BiConsumer<String, Long> scheduler;
 
-    public ServiceTaskRunner() { this.retryScheduler = null; }
+    public ServiceTaskRunner() { this.scheduler = null; }
 
-    public ServiceTaskRunner(java.util.function.BiConsumer<String, Long> retryScheduler) {
-        this.retryScheduler = retryScheduler;
+    public ServiceTaskRunner(java.util.function.BiConsumer<String, Long> scheduler) {
+        this.scheduler = scheduler;
     }
 
     public void registerHandler(String className, ServiceTaskHandler handler) {
@@ -111,8 +111,8 @@ public class ServiceTaskRunner implements NodeRunner {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
                     repo.update(instance);
-                    if (retryScheduler != null) {
-                        retryScheduler.accept(exec.getInstanceId(), delay);
+                    if (scheduler != null) {
+                        scheduler.accept(exec.getInstanceId(), delay);
                         log.warn("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");
                     }
                     exec.setStatus(ExecutionStatus.WAITING);

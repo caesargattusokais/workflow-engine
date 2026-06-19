@@ -13,11 +13,11 @@ import java.util.function.BiConsumer;
 
 public class TimerRunner implements NodeRunner {
 
-    private final BiConsumer<String, Long> retryScheduler;
+    private final BiConsumer<String, Long> scheduler;
 
-    public TimerRunner() { this.retryScheduler = null; }
-    public TimerRunner(BiConsumer<String, Long> retryScheduler) {
-        this.retryScheduler = retryScheduler;
+    public TimerRunner() { this.scheduler = null; }
+    public TimerRunner(BiConsumer<String, Long> scheduler) {
+        this.scheduler = scheduler;
     }
 
     @Override
@@ -37,8 +37,8 @@ public class TimerRunner implements NodeRunner {
         }
 
         // Schedule wake-up via existing retry infrastructure
-        if (retryScheduler != null) {
-            retryScheduler.accept(exec.getInstanceId(), delayMs);
+        if (scheduler != null) {
+            scheduler.accept(exec.getInstanceId(), delayMs);
         }
         exec.setStatus(ExecutionStatus.WAITING);
         exec.setRetryState("TIMER_PENDING");

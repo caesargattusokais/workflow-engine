@@ -27,7 +27,7 @@ public class WorkflowEngine {
     public final InstanceRepository instanceRepository;
     public final TaskRepository taskRepository;
     final ExpressionEvaluator expressionEvaluator;
-    final DelayQueue<DelayedTrigger> retryQueue = new DelayQueue<>();
+    final DelayQueue<DelayedTrigger> delayQueue = new DelayQueue<>();
     final ConcurrentHashMap<String, ReentrantLock> instanceLocks = new ConcurrentHashMap<>();
 
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
@@ -42,29 +42,28 @@ public class WorkflowEngine {
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
         registerDefaultRunners();
-        // Retry daemon: waits on delay queue, wakes instances when timers expire
-        Thread retryDaemon = new Thread(() -> {
+        // Delay daemon: picks up delayed triggers (retry/timer), wakes instances
+        Thread delayDaemon = new Thread(() -> {
             while (true) {
                 try {
-                    DelayedTrigger dt = retryQueue.take();
+                    DelayedTrigger dt = delayQueue.take();
                     trigger(dt.instanceId);
-                    log.warn("Retrying instance " + dt.instanceId);
                 } catch (InterruptedException e) { break; }
             }
-        }, "wf-retry-daemon");
-        retryDaemon.setDaemon(true);
-        retryDaemon.start();
+        }, "wf-delay-daemon");
+        delayDaemon.setDaemon(true);
+        delayDaemon.start();
     }
 
     private void registerDefaultRunners() {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
         runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository));
-        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleRetry));
+        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleDelay));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
-        runners.put(NodeType.TIMER, new TimerRunner(this::scheduleRetry));
+        runners.put(NodeType.TIMER, new TimerRunner(this::scheduleDelay));
     }
 
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
@@ -128,8 +127,9 @@ public class WorkflowEngine {
         return instanceRepository.findById(instance.getId());
     }
 
-    public void scheduleRetry(String instanceId, long delayMs) {
-        retryQueue.put(new DelayedTrigger(instanceId, delayMs));
+    /** Generic delayed trigger — used by both retry and timer nodes */
+    public void scheduleDelay(String instanceId, long delayMs) {
+        delayQueue.put(new DelayedTrigger(instanceId, delayMs));
     }
 
     static class DelayedTrigger implements Delayed {
