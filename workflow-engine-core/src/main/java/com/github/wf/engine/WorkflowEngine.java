@@ -204,9 +204,22 @@ public class WorkflowEngine {
 
                             // Check if runner signaled suspension
                             if ("SUSPENDED".equals(exec.getRetryState())) {
-                                instance.setStatus(InstanceStatus.SUSPENDED);
-                                instanceRepository.update(instance);
-                                return;
+                                if (!exec.isChild()) {
+                                    // Main execution — suspend instance immediately
+                                    instance.setStatus(InstanceStatus.SUSPENDED);
+                                    instanceRepository.update(instance);
+                                    return;
+                                }
+                                // Child execution (parallel fork) — check siblings
+                                List<Execution> siblings = instanceRepository.findExecutionsByParentId(exec.getParentExecutionId());
+                                boolean allSuspended = siblings.stream().allMatch(s ->
+                                        "SUSPENDED".equals(s.getRetryState()));
+                                if (allSuspended) {
+                                    instance.setStatus(InstanceStatus.SUSPENDED);
+                                    instanceRepository.update(instance);
+                                    return;
+                                }
+                                // Some siblings still running — don't suspend yet
                             }
                         } catch (Exception e) {
                             log.error("Error running node " + node.getId(), e);
