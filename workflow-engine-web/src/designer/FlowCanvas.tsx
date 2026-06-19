@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
+import { useT } from '../i18n';
 import {
   ReactFlow, Background, MiniMap,
   addEdge, Connection, MarkerType,
@@ -43,6 +44,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [locked, setLocked] = useState(false);
   const rfInstance = useRef<any>(null);
+  const { t } = useT();
 
   // Close menu on any click outside
   useEffect(() => {
@@ -182,14 +184,14 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         <button onClick={() => rfInstance.current?.fitView({ duration: 300 })}
           className="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-2.5 py-1.5
                      text-gray-300 text-xs transition-colors shadow-lg"
-          title="定位 — 居中显示所有节点">
-          &#8982; 定位
+          title={`${t.designer.locate} — 居中显示所有节点`}>
+          &#8982; {t.designer.locate}
         </button>
         <button onClick={() => setLocked(!locked)}
           className={`border rounded px-2.5 py-1.5 text-xs transition-colors shadow-lg
             ${locked ? 'bg-red-900 border-red-600 text-red-300' : 'bg-gray-800 hover:bg-gray-700 border-gray-600 text-gray-300'}`}
-          title={locked ? '解锁编辑' : '锁定画布'}>
-          {locked ? '🔒 锁定' : '🔓'}
+          title={locked ? `${t.designer.unlock}编辑` : `${t.designer.lock}画布`}>
+          {locked ? `🔒 ${t.designer.lock}` : '🔓'}
         </button>
       </div>
 
@@ -208,12 +210,12 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               <button
                 onClick={() => duplicateNode(menu.nodeId!)}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
-                Duplicate
+                {t.designer.duplicate}
               </button>
               <button
                 onClick={() => deleteNode(menu.nodeId!)}
                 className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors">
-                Delete
+                {t.designer.delete}
               </button>
             </>
           )}
@@ -265,17 +267,17 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               )}
               <div className="border-t border-gray-700" />
               <button onClick={() => { deleteEdge(menu.edgeId!); setMenu(null); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">Delete</button>
+                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">{t.designer.delete}</button>
               </div>
             );
             })()}
           {menu.type === 'pane' && (
             <>
               <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
-                Canvas
+                {t.designer.canvas}
               </div>
               <div className="px-3 py-1.5 text-sm text-gray-500">
-                Drag nodes from palette
+                {t.designer.dragHint}
               </div>
             </>
           )}

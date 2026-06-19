@@ -6,6 +6,7 @@ import PropertyPanel from './PropertyPanel';
 import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, listInstances, copyDraft, importDraft } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 import { yamlToGraph } from './yamlToGraph';
+import { useT } from '../i18n';
 
 interface Draft {
   id: string;
@@ -19,6 +20,7 @@ interface Draft {
 interface VarInfo { name: string; source: string; }
 
 export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designer'|'monitor') => void }) {
+  const { t } = useT();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -93,8 +95,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const newVersion = (activeDraft?.version || 1) + 1;
       await updateDraft(activeId, { nodes, edges, version: newVersion });
       setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
-      setToast(`Saved as v${newVersion}`);
-    } catch { alert('Save failed — server unreachable'); }
+      setToast(`${t.designer.savedAs}${newVersion}`);
+    } catch { alert(t.designer.saveFailed); }
     finally { setSaving(false); }
   };
 
@@ -108,7 +110,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   };
 
   const renameDraft = async (id: string) => {
-    const name = prompt('草稿名称:');
+    const name = prompt(t.designer.draftName);
     if (!name) return;
     try {
       await updateDraft(id, { name });
@@ -117,7 +119,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   };
 
   const delDraft = async (id: string) => {
-    if (!confirm('删除这个草稿?')) return;
+    if (!confirm(t.designer.confirmDelete)) return;
     try { await removeDraft(id); } catch {}
     setDrafts(prev => {
       const u = prev.filter(d => d.id !== id);
@@ -133,8 +135,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     try {
       const copy = await copyDraft(id);
       setDrafts(prev => [...prev, { ...copy, nodes: copy.nodes || [], edges: copy.edges || [] }]);
-      setToast(`Copied: ${copy.name}`);
-    } catch { alert('Copy failed'); }
+      setToast(`${t.designer.copied}${copy.name}`);
+    } catch { alert(t.designer.saveFailed); }
   };
 
   const downloadYaml = (draft: Draft) => {
@@ -162,7 +164,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         const d = await importDraft(name, importedNodes, importedEdges);
         setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
         setActiveId(d.id);
-        setToast(`Imported: ${name} (${importedNodes.length} nodes)`);
+        setToast(`Imported: ${name}`);
       } catch (e: any) {
         alert('Import failed: ' + e.message);
       }
@@ -186,7 +188,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   }, [selectedNode, nodes, edges, setNodes, setEdges]);
 
   const handleDeploy = async () => {
-    if (nodes.length === 0) { setToast('Add some nodes first'); return; }
+    if (nodes.length === 0) { setToast(t.designer.addNodes); return; }
     try {
       const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow', activeDraft?.version || 1);
       const positions: Record<string, {x:number;y:number}> = {};
@@ -198,12 +200,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       // Auto-start instance
       try {
         const inst = await startInstance(result.id, {});
-        setToast(`Deployed & started! Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
+        setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
         listInstances().then(setInstances).catch(() => {});
       } catch {
-        setToast(`Deployed: ${result.id} (auto-start failed)`);
+        setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
       }
-    } catch (e: any) { setToast('Deploy failed: ' + e.message); }
+    } catch (e: any) { setToast(t.designer.deployFailed + e.message); }
   };
 
   // ── Variables ─────────────────────────
@@ -237,16 +239,16 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-1 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">
-            {activeDraft ? `${activeDraft.name} v${activeDraft.version || 1}` : 'No draft'}
+            {activeDraft ? `${activeDraft.name} v${activeDraft.version || 1}` : t.designer.noDraft}
           </span>
           <button onClick={doSave}
             className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? t.designer.saving : t.designer.save}
           </button>
           {selectedNode && (
             <button onClick={handleDeleteNode}
               className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
-              Delete Node
+              {t.designer.deleteNode}
             </button>
           )}
           <button onClick={() => setShowVars(!showVars)}
@@ -256,7 +258,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         </div>
         <button onClick={handleDeploy}
           className="bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-1 rounded">
-          Deploy
+          {t.designer.deploy}
         </button>
       </div>
 
@@ -269,13 +271,13 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               {deployedId && (
                 <button onClick={() => onNavigate?.('monitor')}
                   className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-                  View in Monitor
+                  {t.designer.viewInMonitor}
                 </button>
               )}
               {deployedYaml && (
                 <button onClick={() => setShowYaml(!showYaml)}
                   className="bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
-                  {showYaml ? 'Hide YAML' : 'Show YAML'}
+                  {showYaml ? t.designer.hideYaml : t.designer.showYaml}
                 </button>
               )}
               <button onClick={() => { setToast(null); setDeployedYaml(null); setShowYaml(false); }}
@@ -295,7 +297,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         <div className="bg-gray-800 border-b border-gray-700 px-4 py-2">
           <div className="flex flex-wrap gap-1.5">
             {allVars.length === 0 ? (
-              <span className="text-xs text-gray-600 italic">No variables defined</span>
+              <span className="text-xs text-gray-600 italic">{t.designer.noVariables}</span>
             ) : allVars.map((v, i) => (
               <span key={i} className="inline-flex items-center gap-1 bg-gray-750 border border-gray-600
                        rounded px-2 py-0.5 text-xs text-gray-300" title={v.source}>
@@ -312,14 +314,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         {/* Draft List Sidebar */}
         <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
           <div className="p-2 border-b border-gray-700 flex items-center gap-1">
-            <span className="text-xs text-gray-500 flex-1">草稿列表</span>
+            <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
             <button onClick={importYamlAction}
               className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title="导入 YAML">
-              Import
+              {t.designer.import}
             </button>
             <button onClick={newDraft}
               className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded">
-              + New
+              {t.designer.newDraft}
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">

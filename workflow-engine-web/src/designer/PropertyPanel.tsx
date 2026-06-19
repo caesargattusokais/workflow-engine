@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Node } from '@xyflow/react';
+import { useT } from '../i18n';
 
 interface ConditionItem {
   expr: string;
@@ -16,6 +17,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
     onSelectEdge?: (edgeId: string) => void;
     onEdgesChange?: (edges: Edge[]) => void;
 }) {
+  const { t } = useT();
   const [width, setWidth] = useState(280);
   const dragging = useRef(false);
   const startX = useRef(0);
@@ -51,7 +53,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
   if (!node) {
     return (
       <div className="bg-gray-800 border-l border-gray-700 p-4 text-sm text-gray-500" style={{ width, minWidth: width }}>
-        Select a node to edit
+        {t.props.selectNode}
       </div>
     );
   }
@@ -89,20 +91,20 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
 
       <div className="p-4 text-sm">
         <h3 className="text-gray-300 font-bold mb-1 capitalize">
-          {node.type === 'exclusiveGateway' ? '判断网关' :
-           node.type === 'inclusiveGateway' ? '条件分支网关' :
-           node.type === 'parallelGateway' ? '并行网关' :
-           node.type === 'userTask' ? '用户任务' :
-           node.type === 'serviceTask' ? '服务任务' :
-           node.type === 'startEvent' ? '开始事件' :
-           node.type === 'endEvent' ? '结束事件' :
-           node.type === 'timer' ? '定时器' : node.type}
+          {node.type === 'exclusiveGateway' ? t.nodes.exclusiveGateway :
+           node.type === 'inclusiveGateway' ? t.nodes.inclusiveGateway :
+           node.type === 'parallelGateway' ? t.nodes.parallelGateway :
+           node.type === 'userTask' ? t.nodes.userTask :
+           node.type === 'serviceTask' ? t.nodes.serviceTask :
+           node.type === 'startEvent' ? t.nodes.startEvent :
+           node.type === 'endEvent' ? t.nodes.endEvent :
+           node.type === 'timer' ? t.nodes.timer : node.type}
         </h3>
         <div className="text-[10px] text-gray-600 mb-3">{node.type}</div>
 
         {/* Name (all nodes) */}
         <label className="block mb-3">
-          <span className="text-gray-400 text-xs">Name</span>
+          <span className="text-gray-400 text-xs">{t.props.name}</span>
           <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
             value={(node.data.name as string) || ''}
             onChange={e => updateData('name', e.target.value)} />
@@ -111,8 +113,8 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {/* ── StartEvent: Initial Variables ──── */}
         {node.type === 'startEvent' && (
           <div className="border-t border-green-500/50 pt-3 mt-2">
-            <span className="text-green-400 text-xs font-semibold">初始变量 (Initial Variables)</span>
-            <div className="text-[10px] text-gray-500 mb-2">启动流程时传入的变量，在条件中可用</div>
+            <span className="text-green-400 text-xs font-semibold">{t.props.initialVars}</span>
+            <div className="text-[10px] text-gray-500 mb-2">{t.props.initialVarsHint}</div>
             <VarEditor vars={(node.data.initialVars as string[]) || []} onChange={v => updateData('initialVars', v)} />
           </div>
         )}
@@ -121,27 +123,27 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {node.type === 'userTask' && (
           <>
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-gray-400 text-xs">Mode:</span>
+              <span className="text-gray-400 text-xs">{t.props.mode}:</span>
               <button onClick={() => updateData('httpMode', false)}
                 className={`text-xs px-2 py-0.5 rounded ${!(node.data.httpMode as boolean) ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
-                本地任务
+                {t.props.localTask}
               </button>
               <button onClick={() => updateData('httpMode', true)}
                 className={`text-xs px-2 py-0.5 rounded ${(node.data.httpMode as boolean) ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
-                HTTP 回调
+                {t.props.httpCallback}
               </button>
             </div>
 
             {!(node.data.httpMode as boolean) ? (
               <>
                 <label className="block mb-2">
-                  <span className="text-gray-400 text-xs">Assignee</span>
+                  <span className="text-gray-400 text-xs">{t.props.assignee}</span>
                   <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
                     value={(node.data.assignee as string) || ''} placeholder="e.g. ${applicant}"
                     onChange={e => updateData('assignee', e.target.value)} />
                 </label>
                 <label className="block mb-2">
-                  <span className="text-gray-400 text-xs">Candidate Groups</span>
+                  <span className="text-gray-400 text-xs">{t.props.candidateGroups}</span>
                   <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
                     value={(Array.isArray(node.data.candidateGroups) ? (node.data.candidateGroups as string[]).join(', ') : '')}
                     placeholder="comma-separated"
@@ -150,16 +152,16 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               </>
             ) : (
               <>
-                <div className="text-[10px] text-gray-500 mb-2">Body auto-injects: ${'${taskId}'}, ${'${completeUrl}'}, ${'${rejectUrl}'}, ${'${instanceId}'}, ${'${nodeId}'}</div>
+                <div className="text-[10px] text-gray-500 mb-2">{t.props.callbackHint}</div>
                 <label className="block mb-2">
-                  <span className="text-teal-400 text-xs">URL</span>
+                  <span className="text-teal-400 text-xs">{t.props.url}</span>
                   <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
                     value={(node.data.url as string) || ''} placeholder="https://oa.company.com/api/approval"
                     onChange={e => updateData('url', e.target.value)} />
                 </label>
                 <div className="flex gap-2 mb-2">
                   <label className="flex-1">
-                    <span className="text-gray-400 text-xs">Method</span>
+                    <span className="text-gray-400 text-xs">{t.props.method}</span>
                     <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                       value={(node.data.method as string) || 'POST'}
                       onChange={e => updateData('method', e.target.value)}>
@@ -169,11 +171,11 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     </select>
                   </label>
                 </div>
-                <KvEditor label="Headers"
+                <KvEditor label={t.props.headers}
                   entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('headerEntries', v)}
                   keyPlaceholder="Content-Type" valPlaceholder="application/json" />
-                <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? 'Query Params' : 'Body Params'}
+                <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? t.props.queryParams : t.props.bodyParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
                   keyPlaceholder="applicant" valPlaceholder="${applicant}" />
@@ -181,10 +183,10 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             )}
 
             <div className="border-t border-orange-500/50 pt-2 mt-2">
-              <span className="text-orange-400 text-xs font-semibold">Timeout (Boundary Timer)</span>
-              <div className="text-[10px] text-gray-500 mb-2">Draw a timeout edge to set the target node. Duration takes priority.</div>
+              <span className="text-orange-400 text-xs font-semibold">{t.props.timeout}</span>
+              <div className="text-[10px] text-gray-500 mb-2">{t.props.timeoutHint}</div>
               <label className="block mb-1">
-                <span className="text-gray-400 text-xs">Duration</span>
+                <span className="text-gray-400 text-xs">{t.props.duration}</span>
                 <div className="flex gap-1 mt-0.5">
                   <input type="number" min="1" className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
                     value={parseDurationValue(node.data.boundaryTimer as string)}
@@ -201,9 +203,9 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                       const newData = { ...(node.data || {}), boundaryTimer: `PT${val}${e.target.value}` };
                       onChange({ id: node.id, type: node.type, position: node.position, data: newData } as Node);
                     }}>
-                    <option value="S">秒</option>
-                    <option value="M">分</option>
-                    <option value="H">时</option>
+                    <option value="S">{t.props.seconds}</option>
+                    <option value="M">{t.props.minutes}</option>
+                    <option value="H">{t.props.hours}</option>
                   </select>
                 </div>
               </label>
@@ -218,23 +220,23 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               <span className="text-gray-400 text-xs">Type:</span>
               <button onClick={() => updateData('httpMode', false)}
                 className={`text-xs px-2 py-0.5 rounded ${!(node.data.httpMode as boolean) ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
-                代码逻辑
+                {t.props.codeLogic}
               </button>
               <button onClick={() => updateData('httpMode', true)}
                 className={`text-xs px-2 py-0.5 rounded ${(node.data.httpMode as boolean) ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
-                HTTP 调用
+                {t.props.httpCall}
               </button>
             </div>
 
             {!(node.data.httpMode as boolean) ? (
               <>
                 <label className="block mb-2">
-                  <span className="text-gray-400 text-xs">Handler Class</span>
+                  <span className="text-gray-400 text-xs">{t.props.handlerClass}</span>
                   <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
                     value={(node.data.handlerClass as string) || ''} placeholder="com.myapp.Handler"
                     onChange={e => updateData('handlerClass', e.target.value)} />
                 </label>
-                <KvEditor label="Input Parameters"
+                <KvEditor label={t.props.inputParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
                   keyPlaceholder="paramName" valPlaceholder="${variable} or fixed" />
@@ -242,14 +244,14 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             ) : (
               <>
                 <label className="block mb-2">
-                  <span className="text-teal-400 text-xs">URL</span>
+                  <span className="text-teal-400 text-xs">{t.props.url}</span>
                   <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
                     value={(node.data.url as string) || ''} placeholder="https://api.example.com/check"
                     onChange={e => updateData('url', e.target.value)} />
                 </label>
                 <div className="flex gap-2 mb-2">
                   <label className="flex-1">
-                    <span className="text-gray-400 text-xs">Method</span>
+                    <span className="text-gray-400 text-xs">{t.props.method}</span>
                     <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                       value={(node.data.method as string) || 'POST'}
                       onChange={e => updateData('method', e.target.value)}>
@@ -259,11 +261,11 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     </select>
                   </label>
                 </div>
-                <KvEditor label="Headers"
+                <KvEditor label={t.props.headers}
                   entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('headerEntries', v)}
                   keyPlaceholder="Content-Type" valPlaceholder="application/json" />
-                <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? 'Query Params' : 'Body Params'}
+                <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? t.props.queryParams : t.props.bodyParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
                   keyPlaceholder="amount" valPlaceholder="${amount}" />

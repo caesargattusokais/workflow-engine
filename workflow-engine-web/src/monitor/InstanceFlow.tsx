@@ -2,8 +2,10 @@ import { useRef, useEffect } from 'react';
 import { ReactFlow, Background, type Node, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from '../designer/nodes';
+import { useT } from '../i18n';
 
 export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], edges: Edge[], error?: string }) {
+  const { t } = useT();
   const rfRef = useRef<any>(null);
 
   // Fit view after nodes change

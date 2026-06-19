@@ -4,8 +4,10 @@ import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
 import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, authHeaders, getInstance } from '../api/client';
+import { useT } from '../i18n';
 
 export default function MonitorPage() {
+  const { t } = useT();
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -174,10 +176,10 @@ export default function MonitorPage() {
               <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {selectedInst.status}</span>
               <div className="flex-1" />
               {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
-                <button onClick={handleTerminate} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">Terminate</button>
+                <button onClick={handleTerminate} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">{t.monitor.terminate}</button>
               )}
               {selectedInst.status === 'SUSPENDED' && (
-                <button onClick={handleResume} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">Resume</button>
+                <button onClick={handleResume} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">{t.monitor.resume}</button>
               )}
             </div>
           )}
@@ -205,7 +207,7 @@ export default function MonitorPage() {
             )) : <div className="text-gray-600">none</div>}
 
             {/* Variables */}
-            <div className="text-gray-400 font-semibold mt-3 mb-1">Variables</div>
+            <div className="text-gray-400 font-semibold mt-3 mb-1">{t.designer.variables}</div>
             {Object.keys(selectedInst.variables || {}).length > 0
               ? Object.entries(selectedInst.variables||{}).map(([k,v]) => (
                 <div key={k} className="text-gray-500 mb-0.5">
@@ -215,7 +217,7 @@ export default function MonitorPage() {
               : <div className="text-gray-600">none</div>}
 
             {/* History */}
-            <div className="text-gray-400 font-semibold mt-3 mb-1">History ({history.length})</div>
+            <div className="text-gray-400 font-semibold mt-3 mb-1">{t.monitor.history} ({history.length})</div>
             {history.slice(-10).reverse().map((h:any,i:number) => (
               <div key={i} className="mb-1 pl-2 border-l border-gray-700">
                 <div className="text-gray-300">{nodeNames[h.nodeId] || h.nodeId}</div>
