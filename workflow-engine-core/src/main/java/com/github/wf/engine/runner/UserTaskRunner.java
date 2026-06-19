@@ -105,15 +105,23 @@ public class UserTaskRunner implements NodeRunner {
             httpVars.put("taskId", taskId);
             httpVars.put("instanceId", exec.getInstanceId());
             httpVars.put("nodeId", node.getId());
+
+            // Build callback headers — always passed, regardless of body
+            Map<String, String> callHeaders = new HashMap<>(userTask.getHeaders());
             if (baseUrl != null && !baseUrl.isBlank()) {
                 String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-                httpVars.put("completeUrl", base + "/api/tasks/" + taskId + "/complete");
-                httpVars.put("rejectUrl", base + "/api/tasks/" + taskId + "/reject");
+                String completeUrl = base + "/api/tasks/" + taskId + "/complete";
+                String rejectUrl = base + "/api/tasks/" + taskId + "/reject";
+                httpVars.put("completeUrl", completeUrl);
+                httpVars.put("rejectUrl", rejectUrl);
+                callHeaders.put("X-Callback-Complete", completeUrl);
+                callHeaders.put("X-Callback-Reject", rejectUrl);
+                callHeaders.put("X-Task-Id", taskId);
             }
             log.warn("Sending HTTP callback for task " + taskId + " to " + userTask.getUrl());
             try {
                 HttpClientUtil.fireAndForget(userTask.getUrl(), userTask.getMethod(),
-                        userTask.getHeaders(), userTask.getBody(), httpVars);
+                        callHeaders, userTask.getBody(), httpVars);
             } catch (Exception e) {
                 log.error("HTTP callback failed for task " + taskId + ": " + e.getMessage(), e);
                 throw new RuntimeException("UserTask HTTP callback failed: " + e.getMessage(), e);

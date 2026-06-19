@@ -4,11 +4,15 @@ import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.memory.InMemoryInstanceRepository;
 import com.github.wf.memory.InMemoryProcessRepository;
 import com.github.wf.memory.InMemoryTaskRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class EngineConfig {
+
+    @Value("${engine.base-url:http://localhost:8080}")
+    private String baseUrl;
 
     @Bean
     public WorkflowEngine workflowEngine() {
@@ -20,6 +24,7 @@ public class EngineConfig {
                 .processRepository(processRepo)
                 .instanceRepository(instanceRepo)
                 .taskRepository(taskRepo)
+                .baseUrl(baseUrl)
                 .build();
     }
 }
