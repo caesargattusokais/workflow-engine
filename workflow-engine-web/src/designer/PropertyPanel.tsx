@@ -133,6 +133,16 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                 placeholder="comma-separated"
                 onChange={e => updateData('candidateGroups', e.target.value.split(',').map(s => s.trim()))} />
             </label>
+            <div className="border-t border-orange-500/50 pt-2 mt-2">
+              <span className="text-orange-400 text-xs font-semibold">Timeout (Boundary Timer)</span>
+              <div className="text-[10px] text-gray-500 mb-1">Draw a timeout edge to set the target node</div>
+              <label className="block mb-1">
+                <span className="text-gray-400 text-xs">Duration</span>
+                <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                  value={(node.data.boundaryTimer as string) || ''} placeholder="PT30M"
+                  onChange={e => updateData('boundaryTimer', e.target.value)} />
+              </label>
+            </div>
           </>
         )}
 
@@ -353,7 +363,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             {edges.filter(e => e.source === node.id).map(e => {
               const et = (e.data as any)?.edgeType || 'direct';
               const colors: Record<string,string> = { result: '#22c55e', exception: '#ef4444', timeout: '#f97316', conditional: '#e5a50a', default: '#888', direct: '#666' };
-              const needsExpr = et === 'result' || et === 'exception' || et === 'conditional' || et === 'timeout';
+              const needsExpr = et === 'result' || et === 'exception' || et === 'conditional';
               const isDefault = (e.data as any)?.isDefault;
               return (
                 <div key={e.id} className="mt-1.5 text-xs">

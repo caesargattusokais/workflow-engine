@@ -35,6 +35,9 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', ver
     if (data.assignee && node.type === 'userTask') {
       lines.push(`    assignee: ${y(data.assignee as string)}`);
     }
+    if (data.boundaryTimer && node.type === 'userTask') {
+      lines.push(`    boundaryTimer: "${data.boundaryTimer}"`);
+    }
 
     if (node.type === 'serviceTask') {
       const httpMode = data.httpMode as boolean;
