@@ -67,6 +67,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     }).catch(() => {});
   }, [activeId, loaded]);
 
+  // Keep draft list in sync with live nodes/edges
+  useEffect(() => {
+    if (!activeId) return;
+    setDrafts(prev => prev.map(d => d.id === activeId ? { ...d, nodes, edges } : d));
+  }, [nodes, edges]);
+
   // Auto-save to server (debounced 10s, no version bump)
   useEffect(() => {
     if (!activeId || !loaded) return;
