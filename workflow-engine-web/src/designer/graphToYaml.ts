@@ -39,6 +39,25 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', ver
       lines.push(`    boundaryTimer: "${data.boundaryTimer}"`);
     }
 
+    // UserTask HTTP callback mode
+    if (node.type === 'userTask' && data.httpMode) {
+      lines.push('    httpMode: true');
+      if (data.url) lines.push(`    url: ${y(data.url as string)}`);
+      if (data.method && data.method !== 'POST') lines.push(`    method: ${data.method}`);
+      const headerEntries = (data.headerEntries as Array<{key:string;value:string}>) || [];
+      if (headerEntries.length > 0) {
+        lines.push('    headers:');
+        for (const h of headerEntries) { if (h.key) lines.push(`      ${h.key}: ${y(h.value)}`); }
+      }
+      const paramEntries = (data.paramEntries as Array<{key:string;value:string}>) || [];
+      const method = (data.method as string) || 'POST';
+      if (['POST','PUT','PATCH'].includes(method) && paramEntries.length > 0) {
+        const bodyObj: Record<string,string> = {};
+        for (const p of paramEntries) { if (p.key) bodyObj[p.key] = p.value; }
+        if (Object.keys(bodyObj).length > 0) lines.push(`    body: '${JSON.stringify(bodyObj)}'`);
+      }
+    }
+
     if (node.type === 'serviceTask') {
       const httpMode = data.httpMode as boolean;
       if (httpMode) lines.push('    httpMode: true');

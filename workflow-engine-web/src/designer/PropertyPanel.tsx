@@ -120,19 +120,66 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {/* ── UserTask ──────────────────────── */}
         {node.type === 'userTask' && (
           <>
-            <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Assignee</span>
-              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-                value={(node.data.assignee as string) || ''} placeholder="e.g. ${applicant}"
-                onChange={e => updateData('assignee', e.target.value)} />
-            </label>
-            <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Candidate Groups</span>
-              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-                value={(Array.isArray(node.data.candidateGroups) ? (node.data.candidateGroups as string[]).join(', ') : '')}
-                placeholder="comma-separated"
-                onChange={e => updateData('candidateGroups', e.target.value.split(',').map(s => s.trim()))} />
-            </label>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-gray-400 text-xs">Mode:</span>
+              <button onClick={() => updateData('httpMode', false)}
+                className={`text-xs px-2 py-0.5 rounded ${!(node.data.httpMode as boolean) ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
+                本地任务
+              </button>
+              <button onClick={() => updateData('httpMode', true)}
+                className={`text-xs px-2 py-0.5 rounded ${(node.data.httpMode as boolean) ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-500'}`}>
+                HTTP 回调
+              </button>
+            </div>
+
+            {!(node.data.httpMode as boolean) ? (
+              <>
+                <label className="block mb-2">
+                  <span className="text-gray-400 text-xs">Assignee</span>
+                  <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+                    value={(node.data.assignee as string) || ''} placeholder="e.g. ${applicant}"
+                    onChange={e => updateData('assignee', e.target.value)} />
+                </label>
+                <label className="block mb-2">
+                  <span className="text-gray-400 text-xs">Candidate Groups</span>
+                  <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+                    value={(Array.isArray(node.data.candidateGroups) ? (node.data.candidateGroups as string[]).join(', ') : '')}
+                    placeholder="comma-separated"
+                    onChange={e => updateData('candidateGroups', e.target.value.split(',').map(s => s.trim()))} />
+                </label>
+              </>
+            ) : (
+              <>
+                <div className="text-[10px] text-gray-500 mb-2">Body auto-injects: ${'${taskId}'}, ${'${completeUrl}'}, ${'${rejectUrl}'}, ${'${instanceId}'}, ${'${nodeId}'}</div>
+                <label className="block mb-2">
+                  <span className="text-teal-400 text-xs">URL</span>
+                  <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                    value={(node.data.url as string) || ''} placeholder="https://oa.company.com/api/approval"
+                    onChange={e => updateData('url', e.target.value)} />
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <label className="flex-1">
+                    <span className="text-gray-400 text-xs">Method</span>
+                    <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                      value={(node.data.method as string) || 'POST'}
+                      onChange={e => updateData('method', e.target.value)}>
+                      {['GET','POST','PUT','DELETE','PATCH'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <KvEditor label="Headers"
+                  entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
+                  onChange={v => updateData('headerEntries', v)}
+                  keyPlaceholder="Content-Type" valPlaceholder="application/json" />
+                <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? 'Query Params' : 'Body Params'}
+                  entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
+                  onChange={v => updateData('paramEntries', v)}
+                  keyPlaceholder="applicant" valPlaceholder="${applicant}" />
+              </>
+            )}
+
             <div className="border-t border-orange-500/50 pt-2 mt-2">
               <span className="text-orange-400 text-xs font-semibold">Timeout (Boundary Timer)</span>
               <div className="text-[10px] text-gray-500 mb-2">Draw a timeout edge to set the target node. Duration takes priority.</div>

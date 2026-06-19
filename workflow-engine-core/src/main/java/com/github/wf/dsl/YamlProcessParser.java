@@ -126,7 +126,7 @@ public class YamlProcessParser implements ProcessParser {
         switch (ny.type) {
             case "startEvent": return new StartEvent(ny.id, ny.name, listeners);
             case "endEvent": return new EndEvent(ny.id, ny.name, listeners);
-            case "userTask": return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, ny.boundaryTimer, listeners);
+            case "userTask": return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, ny.boundaryTimer, ny.httpMode, ny.url, ny.method, ny.headers, ny.body, listeners);
             case "serviceTask":
                 RetryConfig retryConfig = buildRetryConfig(ny);
                 List<RoutingRule> resultRoutes = buildRoutes(ny.resultRouting);

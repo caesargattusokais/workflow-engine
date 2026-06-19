@@ -68,6 +68,16 @@ public class JsonProcessParser implements ProcessParser {
         ny.dynamicRouter = jo.has("dynamicRouter") ? jo.get("dynamicRouter").getAsString() : null;
         ny.duration = jo.has("duration") ? jo.get("duration").getAsString() : null;
         ny.until = jo.has("until") ? jo.get("until").getAsString() : null;
+        ny.boundaryTimer = jo.has("boundaryTimer") ? jo.get("boundaryTimer").getAsString() : null;
+        ny.httpMode = jo.has("httpMode") && jo.get("httpMode").getAsBoolean();
+        ny.url = jo.has("url") ? jo.get("url").getAsString() : null;
+        ny.method = jo.has("method") ? jo.get("method").getAsString() : null;
+        if (jo.has("headers")) {
+            JsonObject hdrs = jo.getAsJsonObject("headers");
+            ny.headers = new HashMap<>();
+            for (var entry : hdrs.entrySet()) ny.headers.put(entry.getKey(), entry.getValue().getAsString());
+        }
+        ny.body = jo.has("body") ? jo.get("body").getAsString() : null;
 
         if (jo.has("candidateGroups")) {
             JsonArray cg = jo.getAsJsonArray("candidateGroups");
@@ -171,7 +181,7 @@ public class JsonProcessParser implements ProcessParser {
             case "endEvent":
                 return new EndEvent(ny.id, ny.name, listeners);
             case "userTask":
-                return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, ny.boundaryTimer, listeners);
+                return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, ny.boundaryTimer, ny.httpMode, ny.url, ny.method, ny.headers, ny.body, listeners);
             case "serviceTask":
                 return new ServiceTask(ny.id, ny.name, ny.handlerClass, listeners);
             case "exclusiveGateway":

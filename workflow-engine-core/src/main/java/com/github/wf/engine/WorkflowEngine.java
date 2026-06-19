@@ -32,15 +32,18 @@ public class WorkflowEngine {
 
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
     private ProcessParser processParser = new YamlProcessParser();
+    private String baseUrl;
 
     WorkflowEngine(ProcessRepository processRepository,
                    InstanceRepository instanceRepository,
                    TaskRepository taskRepository,
-                   ExpressionEvaluator expressionEvaluator) {
+                   ExpressionEvaluator expressionEvaluator,
+                   String baseUrl) {
         this.processRepository = processRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
+        this.baseUrl = baseUrl;
         registerDefaultRunners();
         // Delay daemon: picks up delayed triggers (retry/timer), wakes instances
         Thread delayDaemon = new Thread(() -> {
@@ -59,7 +62,7 @@ public class WorkflowEngine {
     private void registerDefaultRunners() {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
-        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay));
+        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay, baseUrl));
         runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleDelay));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());

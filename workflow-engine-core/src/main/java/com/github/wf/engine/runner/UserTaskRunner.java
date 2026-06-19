@@ -2,6 +2,7 @@ package com.github.wf.engine.runner;
 
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
+import com.github.wf.ext.http.HttpClientUtil;
 import com.github.wf.model.ExecutionStatus;
 import com.github.wf.model.Node;
 import com.github.wf.model.ProcessInstance;
@@ -13,6 +14,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -23,15 +25,24 @@ public class UserTaskRunner implements NodeRunner {
 
     private final TaskRepository taskRepository;
     private final BiConsumer<String, Long> scheduler;
+    private final String baseUrl;
 
     public UserTaskRunner(TaskRepository taskRepository) {
         this.taskRepository = Objects.requireNonNull(taskRepository);
         this.scheduler = null;
+        this.baseUrl = null;
     }
 
     public UserTaskRunner(TaskRepository taskRepository, BiConsumer<String, Long> scheduler) {
         this.taskRepository = Objects.requireNonNull(taskRepository);
         this.scheduler = scheduler;
+        this.baseUrl = null;
+    }
+
+    public UserTaskRunner(TaskRepository taskRepository, BiConsumer<String, Long> scheduler, String baseUrl) {
+        this.taskRepository = Objects.requireNonNull(taskRepository);
+        this.scheduler = scheduler;
+        this.baseUrl = baseUrl;
     }
 
     @Override
@@ -47,7 +58,6 @@ public class UserTaskRunner implements NodeRunner {
             log.warn("Boundary timer fired for node=" + node.getId() + " instance=" + context.getInstanceId());
             instance.removeVariable(timerKey);
             context.getInstanceRepository().update(instance);
-            // Route via timeout edge
             for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
                 if (t.isTimeout()) {
                     log.warn("Timeout edge matched, routing to " + t.getTo());
@@ -57,7 +67,6 @@ public class UserTaskRunner implements NodeRunner {
                 }
             }
             log.warn("No timeout edge found for node=" + node.getId() + " — falling through");
-            // If no timeout edge, fall through and create task normally
         }
 
         // Check if a pending task already exists for this execution+node
@@ -67,7 +76,7 @@ public class UserTaskRunner implements NodeRunner {
                 .anyMatch(t -> t.getNodeId().equals(node.getId()) && t.isPending());
 
         if (taskExists) {
-            return false; // already waiting, no advance
+            return false;
         }
 
         // Create task
@@ -88,6 +97,28 @@ public class UserTaskRunner implements NodeRunner {
         task.setCandidateGroups(userTask.getCandidateGroups());
         task.setVariables(new java.util.HashMap<>(variables));
         taskRepository.save(task);
+
+        // ── HTTP callback mode ─────────────────
+        if (userTask.isHttpTask() && userTask.getUrl() != null && !userTask.getUrl().isBlank()) {
+            String taskId = task.getId();
+            Map<String, Object> httpVars = new HashMap<>(variables);
+            httpVars.put("taskId", taskId);
+            httpVars.put("instanceId", exec.getInstanceId());
+            httpVars.put("nodeId", node.getId());
+            if (baseUrl != null && !baseUrl.isBlank()) {
+                String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+                httpVars.put("completeUrl", base + "/api/tasks/" + taskId + "/complete");
+                httpVars.put("rejectUrl", base + "/api/tasks/" + taskId + "/reject");
+            }
+            log.warn("Sending HTTP callback for task " + taskId + " to " + userTask.getUrl());
+            try {
+                HttpClientUtil.fireAndForget(userTask.getUrl(), userTask.getMethod(),
+                        userTask.getHeaders(), userTask.getBody(), httpVars);
+            } catch (Exception e) {
+                log.error("HTTP callback failed for task " + taskId + ": " + e.getMessage(), e);
+                throw new RuntimeException("UserTask HTTP callback failed: " + e.getMessage(), e);
+            }
+        }
 
         exec.setStatus(ExecutionStatus.WAITING);
 

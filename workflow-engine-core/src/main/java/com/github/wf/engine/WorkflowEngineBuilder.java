@@ -14,6 +14,7 @@ public class WorkflowEngineBuilder {
     private InstanceRepository instanceRepository;
     private TaskRepository taskRepository;
     private ExpressionEvaluator expressionEvaluator;
+    private String baseUrl;
 
     WorkflowEngineBuilder() {}
 
@@ -37,6 +38,11 @@ public class WorkflowEngineBuilder {
         return this;
     }
 
+    public WorkflowEngineBuilder baseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
+        return this;
+    }
+
     public WorkflowEngine build() {
         Objects.requireNonNull(processRepository, "processRepository is required");
         Objects.requireNonNull(instanceRepository, "instanceRepository is required");
@@ -44,6 +50,6 @@ public class WorkflowEngineBuilder {
         if (expressionEvaluator == null) {
             expressionEvaluator = new SpelExpressionEvaluator();
         }
-        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator);
+        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, baseUrl);
     }
 }

@@ -56,7 +56,9 @@ public class ServiceTaskRunner implements NodeRunner {
 
             Map<String, Object> result;
             if (hasUrl) {
-                result = executeHttp(serviceTask, variables);
+                result = com.github.wf.ext.http.HttpClientUtil.execute(
+                        serviceTask.getUrl(), serviceTask.getMethod(),
+                        serviceTask.getHeaders(), serviceTask.getBody(), variables);
             } else {
                 result = getHandler(hc).execute(variables);
             }
@@ -212,77 +214,6 @@ public class ServiceTaskRunner implements NodeRunner {
             }
         }
         return handler;
-    }
-
-    /**
-     * Execute an HTTP service task using built-in java.net.http.HttpClient.
-     * No handlerClass needed — reads url/method/headers/body from node config.
-     */
-    private Map<String, Object> executeHttp(ServiceTask task, Map<String, Object> variables) {
-        try {
-            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(30))
-                    .build();
-
-            java.net.http.HttpRequest.Builder builder = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(interpolate(task.getUrl(), variables)))
-                    .timeout(java.time.Duration.ofSeconds(30));
-
-            // Headers
-            for (var entry : task.getHeaders().entrySet()) {
-                builder.header(entry.getKey(), interpolate(entry.getValue(), variables));
-            }
-
-            // Method + body
-            String method = task.getMethod().toUpperCase();
-            String bodyStr = task.getBody() != null ? interpolate(task.getBody(), variables) : null;
-
-            if (bodyStr != null && !bodyStr.isEmpty()
-                    && ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
-                builder.method(method, java.net.http.HttpRequest.BodyPublishers.ofString(
-                        bodyStr, java.nio.charset.StandardCharsets.UTF_8));
-            } else {
-                builder.method(method, java.net.http.HttpRequest.BodyPublishers.noBody());
-            }
-
-            java.net.http.HttpResponse<String> response = client.send(builder.build(),
-                    java.net.http.HttpResponse.BodyHandlers.ofString());
-
-            int status = response.statusCode();
-            if (status < 200 || status >= 300) {
-                throw new RuntimeException("HTTP " + status + ": " + response.body());
-            }
-
-            if (response.body() == null || response.body().isBlank()) {
-                return Map.of("statusCode", status, "body", "");
-            }
-
-            // Parse JSON response
-            com.google.gson.Gson gson = new com.google.gson.Gson();
-            var type = new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType();
-            Map<String, Object> result = gson.fromJson(response.body(), type);
-            result.put("statusCode", status);
-            return result;
-
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new com.github.wf.ext.http.HttpTimeoutException("HTTP timeout: " + e.getMessage(), e);
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("HTTP interrupted", e);
-        }
-    }
-
-    /** Simple ${var} interpolation in strings */
-    private String interpolate(String template, Map<String, Object> vars) {
-        if (template == null) return null;
-        String result = template;
-        for (var entry : vars.entrySet()) {
-            result = result.replace("${" + entry.getKey() + "}",
-                    entry.getValue() != null ? entry.getValue().toString() : "");
-        }
-        return result;
     }
 
     /**
