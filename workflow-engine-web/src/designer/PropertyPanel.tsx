@@ -7,9 +7,13 @@ interface ConditionItem {
   isDefault: boolean;
 }
 
-export default function PropertyPanel({ node, onChange }: {
+import type { Edge } from '@xyflow/react';
+
+export default function PropertyPanel({ node, onChange, edges, onSelectEdge }: {
     node: Node | null;
     onChange: (node: Node) => void;
+    edges?: Edge[];
+    onSelectEdge?: (edgeId: string) => void;
 }) {
   const [width, setWidth] = useState(280);
   const dragging = useRef(false);
@@ -338,6 +342,27 @@ export default function PropertyPanel({ node, onChange }: {
                   }
                 }} />
             </label>
+          </div>
+        )}
+
+        {/* ── Outgoing Edges ── */}
+        {edges && edges.length > 0 && (
+          <div className="border-t border-gray-700 pt-2 mt-2">
+            <span className="text-gray-400 text-xs font-semibold">Outgoing Edges</span>
+            {edges.filter(e => e.source === node.id).map(e => {
+              const et = (e.data as any)?.edgeType || 'direct';
+              const colors: Record<string,string> = { result: '#22c55e', exception: '#ef4444', timeout: '#f97316', conditional: '#e5a50a', default: '#888', direct: '#666' };
+              return (
+                <div key={e.id} className="mt-1 text-xs flex items-center gap-1 cursor-pointer hover:bg-gray-750 rounded px-1 py-0.5"
+                  onClick={() => onSelectEdge?.(e.id)}>
+                  <span className="w-2 h-2 rounded-full inline-block" style={{background: colors[et]||'#666'}} />
+                  <span className="text-gray-500">{et}</span>
+                  <span className="text-gray-600">→</span>
+                  <span className="text-gray-300 truncate">{e.target}</span>
+                  {(e.data as any)?.expr && <span className="text-gray-500 ml-1 truncate">{(e.data as any).expr}</span>}
+                </div>
+              );
+            })}
           </div>
         )}
 

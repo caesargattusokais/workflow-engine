@@ -348,7 +348,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           setNodes={setNodes} setEdges={setEdges}
           onNodeSelect={handleNodeSelect}
         />
-        <PropertyPanel node={selectedNode} onChange={handleNodeChange} />
+        <PropertyPanel node={selectedNode} onChange={handleNodeChange} edges={edges} />
       </div>
     </div>
   );
