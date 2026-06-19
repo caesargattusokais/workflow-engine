@@ -31,6 +31,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deployedYaml, setDeployedYaml] = useState<string | null>(null);
+  const [showYaml, setShowYaml] = useState(false);
   const [deployedId, setDeployedId] = useState<string | null>(null);
   const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
 
@@ -149,6 +150,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       for (const n of nodes) positions[n.id] = n.position;
       const result = await deployDefinition(yaml, positions);
       setDeployedYaml(yaml);
+      setShowYaml(true);
       setDeployedId(result.id);
       // Auto-start instance
       try {
@@ -228,16 +230,16 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 </button>
               )}
               {deployedYaml && (
-                <button onClick={() => setDeployedYaml(deployedYaml ? null : deployedYaml)}
+                <button onClick={() => setShowYaml(!showYaml)}
                   className="bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
-                  {deployedYaml ? 'Hide YAML' : 'Show YAML'}
+                  {showYaml ? 'Hide YAML' : 'Show YAML'}
                 </button>
               )}
-              <button onClick={() => { setToast(null); setDeployedYaml(null); }}
+              <button onClick={() => { setToast(null); setDeployedYaml(null); setShowYaml(false); }}
                 className="text-gray-400 hover:text-white text-xs">✕</button>
             </div>
           </div>
-          {deployedYaml && (
+          {deployedYaml && showYaml && (
             <pre className="mt-2 bg-gray-900 rounded p-2 text-xs text-green-400 overflow-auto max-h-48 font-mono">
               {deployedYaml}
             </pre>
@@ -318,6 +320,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               <button onClick={() => {
                 const d = draftMenu.draft.id === activeId ? { ...draftMenu.draft, nodes, edges } : draftMenu.draft;
                 const yaml = graphToYaml(d.nodes, d.edges, d.name);
+                setDeployedYaml(yaml);
+                setShowYaml(true);
                 setToast(`YAML for: ${draftMenu.draft.name}`);
                 setDraftMenu(null);
               }}
