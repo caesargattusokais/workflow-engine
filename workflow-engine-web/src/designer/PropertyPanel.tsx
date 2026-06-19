@@ -217,22 +217,6 @@ export default function PropertyPanel({ node, onChange }: {
                 onChange={v => updateData('retryOn', v)} />
             </div>
 
-            {/* ── Result Routing ─────────────── */}
-            <div className="border-t border-gray-700 pt-2 mt-2">
-              <span className="text-gray-400 text-xs font-semibold">Result Routing</span>
-              <div className="text-[10px] text-gray-500 mb-1">Use result.xxx in expressions, e.g. result.status == 'OK'</div>
-              <RouteEditor entries={(node.data.resultRoutes as any[]) || []}
-                onChange={v => updateData('resultRoutes', v)} label="result" />
-            </div>
-
-            {/* ── Exception Routing ──────────── */}
-            <div className="border-t border-gray-700 pt-2 mt-2">
-              <span className="text-gray-400 text-xs font-semibold">Exception Routing</span>
-              <div className="text-[10px] text-gray-500 mb-1">Use exception.type/message in expressions</div>
-              <RouteEditor entries={(node.data.exceptionRoutes as any[]) || []}
-                onChange={v => updateData('exceptionRoutes', v)} label="exception" />
-            </div>
-
             <ReturnValueEditor
               entries={(node.data.returnValues as Array<{key:string;type:string}>) || []}
               onChange={v => updateData('returnValues', v)}

@@ -108,18 +108,23 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', ver
 
   lines.push('transitions:');
   for (const edge of edges) {
-    const label = (edge.data as any)?.label as string | undefined;
     const sourceNode = nodes.find(n => n.id === edge.source);
     const sourceData = sourceNode?.data as Record<string,unknown> | undefined;
     const hasNodeConditions = sourceData?.conditions &&
       (sourceData.conditions as ConditionItem[]).length > 0 &&
       (sourceNode!.type === 'exclusiveGateway' || sourceNode!.type === 'inclusiveGateway');
     if (hasNodeConditions) continue;
+    const edgeType = (edge.data as any)?.edgeType || 'direct';
+    const edgeExpr = (edge.data as any)?.expr;
+    const isDefault = (edge.data as any)?.isDefault;
+
     lines.push(`  - from: ${edge.source}`);
     lines.push(`    to: ${edge.target}`);
-    if (label) {
-      if (label === 'default') lines.push('    type: default');
-      else { lines.push('    type: conditional'); lines.push(`    expr: ${y(label)}`); }
+
+    if (edgeType !== 'direct') {
+      if (isDefault) lines.push('    default: true');
+      else if (edgeExpr) lines.push(`    expr: ${y(edgeExpr)}`);
+      lines.push(`    type: ${edgeType}`);
     }
   }
 

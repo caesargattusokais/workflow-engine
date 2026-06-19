@@ -27,6 +27,17 @@ interface ContextMenuState {
 
 let nodeIdCounter = 0;
 
+function getEdgeStyle(type?: string) {
+  switch (type) {
+    case 'result': return { stroke: '#22c55e', strokeWidth: 2 };
+    case 'exception': return { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' };
+    case 'timeout': return { stroke: '#f97316', strokeWidth: 2, strokeDasharray: '5,5' };
+    case 'conditional': return { stroke: '#e5a50a', strokeWidth: 2 };
+    case 'default': return { stroke: '#888', strokeWidth: 2, strokeDasharray: '3,3' };
+    default: return { stroke: '#666', strokeWidth: 2 };
+  }
+}
+
 export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -46,8 +57,9 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       ...params,
       id: `edge_${Date.now()}`,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
-      style: { stroke: '#666', strokeWidth: 2 },
-      interactionWidth: 20
+      style: getEdgeStyle(),
+      interactionWidth: 20,
+      data: { edgeType: 'direct' }
     } as Edge]);
   }, [edges, setEdges, locked]);
 
@@ -155,9 +167,10 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
-          style: { stroke: '#555', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#555' },
-          interactionWidth: 20
+          style: getEdgeStyle(),
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+          interactionWidth: 20,
+          data: { edgeType: 'direct' }
         }}
         style={{ background: '#1a1a2e' }}
       >
@@ -206,14 +219,36 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
           )}
           {menu.type === 'edge' && (
             <>
-              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
-                Edge
-              </div>
-              <button
-                onClick={() => deleteEdge(menu.edgeId!)}
-                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors">
-                Delete Edge
-              </button>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">Edge</div>
+              {['direct','conditional','default','result','exception','timeout'].map(t => (
+                <button key={t} onClick={() => {
+                  const style = getEdgeStyle(t);
+                  setEdges(edges.map(e => e.id === menu.edgeId ? {
+                    ...e, data: { ...e.data, edgeType: t }, style, markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke as string }
+                  } : e));
+                  setMenu(null);
+                }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
+                  {t}
+                </button>
+              ))}
+              {['conditional','result','exception'].includes(edges.find(e => e.id === menu.edgeId)?.data?.edgeType as string) && (
+                <div className="px-3 py-1" onClick={e => e.stopPropagation()}>
+                  <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-xs mt-1"
+                    placeholder="SpEL: days > 3"
+                    defaultValue={(edges.find(e => e.id === menu.edgeId)?.data?.expr as string) || ''}
+                    onBlur={e => {
+                      setEdges(edges.map(ed => ed.id === menu.edgeId ? {
+                        ...ed, data: { ...ed.data, expr: e.target.value }
+                      } : ed));
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  />
+                </div>
+              )}
+              <div className="border-t border-gray-700" />
+              <button onClick={() => { deleteEdge(menu.edgeId!); setMenu(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">Delete</button>
             </>
           )}
           {menu.type === 'pane' && (
