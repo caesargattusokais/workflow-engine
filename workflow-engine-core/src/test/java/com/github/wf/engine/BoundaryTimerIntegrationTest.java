@@ -170,4 +170,61 @@ class BoundaryTimerIntegrationTest {
                 .toList();
         assertThat(escalatedTasks).hasSize(1);
     }
+
+    @Test
+    void manualCompleteRoutesToDirectEdgeNotTimeout() {
+        // Same workflow as above
+        engine.deploy("""
+                id: bt-manual
+                name: 手动完成测试
+                version: 1
+                nodes:
+                  - id: start
+                    type: startEvent
+                  - id: review
+                    type: userTask
+                    name: 审批
+                    assignee: manager
+                    boundaryTimer: "PT30M"
+                  - id: normal-end
+                    type: endEvent
+                  - id: escalated
+                    type: userTask
+                    name: 升级处理
+                    assignee: director
+                  - id: timeout-end
+                    type: endEvent
+                transitions:
+                  - from: start
+                    to: review
+                  - from: review
+                    to: normal-end
+                    type: direct
+                  - from: review
+                    to: escalated
+                    type: timeout
+                  - from: escalated
+                    to: timeout-end
+                """);
+
+        ProcessInstance instance = engine.start("bt-manual", Map.of());
+        String instanceId = instance.getId();
+
+        // Get the review task
+        List<Task> reviewTasks = taskStore.values().stream()
+                .filter(t -> t.getInstanceId().equals(instanceId) && t.isPending() && t.getNodeId().equals("review"))
+                .toList();
+        assertThat(reviewTasks).hasSize(1);
+
+        // Manually complete the task
+        engine.completeTask(reviewTasks.get(0).getId(), Map.of("approved", true), "同意");
+
+        // Execution should go to normal-end (direct), NOT escalated (timeout)
+        List<Execution> currentExecs = executionStore.values().stream()
+                .filter(e -> e.getInstanceId().equals(instanceId) && !e.isCompleted()).toList();
+        // After reaching endEvent, the flow should be COMPLETED
+        ProcessInstance afterComplete = instanceStore.get(instanceId);
+        // If it went to normal-end → COMPLETED; if it went to escalated → still RUNNING with a task
+        assertThat(afterComplete.getStatus()).isEqualTo(InstanceStatus.COMPLETED);
+    }
 }

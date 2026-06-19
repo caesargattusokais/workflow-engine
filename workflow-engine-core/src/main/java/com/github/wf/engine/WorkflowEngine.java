@@ -271,6 +271,11 @@ public class WorkflowEngine {
         List<Execution> executions = instanceRepository.findActiveExecutions(task.getInstanceId());
         for (Execution exec : executions) {
             if (exec.isWaiting() && exec.getCurrentNodeId().equals(task.getNodeId())) {
+                // Clear any pending timer/retry state — user completed manually
+                exec.setRetryState(null);
+                instance.removeVariable(task.getNodeId() + "_boundaryTimerFired");
+                instanceRepository.update(instance);
+
                 // Check for dynamic router
                 if (node instanceof UserTask) {
                     UserTask ut = (UserTask) node;
@@ -279,8 +284,18 @@ public class WorkflowEngine {
                                 instance.getId(), node.getId(), instance.getVariables());
                         exec.setCurrentNodeId(nextNodeId);
                     } else {
+                        // Pick first non-routing edge (direct/conditional/default), skip timeout/result/exception
                         List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
-                        if (!outgoing.isEmpty()) exec.setCurrentNodeId(outgoing.get(0).getTo());
+                        com.github.wf.model.Transition picked = null;
+                        for (com.github.wf.model.Transition t : outgoing) {
+                            if (t.isDirect()) { picked = t; break; }
+                        }
+                        if (picked == null) {
+                            for (com.github.wf.model.Transition t : outgoing) {
+                                if (t.isConditional() || t.isDefault()) { picked = t; break; }
+                            }
+                        }
+                        if (picked != null) exec.setCurrentNodeId(picked.getTo());
                     }
                 } else {
                     List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
