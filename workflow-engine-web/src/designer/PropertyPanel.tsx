@@ -9,11 +9,12 @@ interface ConditionItem {
 
 import type { Edge } from '@xyflow/react';
 
-export default function PropertyPanel({ node, onChange, edges, onSelectEdge }: {
+export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onEdgesChange }: {
     node: Node | null;
     onChange: (node: Node) => void;
     edges?: Edge[];
     onSelectEdge?: (edgeId: string) => void;
+    onEdgesChange?: (edges: Edge[]) => void;
 }) {
   const [width, setWidth] = useState(280);
   const dragging = useRef(false);
@@ -352,14 +353,31 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge }: {
             {edges.filter(e => e.source === node.id).map(e => {
               const et = (e.data as any)?.edgeType || 'direct';
               const colors: Record<string,string> = { result: '#22c55e', exception: '#ef4444', timeout: '#f97316', conditional: '#e5a50a', default: '#888', direct: '#666' };
+              const needsExpr = et === 'result' || et === 'exception' || et === 'conditional' || et === 'timeout';
+              const isDefault = (e.data as any)?.isDefault;
               return (
-                <div key={e.id} className="mt-1 text-xs flex items-center gap-1 cursor-pointer hover:bg-gray-750 rounded px-1 py-0.5"
-                  onClick={() => onSelectEdge?.(e.id)}>
-                  <span className="w-2 h-2 rounded-full inline-block" style={{background: colors[et]||'#666'}} />
-                  <span className="text-gray-500">{et}</span>
-                  <span className="text-gray-600">→</span>
-                  <span className="text-gray-300 truncate">{e.target}</span>
-                  {(e.data as any)?.expr && <span className="text-gray-500 ml-1 truncate">{(e.data as any).expr}</span>}
+                <div key={e.id} className="mt-1.5 text-xs">
+                  <div className="flex items-center gap-1 cursor-pointer hover:bg-gray-750 rounded px-1 py-0.5"
+                    onClick={() => onSelectEdge?.(e.id)}>
+                    <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{background: colors[et]||'#666'}} />
+                    <span className="text-gray-500 w-14 flex-shrink-0">{et}</span>
+                    <span className="text-gray-600">→</span>
+                    <span className="text-gray-300 truncate">{e.target}</span>
+                  </div>
+                  {needsExpr && !isDefault && (
+                    <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px] mt-0.5 font-mono"
+                      value={(e.data as any)?.expr || ''}
+                      placeholder={et === 'timeout' ? 'PT30M' : 'SpEL expression'}
+                      onChange={ev => {
+                        const updated = edges.map(ed => ed.id === e.id ? {
+                          ...ed, data: { ...ed.data, expr: ev.target.value }
+                        } : ed);
+                        // Update edges through parent callback
+                        onEdgesChange?.(updated);
+                      }}
+                    />
+                  )}
+                  {et === 'default' && <div className="text-[10px] text-gray-500 mt-0.5">fallback</div>}
                 </div>
               );
             })}
