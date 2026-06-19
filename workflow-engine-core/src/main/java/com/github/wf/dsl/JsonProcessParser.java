@@ -66,6 +66,8 @@ public class JsonProcessParser implements ProcessParser {
         ny.assignee = jo.has("assignee") ? jo.get("assignee").getAsString() : null;
         ny.handlerClass = jo.has("handlerClass") ? jo.get("handlerClass").getAsString() : null;
         ny.dynamicRouter = jo.has("dynamicRouter") ? jo.get("dynamicRouter").getAsString() : null;
+        ny.duration = jo.has("duration") ? jo.get("duration").getAsString() : null;
+        ny.until = jo.has("until") ? jo.get("until").getAsString() : null;
 
         if (jo.has("candidateGroups")) {
             JsonArray cg = jo.getAsJsonArray("candidateGroups");
@@ -178,6 +180,8 @@ public class JsonProcessParser implements ProcessParser {
                 return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway":
                 return new InclusiveGateway(ny.id, ny.name, listeners);
+            case "timer":
+                return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
             default:
                 throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }

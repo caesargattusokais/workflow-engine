@@ -98,6 +98,9 @@ public class DefinitionController {
                 data.put("dynamicRouter", ut.getDynamicRouter());
             } else if (n instanceof ServiceTask st) {
                 data.put("handlerClass", st.getHandlerClass());
+            } else if (n instanceof TimerNode tn) {
+                data.put("duration", tn.getDuration());
+                data.put("deadline", tn.getDeadline());
             }
             gn.setData(data);
             nodes.add(gn);
@@ -124,6 +127,7 @@ public class DefinitionController {
             case EXCLUSIVE_GATEWAY -> "exclusiveGateway";
             case PARALLEL_GATEWAY -> "parallelGateway";
             case INCLUSIVE_GATEWAY -> "inclusiveGateway";
+            case TIMER -> "timer";
         };
     }
 }

@@ -138,6 +138,7 @@ public class YamlProcessParser implements ProcessParser {
             case "exclusiveGateway": return new ExclusiveGateway(ny.id, ny.name, listeners);
             case "parallelGateway": return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway": return new InclusiveGateway(ny.id, ny.name, listeners);
+            case "timer": return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
             default: throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }
     }

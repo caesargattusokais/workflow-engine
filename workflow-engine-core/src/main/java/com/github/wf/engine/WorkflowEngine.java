@@ -64,6 +64,7 @@ public class WorkflowEngine {
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
+        runners.put(NodeType.TIMER, new TimerRunner(this::scheduleRetry));
     }
 
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
@@ -161,7 +162,7 @@ public class WorkflowEngine {
             // Reactivate retry-pending executions BEFORE the loop (only from daemon wake-ups)
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
-                if (exec.isWaiting() && "RETRY_PENDING".equals(exec.getRetryState())) {
+                if (exec.isWaiting() && ("RETRY_PENDING".equals(exec.getRetryState()) || "TIMER_PENDING".equals(exec.getRetryState()))) {
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     exec.setRetryState(null);
                     instanceRepository.updateExecution(exec);

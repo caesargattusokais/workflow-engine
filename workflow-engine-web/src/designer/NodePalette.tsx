@@ -6,6 +6,7 @@ const PALETTE_ITEMS = [
   { type: 'exclusiveGateway', label: '判断 (XOR)', color: 'bg-orange-500', shape: 'rotate-45' },
   { type: 'parallelGateway', label: '并行 (AND)', color: 'bg-blue-600', shape: 'rotate-45' },
   { type: 'inclusiveGateway', label: '条件 (OR)', color: 'bg-purple-600', shape: 'rotate-45' },
+  { type: 'timer', label: 'Timer', color: 'bg-amber-600', shape: 'rounded-lg' },
 ];
 
 export default function NodePalette() {

@@ -90,7 +90,8 @@ export default function PropertyPanel({ node, onChange }: {
            node.type === 'userTask' ? '用户任务' :
            node.type === 'serviceTask' ? '服务任务' :
            node.type === 'startEvent' ? '开始事件' :
-           node.type === 'endEvent' ? '结束事件' : node.type}
+           node.type === 'endEvent' ? '结束事件' :
+           node.type === 'timer' ? '定时器' : node.type}
         </h3>
         <div className="text-[10px] text-gray-600 mb-3">{node.type}</div>
 
@@ -305,6 +306,26 @@ export default function PropertyPanel({ node, onChange }: {
         {node.type === 'parallelGateway' && (
           <div className="border-t border-gray-700 pt-3 mt-2">
             <div className="text-xs text-gray-500">并行网关自动分叉到所有连线目标，无需配置。在画布上直接连线即可。</div>
+          </div>
+        )}
+
+        {/* ── Timer ──────────────────────────── */}
+        {node.type === 'timer' && (
+          <div className="border-t border-amber-500/50 pt-3 mt-2">
+            <span className="text-amber-400 text-xs font-semibold">Timer Config</span>
+            <div className="text-[10px] text-gray-500 mb-2">Use ISO 8601 format. Duration takes priority over deadline.</div>
+            <label className="block mb-2">
+              <span className="text-gray-400 text-xs">Duration (e.g. PT30S, PT5M, PT2H)</span>
+              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                value={(node.data.duration as string) || ''} placeholder="PT30S"
+                onChange={e => updateData('duration', e.target.value)} />
+            </label>
+            <label className="block mb-2">
+              <span className="text-gray-400 text-xs">Deadline (ISO 8601 datetime)</span>
+              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+                value={(node.data.deadline as string) || ''} placeholder="2026-06-25T09:00:00Z"
+                onChange={e => updateData('deadline', e.target.value)} />
+            </label>
           </div>
         )}
 

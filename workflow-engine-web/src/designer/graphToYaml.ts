@@ -93,6 +93,13 @@ export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', ver
       }
     }
 
+    if (data.duration && node.type === 'timer') {
+      lines.push(`    duration: "${data.duration}"`);
+    }
+    if (data.deadline && node.type === 'timer') {
+      lines.push(`    until: "${data.deadline}"`);
+    }
+
     const groups = data.candidateGroups as string[] | undefined;
     if (groups && groups.length > 0) {
       lines.push(`    candidateGroups: [${groups.map(g => y(g)).join(', ')}]`);

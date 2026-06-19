@@ -21,6 +21,8 @@ public class NodeYaml {
     public RetryYaml retry;
     public List<RouteYaml> resultRouting;
     public List<RouteYaml> exceptionRouting;
+    public String duration;  // ISO 8601 duration
+    public String until;     // ISO 8601 datetime (deadline)
 
     public static class RetryYaml {
         public int maxAttempts = 1;
