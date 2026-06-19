@@ -143,16 +143,16 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     value={parseDurationValue(node.data.boundaryTimer as string)}
                     onChange={e => {
                       const val = parseInt(e.target.value) || 0;
-                      const unit = (node.data._bndUnit as string) || 'M';
+                      const unit = parseDurationUnit(node.data.boundaryTimer as string);
                       if (val > 0) updateData('boundaryTimer', `PT${val}${unit}`);
                       else updateData('boundaryTimer', '');
                     }} placeholder="30" />
                   <select className="w-16 bg-gray-700 rounded px-1 py-1 text-white text-xs"
-                    value={(node.data._bndUnit as string) || 'M'}
+                    value={parseDurationUnit(node.data.boundaryTimer as string)}
                     onChange={e => {
-                      updateData('_bndUnit', e.target.value);
-                      const val = parseDurationValue(node.data.boundaryTimer as string);
-                      if (val > 0) updateData('boundaryTimer', `PT${val}${e.target.value}`);
+                      const val = parseDurationValue(node.data.boundaryTimer as string) || 1;
+                      const newData = { ...(node.data || {}), boundaryTimer: `PT${val}${e.target.value}` };
+                      onChange({ id: node.id, type: node.type, position: node.position, data: newData } as Node);
                     }}>
                     <option value="S">秒</option>
                     <option value="M">分</option>
@@ -339,16 +339,16 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                   value={parseDurationValue(node.data.duration as string)}
                   onChange={e => {
                     const val = parseInt(e.target.value) || 0;
-                    const unit = (node.data._durationUnit as string) || 'S';
+                    const unit = parseDurationUnit(node.data.duration as string);
                     if (val > 0) updateData('duration', `PT${val}${unit}`);
                     else updateData('duration', '');
                   }} placeholder="30" />
                 <select className="w-16 bg-gray-700 rounded px-1 py-1 text-white text-xs"
-                  value={(node.data._durationUnit as string) || 'S'}
+                  value={parseDurationUnit(node.data.duration as string)}
                   onChange={e => {
-                    updateData('_durationUnit', e.target.value);
-                    const val = parseDurationValue(node.data.duration as string);
-                    if (val > 0) updateData('duration', `PT${val}${e.target.value}`);
+                    const val = parseDurationValue(node.data.duration as string) || 1;
+                    const newData = { ...(node.data || {}), duration: `PT${val}${e.target.value}` };
+                    onChange({ id: node.id, type: node.type, position: node.position, data: newData } as Node);
                   }}>
                   <option value="S">秒</option>
                   <option value="M">分</option>
@@ -579,6 +579,11 @@ function parseDurationValue(dur: string | undefined): number {
   if (!dur) return 0;
   const m = dur.match(/^PT(\d+)/);
   return m ? parseInt(m[1]) : 0;
+}
+function parseDurationUnit(dur: string | undefined): string {
+  if (!dur) return 'M';
+  const m = dur.match(/^PT\d+([SMH])/);
+  return m ? m[1] : 'M';
 }
 function toDatetimeLocal(iso: string | undefined): string {
   if (!iso) return '';
