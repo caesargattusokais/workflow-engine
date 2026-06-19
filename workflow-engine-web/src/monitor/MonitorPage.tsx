@@ -135,6 +135,16 @@ export default function MonitorPage() {
     } catch (e: any) { alert('Start failed: ' + e.message); }
   };
 
+  const statusLabel = (s: string) => {
+    const m: Record<string, string> = {
+      RUNNING: t.monitor.running,
+      COMPLETED: t.monitor.completed,
+      TERMINATED: t.monitor.terminated,
+      SUSPENDED: t.monitor.suspended,
+    };
+    return m[s] || s;
+  };
+
   const selectedInst = instances.find(i => i.id === selectedId);
 
   return (
@@ -173,7 +183,7 @@ export default function MonitorPage() {
             <div className={`p-2 flex gap-2 border-t text-xs
               ${selectedInst.status === 'SUSPENDED' ? 'bg-yellow-900 border-yellow-700' :
                 selectedInst.status === 'RUNNING' ? 'bg-gray-800 border-gray-700' : 'bg-gray-850 border-gray-700'}`}>
-              <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {selectedInst.status}</span>
+              <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {statusLabel(selectedInst.status)}</span>
               <div className="flex-1" />
               {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
                 <button onClick={handleTerminate} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">{t.monitor.terminate}</button>
@@ -196,7 +206,7 @@ export default function MonitorPage() {
                 ${selectedInst.status==='RUNNING'?'bg-green-900 text-green-400':
                   selectedInst.status==='COMPLETED'?'bg-blue-900 text-blue-400':
                   selectedInst.status==='SUSPENDED'?'bg-yellow-900 text-yellow-400':'bg-red-900 text-red-400'}`}>
-                {selectedInst.status}
+                {statusLabel(selectedInst.status)}
               </span>
             </div>
 

@@ -274,32 +274,33 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             {/* Return Values — shared by both modes */}
             {/* ── Retry Config ──────────────── */}
             <div className="border-t border-gray-700 pt-2 mt-2">
-              <span className="text-gray-400 text-xs font-semibold">Retry Config</span>
+              <span className="text-gray-400 text-xs font-semibold">{t.props.retryConfig}</span>
               <div className="text-[10px] text-gray-500 mb-1">Set maxAttempts &gt; 1 to enable retry. Leave at 1 for no retry.</div>
               <label className="block mb-1">
-                <span className="text-gray-400 text-xs">Max Attempts</span>
+                <span className="text-gray-400 text-xs">{t.props.maxAttempts}</span>
                 <input type="number" min="1" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                   value={(node.data.retryMaxAttempts as number) || 1}
                   onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||1)} />
               </label>
               <label className="block mb-1">
-                <span className="text-gray-400 text-xs">Delay (ms)</span>
+                <span className="text-gray-400 text-xs">{t.props.delayMs}</span>
                 <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                   value={(node.data.retryDelayMs as number) || 1000}
                   onChange={e => updateData('retryDelayMs', parseInt(e.target.value)||1000)} />
               </label>
               <label className="block mb-2">
-                <span className="text-gray-400 text-xs">Backoff Multiplier</span>
+                <span className="text-gray-400 text-xs">{t.props.backoff}</span>
                 <input type="number" step="0.5" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                   value={(node.data.retryBackoff as number) || 2}
                   onChange={e => updateData('retryBackoff', parseFloat(e.target.value)||2)} />
               </label>
-              <div className="text-gray-400 text-xs mb-1">Retry On (empty = retry all exceptions)</div>
+              <div className="text-gray-400 text-xs mb-1">{t.props.retryOn}</div>
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
                 onChange={v => updateData('retryOn', v)} />
             </div>
 
             <ReturnValueEditor
+              label={t.props.returnValues}
               entries={(node.data.returnValues as Array<{key:string;type:string}>) || []}
               onChange={v => updateData('returnValues', v)}
             />
@@ -310,15 +311,15 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {node.type === 'exclusiveGateway' && (
           <div className="border-t border-orange-500/50 pt-3 mt-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-orange-400 text-xs font-semibold">条件判断 — 只走第一条命中的路</span>
-              <button onClick={addCondition} className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-2 py-0.5 rounded">+ Add</button>
+              <span className="text-orange-400 text-xs font-semibold">{t.props.conditionsXor}</span>
+              <button onClick={addCondition} className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-2 py-0.5 rounded">{t.props.addCondition}</button>
             </div>
-            <div className="text-[10px] text-gray-500 mb-2">从上到下依次判断，命中即停止，都不命中走 default</div>
+            <div className="text-[10px] text-gray-500 mb-2">{t.props.conditionsHint}</div>
             {conditions.map((c, i) => (
               <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-orange-800'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-orange-400'}`}>
-                    {c.isDefault ? '默认 (兜底)' : `判断 ${i + 1}`}</span>
+                    {c.isDefault ? t.props.defaultBranch : `判断 ${i + 1}`}</span>
                   <div className="flex gap-1 items-center">
                     <label className="text-[10px] text-gray-500 flex items-center gap-1">
                       <input type="checkbox" checked={c.isDefault} onChange={e => updateCondition(i, 'isDefault', e.target.checked)} className="accent-orange-500" /> default
@@ -341,15 +342,15 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {node.type === 'inclusiveGateway' && (
           <div className="border-t border-purple-500/50 pt-3 mt-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-purple-400 text-xs font-semibold">条件分支 — 满足条件的全部并行</span>
-              <button onClick={addCondition} className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-0.5 rounded">+ Add</button>
+              <span className="text-purple-400 text-xs font-semibold">{t.props.conditionsOr}</span>
+              <button onClick={addCondition} className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-0.5 rounded">{t.props.addCondition}</button>
             </div>
-            <div className="text-[10px] text-gray-500 mb-2">每条独立判断，满足就走对应分支，可能同时走多条</div>
+            <div className="text-[10px] text-gray-500 mb-2">{t.props.conditionsOrHint}</div>
             {conditions.map((c, i) => (
               <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-purple-800'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-purple-400'}`}>
-                    {c.isDefault ? '兜底 (无匹配时)' : `分支 ${i + 1}`}</span>
+                    {c.isDefault ? t.props.fallbackNoMatch : `分支 ${i + 1}`}</span>
                   <div className="flex gap-1 items-center">
                     <label className="text-[10px] text-gray-500 flex items-center gap-1">
                       <input type="checkbox" checked={c.isDefault} onChange={e => updateCondition(i, 'isDefault', e.target.checked)} className="accent-purple-500" /> default
@@ -371,18 +372,18 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {/* ── ParallelGateway: info ──────────── */}
         {node.type === 'parallelGateway' && (
           <div className="border-t border-gray-700 pt-3 mt-2">
-            <div className="text-xs text-gray-500">并行网关自动分叉到所有连线目标，无需配置。在画布上直接连线即可。</div>
+            <div className="text-xs text-gray-500">{t.props.gatewayInfo}</div>
           </div>
         )}
 
         {/* ── Timer ──────────────────────────── */}
         {node.type === 'timer' && (
           <div className="border-t border-amber-500/50 pt-3 mt-2">
-            <span className="text-amber-400 text-xs font-semibold">Timer Config</span>
-            <div className="text-[10px] text-gray-500 mb-2">Duration takes priority over deadline. Leave empty to skip.</div>
+            <span className="text-amber-400 text-xs font-semibold">{t.props.timerConfig}</span>
+            <div className="text-[10px] text-gray-500 mb-2">{t.props.timerHint}</div>
             {/* Duration: number + unit → ISO 8601 */}
             <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Duration</span>
+              <span className="text-gray-400 text-xs">{t.props.duration}</span>
               <div className="flex gap-1 mt-0.5">
                 <input type="number" min="1" className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
                   value={parseDurationValue(node.data.duration as string)}
@@ -399,15 +400,15 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     const newData = { ...(node.data || {}), duration: `PT${val}${e.target.value}` };
                     onChange({ id: node.id, type: node.type, position: node.position, data: newData } as Node);
                   }}>
-                  <option value="S">秒</option>
-                  <option value="M">分</option>
-                  <option value="H">时</option>
+                  <option value="S">{t.props.seconds}</option>
+                  <option value="M">{t.props.minutes}</option>
+                  <option value="H">{t.props.hours}</option>
                 </select>
               </div>
             </label>
             {/* Deadline: datetime-local picker → ISO 8601 */}
             <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Deadline</span>
+              <span className="text-gray-400 text-xs">{t.props.deadline}</span>
               <input type="datetime-local"
                 className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
                 style={{ colorScheme: 'dark' }}
@@ -426,7 +427,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {/* ── Outgoing Edges ── */}
         {edges && edges.length > 0 && (
           <div className="border-t border-gray-700 pt-2 mt-2">
-            <span className="text-gray-400 text-xs font-semibold">Outgoing Edges</span>
+            <span className="text-gray-400 text-xs font-semibold">{t.props.outgoingEdges}</span>
             {edges.filter(e => e.source === node.id).map(e => {
               const et = (e.data as any)?.edgeType || 'direct';
               const colors: Record<string,string> = { result: '#22c55e', exception: '#ef4444', timeout: '#f97316', conditional: '#e5a50a', default: '#888', direct: '#666' };
@@ -523,8 +524,8 @@ function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder }: 
 
 // ── ReturnValue editor (key + type, add/remove) ────
 const TYPES = ['String', 'Number', 'Boolean', 'JSON', 'Object'];
-function ReturnValueEditor({ entries, onChange }: {
-    entries: Array<{key: string; type: string}>;
+function ReturnValueEditor({ label, entries, onChange }: {
+    label: string; entries: Array<{key: string; type: string}>;
     onChange: (v: Array<{key: string; type: string}>) => void;
 }) {
   const add = () => onChange([...entries, { key: '', type: 'String' }]);
@@ -535,7 +536,7 @@ function ReturnValueEditor({ entries, onChange }: {
   return (
     <div className="border-t border-gray-700 pt-3 mt-2">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-gray-400 text-xs">Return Values</span>
+        <span className="text-gray-400 text-xs">{label}</span>
         <button onClick={add} className="text-xs text-yellow-400 hover:text-yellow-300">+ Add</button>
       </div>
       <div className="text-[10px] text-gray-600 mb-1">Fields accessible as nodeName_fieldName. Full map: nodeName_result['field']</div>

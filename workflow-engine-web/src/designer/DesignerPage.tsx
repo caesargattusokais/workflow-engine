@@ -355,7 +355,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
             ))}
             {drafts.length === 0 && (
               <div className="p-3 text-xs text-gray-600 text-center">
-                Click + New to create a draft
+                {t.designer.clickNew}
               </div>
             )}
           </div>
@@ -375,24 +375,24 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 setDraftMenu(null);
               }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                View YAML
+                {t.designer.viewYaml}
               </button>
               <button onClick={() => { setDraftMenu(null); downloadYaml(draftMenu.draft); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                Download YAML
+                {t.designer.downloadYaml}
               </button>
               <div className="border-t border-gray-700" />
               <button onClick={() => { setDraftMenu(null); copyDraftAction(draftMenu.draft.id); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                Copy
+                {t.designer.copy}
               </button>
               <button onClick={() => { setDraftMenu(null); renameDraft(draftMenu.draft.id); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                Rename
+                {t.designer.rename}
               </button>
               <button onClick={() => { setDraftMenu(null); delDraft(draftMenu.draft.id); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">
-                Delete
+                {t.designer.delete}
               </button>
             </div>
           )}
