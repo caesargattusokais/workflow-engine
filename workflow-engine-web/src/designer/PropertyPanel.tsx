@@ -313,18 +313,46 @@ export default function PropertyPanel({ node, onChange }: {
         {node.type === 'timer' && (
           <div className="border-t border-amber-500/50 pt-3 mt-2">
             <span className="text-amber-400 text-xs font-semibold">Timer Config</span>
-            <div className="text-[10px] text-gray-500 mb-2">Use ISO 8601 format. Duration takes priority over deadline.</div>
+            <div className="text-[10px] text-gray-500 mb-2">Duration takes priority over deadline. Leave empty to skip.</div>
+            {/* Duration: number + unit → ISO 8601 */}
             <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Duration (e.g. PT30S, PT5M, PT2H)</span>
-              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
-                value={(node.data.duration as string) || ''} placeholder="PT30S"
-                onChange={e => updateData('duration', e.target.value)} />
+              <span className="text-gray-400 text-xs">Duration</span>
+              <div className="flex gap-1 mt-0.5">
+                <input type="number" min="1" className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+                  value={parseDurationValue(node.data.duration as string)}
+                  onChange={e => {
+                    const val = parseInt(e.target.value) || 0;
+                    const unit = (node.data._durationUnit as string) || 'S';
+                    if (val > 0) updateData('duration', `PT${val}${unit}`);
+                    else updateData('duration', '');
+                  }} placeholder="30" />
+                <select className="w-16 bg-gray-700 rounded px-1 py-1 text-white text-xs"
+                  value={(node.data._durationUnit as string) || 'S'}
+                  onChange={e => {
+                    updateData('_durationUnit', e.target.value);
+                    const val = parseDurationValue(node.data.duration as string);
+                    if (val > 0) updateData('duration', `PT${val}${e.target.value}`);
+                  }}>
+                  <option value="S">秒</option>
+                  <option value="M">分</option>
+                  <option value="H">时</option>
+                </select>
+              </div>
             </label>
+            {/* Deadline: datetime-local picker → ISO 8601 */}
             <label className="block mb-2">
-              <span className="text-gray-400 text-xs">Deadline (ISO 8601 datetime)</span>
-              <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
-                value={(node.data.deadline as string) || ''} placeholder="2026-06-25T09:00:00Z"
-                onChange={e => updateData('deadline', e.target.value)} />
+              <span className="text-gray-400 text-xs">Deadline</span>
+              <input type="datetime-local"
+                className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+                style={{ colorScheme: 'dark' }}
+                value={toDatetimeLocal(node.data.deadline as string)}
+                onChange={e => {
+                  if (e.target.value) {
+                    updateData('deadline', new Date(e.target.value).toISOString());
+                  } else {
+                    updateData('deadline', '');
+                  }
+                }} />
             </label>
           </div>
         )}
@@ -489,4 +517,24 @@ function RetryOnEditor({ entries, onChange }: { entries: any[]; onChange: (v: an
       <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">+ Add condition</button>
     </div>
   );
+}
+
+// ── Timer helpers ─────────────────────────
+function parseDurationValue(dur: string | undefined): number {
+  if (!dur) return 0;
+  const m = dur.match(/^PT(\d+)/);
+  return m ? parseInt(m[1]) : 0;
+}
+function toDatetimeLocal(iso: string | undefined): string {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    // Convert to local datetime-local format: YYYY-MM-DDTHH:mm
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0') + 'T' +
+      String(d.getHours()).padStart(2,'0') + ':' +
+      String(d.getMinutes()).padStart(2,'0');
+  } catch { return ''; }
 }
