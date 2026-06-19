@@ -217,10 +217,27 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               </button>
             </>
           )}
-          {menu.type === 'edge' && (
-            <>
-              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">Edge</div>
-              {['direct','conditional','default','result','exception','timeout'].map(t => (
+          {menu.type === 'edge' && (() => {
+              const edge = edges.find(e => e.id === menu.edgeId);
+              const srcNode = nodes.find(n => n.id === edge?.source);
+              const srcType = srcNode?.type || '';
+              const allowed: Record<string, string[]> = {
+                serviceTask: ['direct','result','exception','timeout'],
+                userTask: ['direct','timeout'],
+                exclusiveGateway: ['conditional','default'],
+                parallelGateway: ['direct'],
+                inclusiveGateway: ['conditional','default'],
+                startEvent: ['direct'],
+                endEvent: [],
+                timer: ['direct'],
+              };
+              const types = allowed[srcType] || ['direct'];
+              const curType = edge?.data?.edgeType as string || 'direct';
+              const needsExpr = ['conditional','result','exception'].includes(curType);
+              return (
+              <div>
+              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">Edge — {srcType}</div>
+              {types.map(t => (
                 <button key={t} onClick={() => {
                   const style = getEdgeStyle(t);
                   setEdges(edges.map(e => e.id === menu.edgeId ? {
@@ -228,11 +245,11 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
                   } : e));
                   setMenu(null);
                 }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                  {t}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700 ${t === curType ? 'text-white' : 'text-gray-400'}`}>
+                  {t === curType ? `● ${t}` : `  ${t}`}
                 </button>
               ))}
-              {['conditional','result','exception'].includes(edges.find(e => e.id === menu.edgeId)?.data?.edgeType as string) && (
+              {needsExpr && (
                 <div className="px-3 py-1" onClick={e => e.stopPropagation()}>
                   <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-xs mt-1"
                     placeholder="SpEL: days > 3"
@@ -249,8 +266,9 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               <div className="border-t border-gray-700" />
               <button onClick={() => { deleteEdge(menu.edgeId!); setMenu(null); }}
                 className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">Delete</button>
-            </>
-          )}
+              </div>
+            );
+            })()}
           {menu.type === 'pane' && (
             <>
               <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
