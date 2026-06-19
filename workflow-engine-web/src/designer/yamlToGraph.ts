@@ -7,13 +7,23 @@ import type { Node, Edge } from '@xyflow/react';
 export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges: Edge[] } {
   const lines = yaml.split('\n');
   let name = 'Imported';
-  let version = 1;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   let nodeIdCounter = 0;
 
   let section: 'header' | 'nodes' | 'transitions' = 'header';
-  let currentNode: Record<string, unknown> | null = null;
+  let current: Record<string, unknown> | null = null;
+
+  // Flush the current item (node or edge) before starting a new one
+  function flush() {
+    if (!current) return;
+    if (section === 'nodes') {
+      flushNode(current, nodes, ++nodeIdCounter);
+    } else if (section === 'transitions') {
+      flushEdge(current, edges);
+    }
+    current = null;
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -21,13 +31,11 @@ export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges:
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    // Top-level keys
+    // Top-level keys — flush previous item before switching sections
     if (indent === 0) {
-      currentNode = null;
+      if (section === 'nodes' || section === 'transitions') flush();
       if (trimmed.startsWith('id:') && section === 'header') {
         name = trimmed.substring(3).trim();
-      } else if (trimmed.startsWith('version:')) {
-        version = parseInt(trimmed.substring(8).trim()) || 1;
       } else if (trimmed === 'nodes:') {
         section = 'nodes';
       } else if (trimmed === 'transitions:') {
@@ -36,36 +44,27 @@ export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges:
       continue;
     }
 
-    if (section === 'nodes') {
-      if (indent === 2 && trimmed.startsWith('- id:')) {
-        // New node
-        if (currentNode) flushNode(currentNode, nodes, ++nodeIdCounter);
-        currentNode = { id: trimmed.substring(5).trim() };
-      } else if (currentNode && indent >= 4) {
-        const kv = parseYamlLine(trimmed);
-        if (kv) currentNode[kv.key] = kv.value;
-        // Handle nested structures (conditions, retry, resultRouting, etc.) as simple string
+    // New list item (indent === 2, starts with "- ")
+    if (indent === 2 && trimmed.startsWith('- ')) {
+      flush(); // save previous item
+
+      if (section === 'nodes' && trimmed.startsWith('- id:')) {
+        current = { id: trimmed.substring(5).trim() };
+      } else if (section === 'transitions' && trimmed.startsWith('- from:')) {
+        current = { from: trimmed.substring(7).trim() };
       }
+      continue;
     }
 
-    if (section === 'transitions') {
-      if (indent === 2 && trimmed.startsWith('- from:')) {
-        if (currentNode) flushNode(currentNode, nodes, ++nodeIdCounter);
-        currentNode = { from: trimmed.substring(7).trim() };
-      } else if (currentNode && indent >= 4) {
-        const kv = parseYamlLine(trimmed);
-        if (kv) currentNode[kv.key] = kv.value;
-      } else if (currentNode && trimmed.startsWith('- from:')) {
-        // Flush previous edge, start new
-        flushEdge(currentNode, edges);
-        currentNode = { from: trimmed.substring(7).trim() };
-      }
+    // Nested property (indent >= 4) — add to current item
+    if (current && indent >= 4) {
+      const kv = parseYamlLine(trimmed);
+      if (kv) current[kv.key] = kv.value;
     }
   }
 
-  // Flush last node/edge
-  if (section === 'nodes' && currentNode) flushNode(currentNode, nodes, ++nodeIdCounter);
-  if (section === 'transitions' && currentNode) flushEdge(currentNode, edges);
+  // Flush the last item
+  flush();
 
   return { name, nodes, edges };
 }
@@ -91,10 +90,10 @@ function parseYamlLine(trimmed: string): { key: string; value: unknown } | null 
   return { key, value };
 }
 
-function flushNode(current: Record<string, unknown>, nodes: Node[], counter: number) {
-  const id = (current.id as string) || `node_${counter}`;
-  const type = (current.type as string) || 'userTask';
-  const name = current.name as string | undefined;
+function flushNode(cur: Record<string, unknown>, nodes: Node[], counter: number) {
+  const id = (cur.id as string) || `node_${counter}`;
+  const type = (cur.type as string) || 'userTask';
+  const name = cur.name as string | undefined;
 
   const node: Node = {
     id,
@@ -106,33 +105,28 @@ function flushNode(current: Record<string, unknown>, nodes: Node[], counter: num
   // Copy known properties to node data
   for (const prop of ['assignee', 'handlerClass', 'url', 'method', 'duration',
     'boundaryTimer', 'dynamicRouter']) {
-    if (current[prop] !== undefined) (node.data as any)[prop] = current[prop];
+    if (cur[prop] !== undefined) (node.data as any)[prop] = cur[prop];
   }
-  if (current.httpMode) (node.data as any).httpMode = true;
-  if (current.until) (node.data as any).deadline = current.until;
+  if (cur.httpMode) (node.data as any).httpMode = true;
+  if (cur.until) (node.data as any).deadline = cur.until;
+  if (Array.isArray(cur.candidateGroups)) (node.data as any).candidateGroups = cur.candidateGroups;
 
-  // candidateGroups
-  if (current.candidateGroups) {
-    const cg = current.candidateGroups;
-    if (Array.isArray(cg)) (node.data as any).candidateGroups = cg;
-  }
-
-  // retry config
-  if (typeof current.maxAttempts === 'number') (node.data as any).retryMaxAttempts = current.maxAttempts;
-  if (typeof current.delayMs === 'number') (node.data as any).retryDelayMs = current.delayMs;
-  if (typeof current.backoffMultiplier === 'number') (node.data as any).retryBackoff = current.backoffMultiplier;
+  // retry config (nested under retry: in YAML, becomes flat keys in our simple parser)
+  if (typeof cur.maxAttempts === 'number') (node.data as any).retryMaxAttempts = cur.maxAttempts;
+  if (typeof cur.delayMs === 'number') (node.data as any).retryDelayMs = cur.delayMs;
+  if (typeof cur.backoffMultiplier === 'number') (node.data as any).retryBackoff = cur.backoffMultiplier;
 
   nodes.push(node);
 }
 
-function flushEdge(current: Record<string, unknown>, edges: Edge[]) {
-  const from = current.from as string;
-  const to = current.to as string;
+function flushEdge(cur: Record<string, unknown>, edges: Edge[]) {
+  const from = cur.from as string;
+  const to = cur.to as string;
   if (!from || !to) return;
 
-  const edgeType = (current.type as string) || 'direct';
-  const expr = current.expr as string | undefined;
-  const isDefault = current.default === true;
+  const edgeType = (cur.type as string) || 'direct';
+  const expr = cur.expr as string | undefined;
+  const isDefault = cur.default === true;
 
   const edge: Edge = {
     id: `edge_${from}_${to}_${Date.now()}`,
