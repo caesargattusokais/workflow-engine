@@ -124,7 +124,6 @@ public class UserTaskRunner implements NodeRunner {
                         callHeaders, userTask.getBody(), httpVars);
             } catch (Exception e) {
                 log.error("HTTP callback failed for task " + taskId + ": " + e.getMessage(), e);
-                throw new RuntimeException("UserTask HTTP callback failed: " + e.getMessage(), e);
             }
         }
 

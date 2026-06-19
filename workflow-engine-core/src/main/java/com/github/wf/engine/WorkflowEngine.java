@@ -275,6 +275,7 @@ public class WorkflowEngine {
         for (Execution exec : executions) {
             if (exec.isWaiting() && exec.getCurrentNodeId().equals(task.getNodeId())) {
                 // Clear any pending timer/retry state — user completed manually
+                log.info("Clearing retry state for node=" + exec.getCurrentNodeId());
                 exec.setRetryState(null);
                 instance.removeVariable(task.getNodeId() + "_boundaryTimerFired");
                 instanceRepository.update(instance);

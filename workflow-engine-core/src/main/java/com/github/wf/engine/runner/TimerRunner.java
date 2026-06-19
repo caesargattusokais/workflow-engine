@@ -4,6 +4,8 @@ import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
 import com.github.wf.model.*;
 import com.github.wf.model.node.TimerNode;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -13,6 +15,7 @@ import java.util.function.BiConsumer;
 
 public class TimerRunner implements NodeRunner {
 
+    private static final Log log = LogFactory.getLog(TimerRunner.class);
     private final BiConsumer<String, Long> scheduler;
 
     public TimerRunner() { this.scheduler = null; }
@@ -22,6 +25,8 @@ public class TimerRunner implements NodeRunner {
 
     @Override
     public boolean run(Node node, ExecutionContext context) {
+
+        log.info("timer node " +node.getId() +" fired");
         TimerNode timer = (TimerNode) node;
         Execution exec = context.getExecution();
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
@@ -44,6 +49,7 @@ public class TimerRunner implements NodeRunner {
             if (!outgoing.isEmpty()) {
                 exec.setCurrentNodeId(outgoing.get(0).getTo());
             }
+            log.info("next node " + exec.getCurrentNodeId() + " in");
             return true;
         }
 
