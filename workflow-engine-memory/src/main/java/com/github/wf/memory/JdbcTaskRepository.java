@@ -9,73 +9,57 @@ import com.google.gson.reflect.TypeToken;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * JDBC-backed TaskRepository with write-through cache.
+ */
 public class JdbcTaskRepository implements TaskRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();
+    private final Map<String, Task> cache = new ConcurrentHashMap<>();
 
     public JdbcTaskRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        // Load existing tasks into cache
+        jdbc.query("SELECT * FROM task", (rs) -> {
+            Task task = mapTask(rs);
+            cache.put(task.getId(), task);
+        });
     }
 
     @Override
     public void save(Task task) {
-        jdbc.update(
-            "INSERT INTO task (id, instance_id, node_id, assignee, candidate_groups_json, status, variables_json, created_at, completed_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            task.getId(), task.getInstanceId(), task.getNodeId(), task.getAssignee(),
-            gson.toJson(task.getCandidateGroups()), task.getStatus().name(),
-            gson.toJson(task.getVariables()), task.getCreatedAt().toEpochMilli(),
-            task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null);
+        cache.put(task.getId(), task);
+        writeToDb(task);
     }
 
     @Override
     public Task findById(String id) {
-        List<Task> list = jdbc.query(
-            "SELECT * FROM task WHERE id = ?",
-            (rs, rowNum) -> mapTask(rs), id);
-        return list.isEmpty() ? null : list.get(0);
+        return cache.get(id);
     }
 
     @Override
     public void update(Task task) {
-        jdbc.update(
-            "UPDATE task SET assignee=?, candidate_groups_json=?, status=?, variables_json=?, completed_at=? WHERE id=?",
-            task.getAssignee(), gson.toJson(task.getCandidateGroups()), task.getStatus().name(),
-            gson.toJson(task.getVariables()),
-            task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null,
-            task.getId());
+        cache.put(task.getId(), task);
+        writeToDb(task);
     }
 
     @Override
     public List<Task> query(TaskQuery query) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM task WHERE 1=1");
-        List<Object> params = new ArrayList<>();
+        return cache.values().stream().filter(query::matches).toList();
+    }
 
-        if (query.getAssignee() != null) {
-            sql.append(" AND assignee = ?");
-            params.add(query.getAssignee());
-        }
-        if (query.getInstanceId() != null) {
-            sql.append(" AND instance_id = ?");
-            params.add(query.getInstanceId());
-        }
-        if (query.getStatus() != null) {
-            sql.append(" AND status = ?");
-            params.add(query.getStatus().name());
-        }
-        if (!query.getCandidateGroups().isEmpty()) {
-            sql.append(" AND (");
-            for (int i = 0; i < query.getCandidateGroups().size(); i++) {
-                if (i > 0) sql.append(" OR ");
-                sql.append("candidate_groups_json LIKE ?");
-                params.add("%\"" + query.getCandidateGroups().get(i) + "\"%");
-            }
-            sql.append(")");
-        }
-
-        return jdbc.query(sql.toString(), (rs, rowNum) -> mapTask(rs), params.toArray());
+    private void writeToDb(Task task) {
+        jdbc.update(
+            "INSERT INTO task (id, instance_id, node_id, assignee, candidate_groups_json, status, variables_json, created_at, completed_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE assignee=VALUES(assignee), " +
+            "candidate_groups_json=VALUES(candidate_groups_json), status=VALUES(status), variables_json=VALUES(variables_json), completed_at=VALUES(completed_at)",
+            task.getId(), task.getInstanceId(), task.getNodeId(), task.getAssignee(),
+            gson.toJson(task.getCandidateGroups()), task.getStatus().name(),
+            gson.toJson(task.getVariables()), task.getCreatedAt().toEpochMilli(),
+            task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null);
     }
 
     private Task mapTask(java.sql.ResultSet rs) throws java.sql.SQLException {
