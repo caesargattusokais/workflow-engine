@@ -206,7 +206,7 @@ public class WorkflowEngine {
                                 return;
                             }
                         } catch (Exception e) {
-                            System.err.println("Error running node " + node.getId() + ": " + e.getMessage());
+                            log.error("Error running node " + node.getId(), e);
                         }
                     }
                 }
@@ -239,7 +239,7 @@ public class WorkflowEngine {
                     listener.onNodeLeave(instanceId, node.getId(), variables);
                 }
             } catch (Exception e) {
-                System.err.println("Listener error: " + listenerClass + " - " + e.getMessage());
+                log.error("Listener error: " + listenerClass, e);
             }
         }
     }
