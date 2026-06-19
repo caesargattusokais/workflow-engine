@@ -222,7 +222,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               const srcNode = nodes.find(n => n.id === edge?.source);
               const srcType = srcNode?.type || '';
               const allowed: Record<string, string[]> = {
-                serviceTask: ['direct','result','exception','timeout'],
+                serviceTask: ['direct','result','exception'],
                 userTask: ['direct','timeout'],
                 exclusiveGateway: ['conditional','default'],
                 parallelGateway: ['direct'],
