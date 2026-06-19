@@ -66,7 +66,90 @@ export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges:
   // Flush the last item
   flush();
 
+  // Layout nodes based on flow topology
+  layoutNodes(nodes, edges);
+
   return { name, nodes, edges };
+}
+
+/** Layered graph layout: topological distance from start nodes → X, center-spread → Y */
+function layoutNodes(nodes: Node[], edges: Edge[]) {
+  const LAYER_GAP = 220;   // horizontal spacing between layers
+  const NODE_GAP = 100;    // vertical spacing between nodes in same layer
+  const START_X = 50;
+  const START_Y = 200;
+
+  // Build adjacency for BFS
+  const outMap = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  for (const n of nodes) {
+    outMap.set(n.id, []);
+    inDegree.set(n.id, 0);
+  }
+  for (const e of edges) {
+    outMap.get(e.source)?.push(e.target);
+    inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
+  }
+
+  // Find start nodes (no incoming edges) — layer 0
+  const layers = new Map<string, number>();
+  const queue: string[] = [];
+  for (const n of nodes) {
+    if (inDegree.get(n.id) === 0) {
+      layers.set(n.id, 0);
+      queue.push(n.id);
+    }
+  }
+
+  // If all nodes have incoming edges (cycle), pick first node as layer 0
+  if (queue.length === 0 && nodes.length > 0) {
+    layers.set(nodes[0].id, 0);
+    queue.push(nodes[0].id);
+  }
+
+  // BFS to assign layers
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const curLayer = layers.get(cur)!;
+    for (const next of outMap.get(cur) || []) {
+      const newLayer = curLayer + 1;
+      const existing = layers.get(next);
+      if (existing === undefined || newLayer > existing) {
+        layers.set(next, newLayer);
+        // Re-queue if layer changed (handles diamond dependencies)
+        if (existing === undefined || !queue.includes(next)) queue.push(next);
+      }
+    }
+  }
+
+  // Assign layers to any unvisited nodes (disconnected)
+  let maxLayer = 0;
+  for (const n of nodes) {
+    const l = layers.get(n.id);
+    if (l !== undefined && l > maxLayer) maxLayer = l;
+  }
+  for (const n of nodes) {
+    if (!layers.has(n.id)) layers.set(n.id, maxLayer + 1);
+  }
+
+  // Group nodes by layer
+  const layerGroups = new Map<number, Node[]>();
+  for (const n of nodes) {
+    const l = layers.get(n.id) || 0;
+    if (!layerGroups.has(l)) layerGroups.set(l, []);
+    layerGroups.get(l)!.push(n);
+  }
+
+  // Position nodes: layer → X, even spread → Y
+  for (const [layer, layerNodes] of layerGroups) {
+    const totalHeight = (layerNodes.length - 1) * NODE_GAP;
+    layerNodes.forEach((n, i) => {
+      n.position = {
+        x: START_X + layer * LAYER_GAP,
+        y: START_Y + i * NODE_GAP - totalHeight / 2,
+      };
+    });
+  }
 }
 
 function parseYamlLine(trimmed: string): { key: string; value: unknown } | null {
@@ -98,7 +181,7 @@ function flushNode(cur: Record<string, unknown>, nodes: Node[], counter: number)
   const node: Node = {
     id,
     type,
-    position: { x: 50 + nodes.length * 200, y: 150 + (nodes.length % 3) * 150 },
+    position: { x: 0, y: 0 }, // positioned later by layoutNodes()
     data: { name: name || type },
   };
 
