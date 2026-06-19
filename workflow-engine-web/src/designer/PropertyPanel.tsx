@@ -115,7 +115,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
           <div className="border-t border-green-500/50 pt-3 mt-2">
             <span className="text-green-400 text-xs font-semibold">{t.props.initialVars}</span>
             <div className="text-[10px] text-gray-500 mb-2">{t.props.initialVarsHint}</div>
-            <VarEditor vars={(node.data.initialVars as string[]) || []} onChange={v => updateData('initialVars', v)} />
+            <VarEditor addLabel={t.props.addVar} vars={(node.data.initialVars as string[]) || []} onChange={v => updateData('initialVars', v)} />
           </div>
         )}
 
@@ -174,11 +174,11 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                 <KvEditor label={t.props.headers}
                   entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('headerEntries', v)}
-                  keyPlaceholder="Content-Type" valPlaceholder="application/json" />
+                  keyPlaceholder="Content-Type" valPlaceholder="application/json" emptyText={t.props.noParams} />
                 <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? t.props.queryParams : t.props.bodyParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
-                  keyPlaceholder="applicant" valPlaceholder="${applicant}" />
+                  keyPlaceholder="applicant" valPlaceholder="${applicant}" emptyText={t.props.noParams} />
               </>
             )}
 
@@ -239,7 +239,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                 <KvEditor label={t.props.inputParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
-                  keyPlaceholder="paramName" valPlaceholder="${variable} or fixed" />
+                  keyPlaceholder="paramName" valPlaceholder="${variable} or fixed" emptyText={t.props.noParams} />
               </>
             ) : (
               <>
@@ -264,11 +264,11 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                 <KvEditor label={t.props.headers}
                   entries={(node.data.headerEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('headerEntries', v)}
-                  keyPlaceholder="Content-Type" valPlaceholder="application/json" />
+                  keyPlaceholder="Content-Type" valPlaceholder="application/json" emptyText={t.props.noParams} />
                 <KvEditor label={['GET','DELETE'].includes((node.data.method as string)||'POST') ? t.props.queryParams : t.props.bodyParams}
                   entries={(node.data.paramEntries as Array<{key:string;value:string}>) || []}
                   onChange={v => updateData('paramEntries', v)}
-                  keyPlaceholder="amount" valPlaceholder="${amount}" />
+                  keyPlaceholder="amount" valPlaceholder="${amount}" emptyText={t.props.noParams} />
               </>
             )}
             {/* Return Values — shared by both modes */}
@@ -296,7 +296,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               </label>
               <div className="text-gray-400 text-xs mb-1">{t.props.retryOn}</div>
               <RetryOnEditor entries={(node.data.retryOn as any[]) || []}
-                onChange={v => updateData('retryOn', v)} />
+                onChange={v => updateData('retryOn', v)} addLabel={t.props.addCondition} />
             </div>
 
             <ReturnValueEditor
@@ -455,7 +455,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                       }}
                     />
                   )}
-                  {et === 'default' && <div className="text-[10px] text-gray-500 mt-0.5">fallback</div>}
+                  {et === 'default' && <div className="text-[10px] text-gray-500 mt-0.5">{t.designer.fallback}</div>}
                 </div>
               );
             })}
@@ -471,7 +471,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
 }
 
 // ── VarEditor ─────────────────────────
-function VarEditor({ vars, onChange }: { vars: string[]; onChange: (v: string[]) => void }) {
+function VarEditor({ vars, onChange, addLabel }: { vars: string[]; onChange: (v: string[]) => void; addLabel: string }) {
   const add = () => onChange([...vars, '']);
   const remove = (i: number) => onChange(vars.filter((_, idx) => idx !== i));
   const update = (i: number, val: string) => {
@@ -486,16 +486,17 @@ function VarEditor({ vars, onChange }: { vars: string[]; onChange: (v: string[])
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
         </div>
       ))}
-      <button onClick={add} className="text-xs text-green-400 hover:text-green-300 mt-1">+ Add variable</button>
+      <button onClick={add} className="text-xs text-green-400 hover:text-green-300 mt-1">{addLabel}</button>
     </div>
   );
 }
 
 // ── KvEditor ──────────────────────────
-function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder }: {
+function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder, emptyText }: {
     label: string; entries: Array<{key: string; value: string}>;
     onChange: (v: Array<{key: string; value: string}>) => void;
     keyPlaceholder: string; valPlaceholder: string;
+    emptyText?: string;
 }) {
   const add = () => onChange([...entries, { key: '', value: '' }]);
   const remove = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
@@ -508,7 +509,7 @@ function KvEditor({ label, entries, onChange, keyPlaceholder, valPlaceholder }: 
         <span className="text-gray-400 text-xs">{label}</span>
         <button onClick={add} className="text-xs text-teal-400 hover:text-teal-300">+ Add</button>
       </div>
-      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">No params yet</div>}
+      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">{emptyText || 'No params yet'}</div>}
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1 mb-1">
           <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
@@ -602,7 +603,7 @@ function RouteEditor({ entries, onChange, label }: { entries: any[]; onChange: (
 }
 
 // ── RetryOn editor (simple SpEL expressions) ──
-function RetryOnEditor({ entries, onChange }: { entries: any[]; onChange: (v: any[]) => void }) {
+function RetryOnEditor({ entries, onChange, addLabel }: { entries: any[]; onChange: (v: any[]) => void; addLabel: string }) {
   const add = () => onChange([...entries, { expr: '' }]);
   const remove = (i: number) => onChange(entries.filter((_:any,idx:number) => idx !== i));
   const update = (i: number, v: string) => {
@@ -619,7 +620,7 @@ function RetryOnEditor({ entries, onChange }: { entries: any[]; onChange: (v: an
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
         </div>
       ))}
-      <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">+ Add condition</button>
+      <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">{addLabel}</button>
     </div>
   );
 }
