@@ -24,11 +24,12 @@ public class TimerRunner implements NodeRunner {
     public boolean run(Node node, ExecutionContext context) {
         TimerNode timer = (TimerNode) node;
         Execution exec = context.getExecution();
+        ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
 
-        // Calculate delay in milliseconds
-        long delayMs = computeDelay(timer);
-        if (delayMs <= 0) {
-            // No delay — move to next node immediately
+        // If re-entering after daemon wake-up, advance immediately
+        if (Boolean.TRUE.equals(instance.getVariable("_timerFired"))) {
+            instance.setVariable("_timerFired", null);
+            context.getInstanceRepository().update(instance);
             List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
             if (!outgoing.isEmpty()) {
                 exec.setCurrentNodeId(outgoing.get(0).getTo());
@@ -36,7 +37,18 @@ public class TimerRunner implements NodeRunner {
             return true;
         }
 
-        // Schedule wake-up via shared delay infrastructure
+        long delayMs = computeDelay(timer);
+        if (delayMs <= 0) {
+            List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
+            if (!outgoing.isEmpty()) {
+                exec.setCurrentNodeId(outgoing.get(0).getTo());
+            }
+            return true;
+        }
+
+        // First entry: mark and schedule
+        instance.setVariable("_timerFired", true);
+        context.getInstanceRepository().update(instance);
         if (scheduler != null) {
             scheduler.accept(exec.getInstanceId(), delayMs);
         }
@@ -47,7 +59,6 @@ public class TimerRunner implements NodeRunner {
 
     private long computeDelay(TimerNode timer) {
         long delay = Long.MAX_VALUE;
-
         if (timer.getDeadline() != null && !timer.getDeadline().isBlank()) {
             try {
                 long ms = Instant.parse(timer.getDeadline()).toEpochMilli() - System.currentTimeMillis();

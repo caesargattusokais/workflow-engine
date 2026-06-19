@@ -163,16 +163,7 @@ public class WorkflowEngine {
             // Reactivate pending executions BEFORE the loop (only from daemon wake-ups)
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
-                if (exec.isWaiting() && "TIMER_PENDING".equals(exec.getRetryState())) {
-                    // Timer expired — advance past the timer node immediately
-                    List<Transition> outgoing = def.getOutgoingTransitions(exec.getCurrentNodeId());
-                    if (!outgoing.isEmpty()) {
-                        exec.setCurrentNodeId(outgoing.get(0).getTo());
-                    }
-                    exec.setStatus(ExecutionStatus.ACTIVE);
-                    exec.setRetryState(null);
-                    instanceRepository.updateExecution(exec);
-                } else if (exec.isWaiting() && "RETRY_PENDING".equals(exec.getRetryState())) {
+                if (exec.isWaiting() && ("RETRY_PENDING".equals(exec.getRetryState()) || "TIMER_PENDING".equals(exec.getRetryState()))) {
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     exec.setRetryState(null);
                     instanceRepository.updateExecution(exec);
