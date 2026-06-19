@@ -59,7 +59,7 @@ class UserTaskRunnerTest {
 
         def = new ProcessDefinition("wf", "Test", 1,
                 List.of(new UserTask("t1", "审批", "${applicant}",
-                        List.of("manager"), null, null)),
+                        List.of("manager"), null, null, null)),
                 List.of());
     }
 

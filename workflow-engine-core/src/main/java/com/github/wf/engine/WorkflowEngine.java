@@ -59,7 +59,7 @@ public class WorkflowEngine {
     private void registerDefaultRunners() {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
-        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository));
+        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay));
         runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleDelay));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());

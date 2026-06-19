@@ -42,4 +42,7 @@ public class Transition {
     public boolean isConditional() { return type == TransitionType.CONDITIONAL; }
     public boolean isDefault() { return type == TransitionType.DEFAULT; }
     public boolean isDirect() { return type == TransitionType.DIRECT; }
+    public boolean isResult() { return type == TransitionType.RESULT; }
+    public boolean isException() { return type == TransitionType.EXCEPTION; }
+    public boolean isTimeout() { return type == TransitionType.TIMEOUT; }
 }

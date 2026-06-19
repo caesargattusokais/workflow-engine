@@ -19,7 +19,7 @@ class NodeTest {
     @Test
     void userTaskStoresAssigneeAndGroups() {
         UserTask task = new UserTask("t1", "审批", "${user}",
-                List.of("manager", "hr"), null, null);
+                List.of("manager", "hr"), null, null, null);
         assertThat(task.getAssignee()).isEqualTo("${user}");
         assertThat(task.getCandidateGroups()).containsExactly("manager", "hr");
         assertThat(task.getDynamicRouter()).isNull();

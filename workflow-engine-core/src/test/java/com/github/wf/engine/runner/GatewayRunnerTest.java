@@ -43,8 +43,8 @@ class GatewayRunnerTest {
     void exclusiveGatewayChoosesMatchingPath() {
         ProcessDefinition def = new ProcessDefinition("wf", "Test", 1,
                 List.of(new ExclusiveGateway("gw"),
-                        new UserTask("t1", "A", null, null, null, null),
-                        new UserTask("t2", "B", null, null, null, null)),
+                        new UserTask("t1", "A", null, null, null, null, null),
+                        new UserTask("t2", "B", null, null, null, null, null)),
                 List.of(Transition.conditional("gw", Condition.expression("amount > 100")).withTo("t1"),
                         Transition.defaultTransition("gw", "t2")));
 
@@ -63,8 +63,8 @@ class GatewayRunnerTest {
     void exclusiveGatewayFallsThroughToDefault() {
         ProcessDefinition def = new ProcessDefinition("wf", "Test", 1,
                 List.of(new ExclusiveGateway("gw"),
-                        new UserTask("t1", "A", null, null, null, null),
-                        new UserTask("t2", "B", null, null, null, null)),
+                        new UserTask("t1", "A", null, null, null, null, null),
+                        new UserTask("t2", "B", null, null, null, null, null)),
                 List.of(Transition.conditional("gw", Condition.expression("amount > 100")).withTo("t1"),
                         Transition.defaultTransition("gw", "t2")));
 
@@ -83,8 +83,8 @@ class GatewayRunnerTest {
     void parallelGatewayForkCreatesChildExecutions() {
         ProcessDefinition def = new ProcessDefinition("wf", "Test", 1,
                 List.of(new ParallelGateway("fork"), new ParallelGateway("join"),
-                        new UserTask("t1", "A", null, null, null, null),
-                        new UserTask("t2", "B", null, null, null, null)),
+                        new UserTask("t1", "A", null, null, null, null, null),
+                        new UserTask("t2", "B", null, null, null, null, null)),
                 List.of(Transition.direct("fork", "t1"), Transition.direct("fork", "t2"),
                         Transition.direct("t1", "join"), Transition.direct("t2", "join")));
 

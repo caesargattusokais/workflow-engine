@@ -171,7 +171,7 @@ public class JsonProcessParser implements ProcessParser {
             case "endEvent":
                 return new EndEvent(ny.id, ny.name, listeners);
             case "userTask":
-                return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, listeners);
+                return new UserTask(ny.id, ny.name, ny.assignee, ny.candidateGroups, ny.dynamicRouter, ny.boundaryTimer, listeners);
             case "serviceTask":
                 return new ServiceTask(ny.id, ny.name, ny.handlerClass, listeners);
             case "exclusiveGateway":

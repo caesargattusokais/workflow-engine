@@ -74,7 +74,25 @@ public class ServiceTaskRunner implements NodeRunner {
             }
             exec.setRetryAttempt(0);
 
-            // Result routing
+            // Result routing — from edges (primary)
+            for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
+                if (t.isResult()) {
+                    if (t.isDefault()) {
+                        exec.setCurrentNodeId(t.getTo());
+                        return true;
+                    } else if (t.getCondition() != null) {
+                        if (evaluateCondition(t.getCondition(), variables, context)) {
+                            exec.setCurrentNodeId(t.getTo());
+                            return true;
+                        }
+                    } else {
+                        exec.setCurrentNodeId(t.getTo());
+                        return true;
+                    }
+                }
+            }
+
+            // Result routing — from node (backward compat)
             List<RoutingRule> resultRoutes = serviceTask.getResultRouting();
             if (!resultRoutes.isEmpty()) {
                 for (RoutingRule rule : resultRoutes) {
@@ -91,10 +109,12 @@ public class ServiceTaskRunner implements NodeRunner {
                 }
             }
 
-            // No result routing match → static transition
-            List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
-            if (!outgoing.isEmpty()) {
-                exec.setCurrentNodeId(outgoing.get(0).getTo());
+            // No result routing match → static direct transition
+            for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
+                if (t.isDirect()) {
+                    exec.setCurrentNodeId(t.getTo());
+                    return true;
+                }
             }
             return true;
 
@@ -122,7 +142,25 @@ public class ServiceTaskRunner implements NodeRunner {
                 }
             }
 
-            // Exception routing
+            // Exception routing — from edges (primary)
+            for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
+                if (t.isException()) {
+                    // No condition = default catch-all
+                    if (t.getCondition() == null) {
+                        exec.setCurrentNodeId(t.getTo());
+                        exec.setRetryAttempt(0);
+                        exec.setRetryState(null);
+                        return true;
+                    } else if (evaluateCondition(t.getCondition(), variables, context)) {
+                        exec.setCurrentNodeId(t.getTo());
+                        exec.setRetryAttempt(0);
+                        exec.setRetryState(null);
+                        return true;
+                    }
+                }
+            }
+
+            // Exception routing — from node (backward compat)
             List<RoutingRule> exceptionRoutes = serviceTask.getExceptionRouting();
             if (!exceptionRoutes.isEmpty()) {
                 for (RoutingRule rule : exceptionRoutes) {

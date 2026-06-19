@@ -23,6 +23,7 @@ public class NodeYaml {
     public List<RouteYaml> exceptionRouting;
     public String duration;  // ISO 8601 duration
     public String until;     // ISO 8601 datetime (deadline)
+    public String boundaryTimer; // ISO 8601 duration for UserTask boundary timer
 
     public static class RetryYaml {
         public int maxAttempts = 1;
