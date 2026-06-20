@@ -29,6 +29,8 @@ import java.util.Properties;
 @Configuration
 public class EngineConfig {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EngineConfig.class);
+
     @Value("${engine.base-url:http://localhost:8080}")
     private String baseUrl;
 
@@ -42,7 +44,7 @@ public class EngineConfig {
     @Bean
     @ConditionalOnProperty("ldap.url")
     public OrgService orgService(Environment env) {
-        System.out.println("[EngineConfig] Creating LdapOrgService — ldap.url=" + env.getProperty("ldap.url"));
+        log.info("[EngineConfig] Creating LdapOrgService — ldap.url={}", env.getProperty("ldap.url"));
         Properties p = new Properties();
         for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userBase","groupBase"}) {
             String val = env.getProperty("ldap." + key);

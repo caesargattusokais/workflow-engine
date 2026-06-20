@@ -13,15 +13,17 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class OrgController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrgController.class);
+
     @Autowired(required = false)
     private OrgService orgService;
 
     @GetMapping("/tree")
     public List<OrgTree> getTree() {
-        if (orgService == null) { System.out.println("[OrgController] orgService is NULL — LDAP not configured"); return List.of(); }
-        System.out.println("[OrgController] orgService=" + orgService.getClass().getSimpleName() + " — fetching tree...");
+        if (orgService == null) { log.info("[OrgController] orgService is NULL — LDAP not configured"); return List.of(); }
+        log.info("[OrgController] orgService={} — fetching tree...", orgService.getClass().getSimpleName());
         List<OrgTree> tree = orgService.getOrgTree();
-        System.out.println("[OrgController] tree returned " + tree.size() + " root nodes");
+        log.info("[OrgController] tree returned {} root nodes", tree.size());
         return tree;
     }
 
