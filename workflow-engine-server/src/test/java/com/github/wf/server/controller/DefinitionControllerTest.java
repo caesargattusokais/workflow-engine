@@ -4,9 +4,12 @@ import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.memory.InMemoryInstanceRepository;
 import com.github.wf.memory.InMemoryProcessRepository;
 import com.github.wf.memory.InMemoryTaskRepository;
+import com.github.wf.memory.JdbcDefinitionRepository;
 import com.github.wf.server.dto.GraphResponse;
 import com.github.wf.server.dto.DeployRequest;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DefinitionControllerTest {
@@ -18,7 +21,7 @@ class DefinitionControllerTest {
                 .instanceRepository(new InMemoryInstanceRepository())
                 .taskRepository(new InMemoryTaskRepository())
                 .build();
-        DefinitionController ctrl = new DefinitionController(engine);
+        DefinitionController ctrl = new DefinitionController(engine, new JdbcDefinitionRepository(new JdbcTemplate()));
 
         DeployRequest req = new DeployRequest();
         req.setYaml("""

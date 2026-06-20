@@ -4,6 +4,8 @@ import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.memory.*;
 import com.github.wf.server.dto.*;
 import org.junit.jupiter.api.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
 
@@ -20,7 +22,7 @@ class InstanceControllerTest {
                 .instanceRepository(new InMemoryInstanceRepository())
                 .taskRepository(new InMemoryTaskRepository())
                 .build();
-        defCtrl = new DefinitionController(engine);
+        defCtrl = new DefinitionController(engine, new JdbcDefinitionRepository(new JdbcTemplate()));
         instCtrl = new InstanceController(engine);
         taskCtrl = new TaskController(engine);
     }
