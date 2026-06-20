@@ -27,6 +27,17 @@ public class ProcessInstance {
         this.createdAt = Instant.now();
     }
 
+    public ProcessInstance(String id, String definitionId, int definitionVersion, Map<String, Object> variables, Instant createdAt, Instant completedAt) {
+        this.id = id != null ? id : UUID.randomUUID().toString();
+        this.definitionId = Objects.requireNonNull(definitionId);
+        this.definitionVersion = definitionVersion;
+        this.status = InstanceStatus.RUNNING;
+        this.variables = new HashMap<>(variables != null ? variables : Map.of());
+        this.activeNodeIds = new HashSet<>();
+        this.createdAt = createdAt;
+        this.completedAt = completedAt;
+    }
+
     public String getId() { return id; }
     public String getDefinitionId() { return definitionId; }
     public int getDefinitionVersion() { return definitionVersion; }
