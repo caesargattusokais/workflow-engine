@@ -28,10 +28,14 @@ public class JdbcProcessRepository implements ProcessRepository {
     public void save(ProcessDefinition def) {
         String nodesJson = gson.toJson(serializeNodes(def.getNodes()));
         String transitionsJson = gson.toJson(serializeTransitions(def.getTransitions()));
-        jdbc.update(
-            "INSERT INTO process_definition (id, version, name, nodes_json, transitions_json) " +
-            "VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), nodes_json=VALUES(nodes_json), transitions_json=VALUES(transitions_json)",
-            def.getId(), def.getVersion(), def.getName(), nodesJson, transitionsJson);
+        int updated = jdbc.update(
+            "UPDATE process_definition SET name=?, nodes_json=?, transitions_json=? WHERE id=? AND version=?",
+            def.getName(), nodesJson, transitionsJson, def.getId(), def.getVersion());
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO process_definition (id, version, name, nodes_json, transitions_json) VALUES (?, ?, ?, ?, ?)",
+                def.getId(), def.getVersion(), def.getName(), nodesJson, transitionsJson);
+        }
     }
 
     @Override

@@ -107,15 +107,22 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     private void writeToDb(ProcessInstance instance) {
-        jdbc.update(
-            "INSERT INTO process_instance (id, definition_id, definition_version, status, variables_json, active_node_ids_json, created_at, completed_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status), variables_json=VALUES(variables_json), " +
-            "active_node_ids_json=VALUES(active_node_ids_json), completed_at=VALUES(completed_at)",
-            instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
+        int updated = jdbc.update(
+            "UPDATE process_instance SET status=?, variables_json=?, active_node_ids_json=?, completed_at=? WHERE id=?",
             instance.getStatus().name(), gson.toJson(instance.getVariables()),
             gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
-            instance.getCreatedAt().toEpochMilli(),
-            instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null);
+            instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null,
+            instance.getId());
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO process_instance (id, definition_id, definition_version, status, variables_json, active_node_ids_json, created_at, completed_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
+                instance.getStatus().name(), gson.toJson(instance.getVariables()),
+                gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
+                instance.getCreatedAt().toEpochMilli(),
+                instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null);
+        }
     }
 
     // ── Execution ────────────────────────
@@ -152,12 +159,17 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     private void writeExecToDb(Execution exec) {
-        jdbc.update(
-            "INSERT INTO execution (id, instance_id, current_node_id, parent_execution_id, status, retry_attempt, next_retry_at, retry_state) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE current_node_id=VALUES(current_node_id), " +
-            "status=VALUES(status), retry_attempt=VALUES(retry_attempt), next_retry_at=VALUES(next_retry_at), retry_state=VALUES(retry_state)",
-            exec.getId(), exec.getInstanceId(), exec.getCurrentNodeId(), exec.getParentExecutionId(),
-            exec.getStatus().name(), exec.getRetryAttempt(), exec.getNextRetryAt(), exec.getRetryState());
+        int updated = jdbc.update(
+            "UPDATE execution SET current_node_id=?, status=?, retry_attempt=?, next_retry_at=?, retry_state=? WHERE id=?",
+            exec.getCurrentNodeId(), exec.getStatus().name(), exec.getRetryAttempt(),
+            exec.getNextRetryAt(), exec.getRetryState(), exec.getId());
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO execution (id, instance_id, current_node_id, parent_execution_id, status, retry_attempt, next_retry_at, retry_state) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                exec.getId(), exec.getInstanceId(), exec.getCurrentNodeId(), exec.getParentExecutionId(),
+                exec.getStatus().name(), exec.getRetryAttempt(), exec.getNextRetryAt(), exec.getRetryState());
+        }
     }
 
     // ── HistoricActivity ─────────────────

@@ -21,10 +21,14 @@ public class JdbcDefinitionRepository {
 
     public void save(String userId, ProcessDefinition def, Map<String, Map<String, Double>> positions) {
         String posJson = positions != null ? gson.toJson(positions) : null;
-        jdbc.update(
-            "INSERT INTO definition (id, version, user_id, name, positions_json) VALUES (?, ?, ?, ?, ?) " +
-            "ON DUPLICATE KEY UPDATE name = VALUES(name), positions_json = VALUES(positions_json)",
-            def.getId(), def.getVersion(), userId, def.getName(), posJson);
+        int updated = jdbc.update(
+            "UPDATE definition SET name = ?, positions_json = ? WHERE user_id = ? AND id = ? AND version = ?",
+            def.getName(), posJson, userId, def.getId(), def.getVersion());
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO definition (id, version, user_id, name, positions_json) VALUES (?, ?, ?, ?, ?)",
+                def.getId(), def.getVersion(), userId, def.getName(), posJson);
+        }
     }
 
     public List<ProcessDefinition> listLatestByUser(String userId) {

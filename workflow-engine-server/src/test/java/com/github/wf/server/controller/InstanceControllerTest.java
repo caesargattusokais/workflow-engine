@@ -5,6 +5,8 @@ import com.github.wf.memory.*;
 import com.github.wf.server.dto.*;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
@@ -17,12 +19,16 @@ class InstanceControllerTest {
 
     @BeforeEach
     void setUp() {
+        var ds = new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2)
+            .addScript("classpath:schema.sql").build();
+        var jdbc = new JdbcTemplate(ds);
+
         engine = WorkflowEngine.builder()
                 .processRepository(new InMemoryProcessRepository())
                 .instanceRepository(new InMemoryInstanceRepository())
                 .taskRepository(new InMemoryTaskRepository())
                 .build();
-        defCtrl = new DefinitionController(engine, new JdbcDefinitionRepository(new JdbcTemplate()));
+        defCtrl = new DefinitionController(engine, new JdbcDefinitionRepository(jdbc));
         instCtrl = new InstanceController(engine);
         taskCtrl = new TaskController(engine);
     }

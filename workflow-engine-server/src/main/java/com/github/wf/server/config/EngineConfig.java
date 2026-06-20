@@ -4,6 +4,8 @@ import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.memory.InMemoryInstanceRepository;
 import com.github.wf.memory.InMemoryProcessRepository;
 import com.github.wf.memory.InMemoryTaskRepository;
+import com.github.wf.memory.JdbcDefinitionRepository;
+import com.github.wf.memory.JdbcDraftRepository;
 import com.github.wf.memory.JdbcInstanceRepository;
 import com.github.wf.memory.JdbcProcessRepository;
 import com.github.wf.memory.JdbcTaskRepository;
@@ -45,5 +47,15 @@ public class EngineConfig {
                 .taskRepository(new InMemoryTaskRepository())
                 .baseUrl(baseUrl)
                 .build();
+    }
+
+    @Bean
+    public JdbcDraftRepository draftRepository(DataSource dataSource) {
+        return new JdbcDraftRepository(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    public JdbcDefinitionRepository definitionRepository(DataSource dataSource) {
+        return new JdbcDefinitionRepository(new JdbcTemplate(dataSource));
     }
 }

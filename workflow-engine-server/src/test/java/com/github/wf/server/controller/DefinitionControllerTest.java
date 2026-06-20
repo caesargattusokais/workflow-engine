@@ -9,6 +9,8 @@ import com.github.wf.server.dto.GraphResponse;
 import com.github.wf.server.dto.DeployRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,12 +18,16 @@ class DefinitionControllerTest {
 
     @Test
     void deployAndGetGraph() {
+        var ds = new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2)
+            .addScript("classpath:schema.sql").build();
+        var jdbc = new JdbcTemplate(ds);
+
         WorkflowEngine engine = WorkflowEngine.builder()
                 .processRepository(new InMemoryProcessRepository())
                 .instanceRepository(new InMemoryInstanceRepository())
                 .taskRepository(new InMemoryTaskRepository())
                 .build();
-        DefinitionController ctrl = new DefinitionController(engine, new JdbcDefinitionRepository(new JdbcTemplate()));
+        DefinitionController ctrl = new DefinitionController(engine, new JdbcDefinitionRepository(jdbc));
 
         DeployRequest req = new DeployRequest();
         req.setYaml("""
