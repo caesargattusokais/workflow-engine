@@ -10,20 +10,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * JDBC-backed TaskRepository with per-taskId locking.
+ * JDBC-backed TaskRepository with per-taskId ReadWriteLock.
  */
 public class JdbcTaskRepository implements TaskRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();
-    private final Map<String, Lock> locks = new ConcurrentHashMap<>();
+    private final Map<String, ReadWriteLock> locks = new ConcurrentHashMap<>();
 
-    private Lock taskLock(String taskId) {
-        return locks.computeIfAbsent(taskId, k -> new ReentrantLock());
+    private ReadWriteLock taskLock(String taskId) {
+        return locks.computeIfAbsent(taskId, k -> new ReentrantReadWriteLock());
     }
 
     public JdbcTaskRepository(JdbcTemplate jdbc) {
@@ -32,8 +32,8 @@ public class JdbcTaskRepository implements TaskRepository {
 
     @Override
     public void save(Task task) {
-        Lock l = taskLock(task.getId());
-        l.lock();
+        var rw = taskLock(task.getId());
+        rw.writeLock().lock();
         try {
             jdbc.update(
                 "INSERT INTO task (id, instance_id, node_id, assignee, candidate_groups_json, status, variables_json, created_at, completed_at) " +
@@ -43,27 +43,27 @@ public class JdbcTaskRepository implements TaskRepository {
                 gson.toJson(task.getVariables()), task.getCreatedAt().toEpochMilli(),
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null);
         } finally {
-            l.unlock();
+            rw.writeLock().unlock();
         }
     }
 
     @Override
     public Task findById(String id) {
-        Lock l = taskLock(id);
-        l.lock();
+        var rw = taskLock(id);
+        rw.readLock().lock();
         try {
             List<Task> list = jdbc.query("SELECT * FROM task WHERE id = ?",
                 (rs, rowNum) -> mapTask(rs), id);
             return list.isEmpty() ? null : list.get(0);
         } finally {
-            l.unlock();
+            rw.readLock().unlock();
         }
     }
 
     @Override
     public void update(Task task) {
-        Lock l = taskLock(task.getId());
-        l.lock();
+        var rw = taskLock(task.getId());
+        rw.writeLock().lock();
         try {
             jdbc.update(
                 "UPDATE task SET assignee=?, candidate_groups_json=?, status=?, variables_json=?, completed_at=? WHERE id=?",
@@ -72,13 +72,13 @@ public class JdbcTaskRepository implements TaskRepository {
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null,
                 task.getId());
         } finally {
-            l.unlock();
+            rw.writeLock().unlock();
         }
     }
 
     @Override
     public List<Task> query(TaskQuery query) {
-        // Read-only scan — no per-task lock needed
+        // Read-only scan
         StringBuilder sql = new StringBuilder("SELECT * FROM task WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
