@@ -46,7 +46,7 @@ public class EngineConfig {
     public OrgService orgService(Environment env) {
         log.info("[EngineConfig] Creating LdapOrgService — ldap.url={}", env.getProperty("ldap.url"));
         Properties p = new Properties();
-        for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userBase","groupBase"}) {
+        for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userObjectClass","userBase","groupBase"}) {
             String val = env.getProperty("ldap." + key);
             if (val != null) p.setProperty("ldap." + key, val);
         }

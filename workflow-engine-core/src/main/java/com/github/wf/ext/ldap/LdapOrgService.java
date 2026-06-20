@@ -28,6 +28,7 @@ public class LdapOrgService implements OrgService {
     private final String userFilter, groupFilter, groupMemberAttr;
     private final String userBase, groupBase;
     private final String uidAttr; // AD: sAMAccountName, OpenLDAP: uid
+    private final String userObjectClass; // AD: user, OpenLDAP: inetOrgPerson
 
     public LdapOrgService(Properties props) {
         this.url = props.getProperty("ldap.url", "ldap://localhost:389");
@@ -40,6 +41,7 @@ public class LdapOrgService implements OrgService {
         this.userBase = props.getProperty("ldap.userBase", base);
         this.groupBase = props.getProperty("ldap.groupBase", base);
         this.uidAttr = props.getProperty("ldap.uidAttr", "sAMAccountName");
+        this.userObjectClass = props.getProperty("ldap.userObjectClass", "user");
     }
 
     private DirContext connect() throws NamingException {
@@ -145,7 +147,7 @@ public class LdapOrgService implements OrgService {
                 sc.setReturningAttributes(new String[]{uidAttr});
                 // AD: manager attribute contains DN. LDAP: may use directReports
                 NamingEnumeration<SearchResult> results = ctx.search(userBase,
-                    "(&(objectClass=user)(manager=" + escape(userDn) + "))", sc);
+                    "(&(objectClass=" + userObjectClass + ")(manager=" + escape(userDn) + "))", sc);
                 while (results.hasMore()) {
                     String rUid = attr(results.next().getAttributes(), uidAttr, null);
                     if (rUid != null) reports.add(rUid);
@@ -210,8 +212,9 @@ public class LdapOrgService implements OrgService {
                 SearchControls sc = new SearchControls();
                 sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
                 sc.setReturningAttributes(new String[]{uidAttr, "cn", "mail", "department", "manager"});
-                String filter = "(&(objectClass=user)(|(sAMAccountName=*" + escape(query)
-                    + "*)(cn=*" + escape(query) + "*)))";
+                String filter = query == null || query.isEmpty()
+                    ? "(objectClass=" + userObjectClass + ")"
+                    : "(&(objectClass=" + userObjectClass + ")(|(" + uidAttr + "=*" + escape(query) + "*)(cn=*" + escape(query) + "*)))";
                 NamingEnumeration<SearchResult> results = ctx.search(userBase, filter, sc);
                 int count = 0;
                 while (results.hasMore() && count++ < 50) {

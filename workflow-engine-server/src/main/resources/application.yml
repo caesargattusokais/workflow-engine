@@ -14,6 +14,7 @@ ldap:
   groupFilter: "(&(objectClass=groupOfUniqueNames)(uniqueMember={0}))"
   groupMemberAttr: uniqueMember
   uidAttr: uid
+  userObjectClass: inetOrgPerson
   userBase: dc=example,dc=com
 
 spring:
