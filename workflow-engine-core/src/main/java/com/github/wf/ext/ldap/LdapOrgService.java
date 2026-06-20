@@ -1,6 +1,7 @@
 package com.github.wf.ext.ldap;
 
 import com.github.wf.ext.OrgService;
+import com.github.wf.ext.OrgTree;
 import com.github.wf.ext.OrgUser;
 
 import javax.naming.Context;
@@ -150,6 +151,29 @@ public class LdapOrgService implements OrgService {
             } finally { ctx.close(); }
         } catch (NamingException ignored) {}
         return reports;
+    }
+
+    @Override
+    public List<OrgTree> getOrgTree() {
+        // Fetch all users, then build tree from manager relationships
+        List<OrgUser> all = searchUsers("");
+        Map<String, OrgTree> nodeMap = new LinkedHashMap<>();
+        List<OrgTree> roots = new ArrayList<>();
+
+        for (OrgUser u : all) {
+            OrgTree node = new OrgTree(u.getUid(), u.getCn(), u.getDepartment());
+            nodeMap.put(u.getUid(), node);
+        }
+        // Link children to parents
+        for (OrgUser u : all) {
+            String mgr = u.getManager();
+            if (mgr != null && nodeMap.containsKey(mgr)) {
+                nodeMap.get(mgr).getChildren().add(nodeMap.get(u.getUid()));
+            } else {
+                roots.add(nodeMap.get(u.getUid()));
+            }
+        }
+        return roots;
     }
 
     @Override
