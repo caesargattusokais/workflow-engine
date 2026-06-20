@@ -96,7 +96,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       await updateDraft(activeId, { nodes, edges, version: newVersion });
       setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
       setToast(`${t.designer.savedAs}${newVersion}`);
-    } catch { alert(t.designer.saveFailed); }
+    } catch (e: any) { alert(e.message || t.designer.saveFailed); }
     finally { setSaving(false); }
   };
 
@@ -106,7 +106,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const d = await createDraft(`Draft ${drafts.length + 1}`);
       setDrafts(prev => [...prev, { ...d, nodes: [], edges: [] }]);
       setActiveId(d.id);
-    } catch { /* server unavailable */ }
+    } catch (e: any) { alert('创建失败: ' + (e.message || 'server unavailable')); }
   };
 
   const renameDraft = async (id: string) => {
@@ -115,7 +115,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     try {
       await updateDraft(id, { name });
       setDrafts(prev => prev.map(d => d.id === id ? { ...d, name } : d));
-    } catch {}
+    } catch (e: any) { alert('重命名失败: ' + (e.message || 'server error')); }
   };
 
   const delDraft = async (id: string) => {
@@ -136,7 +136,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const copy = await copyDraft(id);
       setDrafts(prev => [...prev, { ...copy, nodes: copy.nodes || [], edges: copy.edges || [] }]);
       setToast(`${t.designer.copied}${copy.name}`);
-    } catch { alert(t.designer.saveFailed); }
+    } catch (e: any) { alert(e.message || t.designer.saveFailed); }
   };
 
   const downloadYaml = (draft: Draft) => {
