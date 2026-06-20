@@ -1,6 +1,7 @@
 package com.github.wf.server.controller;
 
 import com.github.wf.ext.OrgService;
+import com.github.wf.ext.OrgTree;
 import com.github.wf.ext.OrgUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,12 @@ public class OrgController {
 
     @Autowired(required = false)
     private OrgService orgService;
+
+    @GetMapping("/tree")
+    public List<OrgTree> getTree() {
+        if (orgService == null) return List.of();
+        return orgService.getOrgTree();
+    }
 
     @GetMapping("/users")
     public List<Map<String, String>> searchUsers(@RequestParam(value = "q", defaultValue = "") String q) {

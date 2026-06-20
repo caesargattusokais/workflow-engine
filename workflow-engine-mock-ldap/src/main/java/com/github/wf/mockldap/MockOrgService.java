@@ -1,6 +1,7 @@
 package com.github.wf.mockldap;
 
 import com.github.wf.ext.OrgService;
+import com.github.wf.ext.OrgTree;
 import com.github.wf.ext.OrgUser;
 
 import java.util.*;
@@ -100,5 +101,30 @@ public class MockOrgService implements OrgService {
     @Override
     public boolean isGroupMember(String uid, String group) {
         return getGroups(uid).contains(group);
+    }
+
+    @Override
+    public List<OrgTree> getOrgTree() {
+        // Find roots: users with no manager
+        List<OrgTree> roots = new ArrayList<>();
+        for (OrgUser u : users.values()) {
+            if (u.getManager() == null || !users.containsKey(u.getManager())) {
+                roots.add(buildTreeNode(u.getUid()));
+            }
+        }
+        return roots;
+    }
+
+    private OrgTree buildTreeNode(String uid) {
+        OrgUser u = users.get(uid);
+        if (u == null) return new OrgTree(uid, uid, "");
+        OrgTree node = new OrgTree(u.getUid(), u.getCn(), u.getDepartment());
+        List<String> reports = getReports(uid);
+        if (!reports.isEmpty()) {
+            List<OrgTree> children = new ArrayList<>();
+            for (String r : reports) children.add(buildTreeNode(r));
+            node.setChildren(children);
+        }
+        return node;
     }
 }

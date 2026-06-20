@@ -53,4 +53,7 @@ public interface OrgService {
 
     /** List all known group names. Used by frontend picker. */
     default List<String> listGroups() { return List.of(); }
+
+    /** Get the full org tree (root nodes = top-level managers). */
+    default List<OrgTree> getOrgTree() { return List.of(); }
 }
