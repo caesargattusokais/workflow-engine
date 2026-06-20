@@ -44,7 +44,7 @@ public class EngineConfig {
     @Profile("!mock-ldap")
     public OrgService orgService(Environment env) {
         Properties p = new Properties();
-        for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","userBase","groupBase"}) {
+        for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userBase","groupBase"}) {
             String val = env.getProperty("ldap." + key);
             if (val != null) p.setProperty("ldap." + key, val);
         }

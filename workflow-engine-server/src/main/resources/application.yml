@@ -4,12 +4,17 @@ server:
 engine:
   base-url: http://localhost:8080
 
-# LDAP/AD config (optional — uncomment to enable)
-#ldap:
-#  url: ldap://dc.company.com:389
-#  base: dc=company,dc=com
-#  user: cn=admin,dc=company,dc=com
-#  password: secret
+# LDAP — public test server (forumsys.com)
+ldap:
+  url: ldap://ldap.forumsys.com:389
+  base: dc=example,dc=com
+  user: cn=read-only-admin,dc=example,dc=com
+  password: password
+  userFilter: "(&(objectClass=inetOrgPerson)(uid={0}))"
+  groupFilter: "(&(objectClass=groupOfUniqueNames)(uniqueMember={0}))"
+  groupMemberAttr: uniqueMember
+  uidAttr: uid
+  userBase: dc=example,dc=com
 
 spring:
   datasource:

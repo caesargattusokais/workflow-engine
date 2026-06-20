@@ -27,6 +27,7 @@ public class LdapOrgService implements OrgService {
     private final String url, base, user, password;
     private final String userFilter, groupFilter, groupMemberAttr;
     private final String userBase, groupBase;
+    private final String uidAttr; // AD: sAMAccountName, OpenLDAP: uid
 
     public LdapOrgService(Properties props) {
         this.url = props.getProperty("ldap.url", "ldap://localhost:389");
@@ -38,6 +39,7 @@ public class LdapOrgService implements OrgService {
         this.groupMemberAttr = props.getProperty("ldap.groupMemberAttr", "member");
         this.userBase = props.getProperty("ldap.userBase", base);
         this.groupBase = props.getProperty("ldap.groupBase", base);
+        this.uidAttr = props.getProperty("ldap.uidAttr", "sAMAccountName");
     }
 
     private DirContext connect() throws NamingException {
@@ -59,14 +61,14 @@ public class LdapOrgService implements OrgService {
             try {
                 SearchControls sc = new SearchControls();
                 sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
-                sc.setReturningAttributes(new String[]{"sAMAccountName", "cn", "mail", "department", "manager"});
+                sc.setReturningAttributes(new String[]{uidAttr, "cn", "mail", "department", "manager"});
                 NamingEnumeration<SearchResult> results = ctx.search(userBase,
                     userFilter.replace("{0}", escape(uid)), sc);
                 if (results.hasMore()) {
                     SearchResult sr = results.next();
                     Attributes attrs = sr.getAttributes();
                     return new OrgUser(
-                        attr(attrs, "sAMAccountName", uid),
+                        attr(attrs, uidAttr, uid),
                         attr(attrs, "cn", uid),
                         attr(attrs, "mail", null),
                         attr(attrs, "department", null),
@@ -140,12 +142,12 @@ public class LdapOrgService implements OrgService {
                 if (userDn == null) return reports;
                 SearchControls sc = new SearchControls();
                 sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
-                sc.setReturningAttributes(new String[]{"sAMAccountName"});
+                sc.setReturningAttributes(new String[]{uidAttr});
                 // AD: manager attribute contains DN. LDAP: may use directReports
                 NamingEnumeration<SearchResult> results = ctx.search(userBase,
                     "(&(objectClass=user)(manager=" + escape(userDn) + "))", sc);
                 while (results.hasMore()) {
-                    String rUid = attr(results.next().getAttributes(), "sAMAccountName", null);
+                    String rUid = attr(results.next().getAttributes(), uidAttr, null);
                     if (rUid != null) reports.add(rUid);
                 }
             } finally { ctx.close(); }
@@ -207,7 +209,7 @@ public class LdapOrgService implements OrgService {
             try {
                 SearchControls sc = new SearchControls();
                 sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
-                sc.setReturningAttributes(new String[]{"sAMAccountName", "cn", "mail", "department", "manager"});
+                sc.setReturningAttributes(new String[]{uidAttr, "cn", "mail", "department", "manager"});
                 String filter = "(&(objectClass=user)(|(sAMAccountName=*" + escape(query)
                     + "*)(cn=*" + escape(query) + "*)))";
                 NamingEnumeration<SearchResult> results = ctx.search(userBase, filter, sc);
@@ -215,7 +217,7 @@ public class LdapOrgService implements OrgService {
                 while (results.hasMore() && count++ < 50) {
                     Attributes attrs = results.next().getAttributes();
                     result.add(new OrgUser(
-                        attr(attrs, "sAMAccountName", ""),
+                        attr(attrs, uidAttr, ""),
                         attr(attrs, "cn", ""),
                         attr(attrs, "mail", null),
                         attr(attrs, "department", null),
