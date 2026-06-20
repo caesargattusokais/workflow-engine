@@ -176,6 +176,52 @@ public class LdapOrgService implements OrgService {
     }
 
     @Override
+    public List<OrgUser> searchUsers(String query) {
+        List<OrgUser> result = new ArrayList<>();
+        try {
+            DirContext ctx = connect();
+            try {
+                SearchControls sc = new SearchControls();
+                sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                sc.setReturningAttributes(new String[]{"sAMAccountName", "cn", "mail", "department", "manager"});
+                String filter = "(&(objectClass=user)(|(sAMAccountName=*" + escape(query)
+                    + "*)(cn=*" + escape(query) + "*)))";
+                NamingEnumeration<SearchResult> results = ctx.search(userBase, filter, sc);
+                int count = 0;
+                while (results.hasMore() && count++ < 50) {
+                    Attributes attrs = results.next().getAttributes();
+                    result.add(new OrgUser(
+                        attr(attrs, "sAMAccountName", ""),
+                        attr(attrs, "cn", ""),
+                        attr(attrs, "mail", null),
+                        attr(attrs, "department", null),
+                        extractUid(attr(attrs, "manager", null))));
+                }
+            } finally { ctx.close(); }
+        } catch (NamingException ignored) {}
+        return result;
+    }
+
+    @Override
+    public List<String> listGroups() {
+        List<String> groups = new ArrayList<>();
+        try {
+            DirContext ctx = connect();
+            try {
+                SearchControls sc = new SearchControls();
+                sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                sc.setReturningAttributes(new String[]{"cn"});
+                NamingEnumeration<SearchResult> results = ctx.search(groupBase,
+                    "(objectClass=group)", sc);
+                while (results.hasMore()) {
+                    groups.add(attr(results.next().getAttributes(), "cn", ""));
+                }
+            } finally { ctx.close(); }
+        } catch (NamingException ignored) {}
+        return groups;
+    }
+
+    @Override
     public String resolveRole(String role, String context) {
         // Look up a group named like "role-approver-dept-engineering"
         // or "app-approver-engineering"

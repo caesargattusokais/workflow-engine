@@ -1,0 +1,38 @@
+package com.github.wf.server.controller;
+
+import com.github.wf.ext.OrgService;
+import com.github.wf.ext.OrgUser;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/org")
+@CrossOrigin(origins = "*")
+public class OrgController {
+
+    @Autowired(required = false)
+    private OrgService orgService;
+
+    @GetMapping("/users")
+    public List<Map<String, String>> searchUsers(@RequestParam(value = "q", defaultValue = "") String q) {
+        if (orgService == null) return List.of();
+        List<OrgUser> users = orgService.searchUsers(q);
+        List<Map<String, String>> result = new ArrayList<>();
+        for (OrgUser u : users) {
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("uid", u.getUid());
+            m.put("name", u.getCn() != null && !u.getCn().isEmpty() ? u.getCn() : u.getUid());
+            m.put("department", u.getDepartment() != null ? u.getDepartment() : "");
+            result.add(m);
+        }
+        return result;
+    }
+
+    @GetMapping("/groups")
+    public List<String> listGroups() {
+        if (orgService == null) return List.of();
+        return orgService.listGroups();
+    }
+}

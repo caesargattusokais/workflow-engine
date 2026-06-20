@@ -138,16 +138,15 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               <>
                 <label className="block mb-2">
                   <span className="text-gray-400 text-xs">{t.props.assignee}</span>
-                  <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-                    value={(node.data.assignee as string) || ''} placeholder="e.g. ${applicant}"
-                    onChange={e => updateData('assignee', e.target.value)} />
+                  <UserPicker value={(node.data.assignee as string) || ''}
+                    onChange={v => updateData('assignee', v)}
+                    placeholder="e.g. ${applicant} or zhangsan" />
                 </label>
                 <label className="block mb-2">
                   <span className="text-gray-400 text-xs">{t.props.candidateGroups}</span>
-                  <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
-                    value={(Array.isArray(node.data.candidateGroups) ? (node.data.candidateGroups as string[]).join(', ') : '')}
-                    placeholder="comma-separated"
-                    onChange={e => updateData('candidateGroups', e.target.value.split(',').map(s => s.trim()))} />
+                  <GroupPicker values={(node.data.candidateGroups as string[]) || []}
+                    onChange={v => updateData('candidateGroups', v)}
+                    placeholder="comma-separated group names" />
                 </label>
               </>
             ) : (
@@ -466,6 +465,86 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
           <span className="text-gray-500 text-xs">ID: {node.id}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── UserPicker (autocomplete from /api/org/users) ──
+function UserPicker({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  const search = (q: string) => {
+    setQuery(q);
+    clearTimeout(timer.current);
+    if (q.length < 1) { setSuggestions([]); setOpen(false); return; }
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/org/users?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setSuggestions(data || []);
+        setOpen((data || []).length > 0);
+      } catch { setSuggestions([]); }
+    }, 300);
+  };
+
+  return (
+    <div className="relative mt-0.5">
+      <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm"
+        value={value} placeholder={placeholder}
+        onChange={e => { onChange(e.target.value); search(e.target.value); }}
+        onFocus={() => { if (value) search(value); }}
+        onBlur={() => setTimeout(() => setOpen(false), 200)} />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 w-full bg-gray-750 border border-gray-600 rounded mt-0.5 max-h-32 overflow-y-auto shadow-lg">
+          {suggestions.map((s: any) => (
+            <div key={s.uid} className="px-2 py-1 text-xs text-gray-300 hover:bg-gray-600 cursor-pointer flex justify-between"
+              onMouseDown={e => { e.preventDefault(); onChange(s.uid); setOpen(false); }}>
+              <span className="text-blue-400">{s.uid}</span>
+              <span className="text-gray-500">{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GroupPicker (autocomplete from /api/org/groups) ──
+function GroupPicker({ values, onChange, placeholder }: { values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [allGroups, setAllGroups] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/org/groups').then(r => r.json()).then(setAllGroups).catch(() => {});
+  }, []);
+
+  const toggle = (g: string) => {
+    if (values.includes(g)) onChange(values.filter(v => v !== g));
+    else onChange([...values, g]);
+  };
+
+  return (
+    <div className="relative mt-0.5">
+      <input ref={inputRef} className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm"
+        value={values.join(', ')} placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={e => onChange(e.target.value.split(',').map(s => s.trim()))}
+        readOnly={allGroups.length > 0} />
+      {open && allGroups.length > 0 && (
+        <div className="absolute z-50 w-full bg-gray-750 border border-gray-600 rounded mt-0.5 max-h-32 overflow-y-auto shadow-lg"
+          onMouseDown={e => e.preventDefault()}>
+          {allGroups.map(g => (
+            <label key={g} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-300 hover:bg-gray-600 cursor-pointer">
+              <input type="checkbox" checked={values.includes(g)} onChange={() => toggle(g)} className="accent-blue-500" />
+              {g}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

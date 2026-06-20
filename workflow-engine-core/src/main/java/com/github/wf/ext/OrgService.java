@@ -47,4 +47,10 @@ public interface OrgService {
     default boolean isGroupMember(String uid, String group) {
         return getGroups(uid).contains(group);
     }
+
+    /** Search users by name/uid prefix. Used by frontend picker. */
+    default List<OrgUser> searchUsers(String query) { return List.of(); }
+
+    /** List all known group names. Used by frontend picker. */
+    default List<String> listGroups() { return List.of(); }
 }
