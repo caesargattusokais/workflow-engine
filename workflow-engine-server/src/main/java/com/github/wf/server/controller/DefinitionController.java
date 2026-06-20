@@ -71,9 +71,14 @@ public class DefinitionController {
         ProcessDefinition def;
         Map<String, Map<String, Double>> positions = null;
         if (version != null) {
-            def = engine.processRepository.findLatestById(id); // fallback
+            def = engine.processRepository.findAllVersions(id).stream()
+                .filter(d -> d.getVersion() == version)
+                .findFirst().orElse(null);
         } else {
             def = engine.processRepository.findLatestById(id);
+        }
+        if (def == null) {
+            def = engine.processRepository.findLatestById(id); // fallback to latest
         }
         if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
         // Load positions from DB
