@@ -4,18 +4,25 @@ server:
 engine:
   base-url: http://localhost:8080
 
-# LDAP — public test server (forumsys.com)
+# LDAP — local Docker (osixia/openldap)
 ldap:
-  url: ldap://ldap.forumsys.com:389
+  url: ldap://localhost:389
   base: dc=example,dc=com
-  user: cn=read-only-admin,dc=example,dc=com
-  password: password
+  user: cn=admin,dc=example,dc=com
+  password: LDAP_password
   userFilter: "(&(objectClass=inetOrgPerson)(uid={0}))"
-  groupFilter: "(&(objectClass=groupOfUniqueNames)(uniqueMember={0}))"
-  groupMemberAttr: uniqueMember
   uidAttr: uid
   userObjectClass: inetOrgPerson
-  userBase: dc=example,dc=com
+
+# LDAP — public test server (forumsys.com)
+#ldap:
+#  url: ldap://ldap.forumsys.com:389
+#  base: dc=example,dc=com
+#  user: cn=read-only-admin,dc=example,dc=com
+#  password: password
+#  userFilter: "(&(objectClass=inetOrgPerson)(uid={0}))"
+#  uidAttr: uid
+#  userObjectClass: inetOrgPerson
 
 spring:
   datasource:
