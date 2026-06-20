@@ -18,8 +18,11 @@ public class OrgController {
 
     @GetMapping("/tree")
     public List<OrgTree> getTree() {
-        if (orgService == null) return List.of();
-        return orgService.getOrgTree();
+        if (orgService == null) { System.out.println("[OrgController] orgService is NULL — LDAP not configured"); return List.of(); }
+        System.out.println("[OrgController] orgService=" + orgService.getClass().getSimpleName() + " — fetching tree...");
+        List<OrgTree> tree = orgService.getOrgTree();
+        System.out.println("[OrgController] tree returned " + tree.size() + " root nodes");
+        return tree;
     }
 
     @GetMapping("/users")

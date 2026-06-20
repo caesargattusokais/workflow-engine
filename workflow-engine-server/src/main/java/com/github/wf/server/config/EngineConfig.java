@@ -42,6 +42,7 @@ public class EngineConfig {
     @Bean
     @ConditionalOnProperty("ldap.url")
     public OrgService orgService(Environment env) {
+        System.out.println("[EngineConfig] Creating LdapOrgService — ldap.url=" + env.getProperty("ldap.url"));
         Properties p = new Properties();
         for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userBase","groupBase"}) {
             String val = env.getProperty("ldap." + key);

@@ -20,10 +20,17 @@ export default function OrgTreePicker({ value, values, onChange, onChangeMulti, 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
 
+  const [status, setStatus] = useState<'loading'|'empty'|'ok'>('loading');
+
   useEffect(() => {
     fetch('/api/org/tree').then(r => r.json())
-      .then(data => { setTree(data || []); if (data) expandAll(data, 2); })
-      .catch(() => {});
+      .then(data => {
+        const nodes = data || [];
+        setTree(nodes);
+        setStatus(nodes.length > 0 ? 'ok' : 'empty');
+        if (nodes.length > 0) expandAll(nodes, 2);
+      })
+      .catch(() => setStatus('empty'));
   }, []);
 
   const expandAll = (nodes: OrgNode[], depth: number) => {
@@ -83,7 +90,8 @@ export default function OrgTreePicker({ value, values, onChange, onChangeMulti, 
       <input className="w-full bg-transparent px-2 py-1 text-xs text-gray-400 border-b border-gray-600 outline-none"
         placeholder="搜索..." value={search} onChange={e => setSearch(e.target.value)} />
       {tree.map(n => renderNode(n, 0))}
-      {tree.length === 0 && <div className="p-2 text-xs text-gray-600">未配置组织架构</div>}
+      {status === 'loading' && <div className="p-2 text-xs text-gray-600">加载中...</div>}
+      {status === 'empty' && <div className="p-2 text-xs text-gray-600">未配置组织架构 — 后端未连接 LDAP 或无用户数据</div>}
     </div>
   );
 }
