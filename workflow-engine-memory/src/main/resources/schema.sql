@@ -41,6 +41,25 @@ CREATE TABLE IF NOT EXISTS task (
   completed_at BIGINT NULL
 );
 
+CREATE TABLE IF NOT EXISTS draft (
+  id VARCHAR(8) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  nodes_json MEDIUMTEXT,
+  edges_json MEDIUMTEXT,
+  version INT DEFAULT 1,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS definition (
+  id VARCHAR(255) NOT NULL,
+  version INT NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  name VARCHAR(255),
+  positions_json TEXT,
+  PRIMARY KEY (user_id, id, version)
+);
+
 CREATE TABLE IF NOT EXISTS historic_activity (
   id VARCHAR(36) PRIMARY KEY,
   instance_id VARCHAR(36) NOT NULL,

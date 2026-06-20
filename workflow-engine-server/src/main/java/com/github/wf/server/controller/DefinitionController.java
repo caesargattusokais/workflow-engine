@@ -6,10 +6,12 @@ import com.github.wf.model.*;
 import com.github.wf.model.node.*;
 import com.github.wf.server.dto.GraphResponse;
 import com.github.wf.server.dto.DeployRequest;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/definitions")
@@ -17,72 +19,73 @@ import java.util.stream.Collectors;
 public class DefinitionController {
 
     private final WorkflowEngine engine;
-    private final Map<String, ProcessDefinition> store = new LinkedHashMap<>();
-    private final Map<String, Map<String, Map<String, Double>>> positionsStore = new LinkedHashMap<>();
+    private final JdbcTemplate jdbc;
+    private static final Gson gson = new Gson();
 
-    public DefinitionController(WorkflowEngine engine) {
+    public DefinitionController(WorkflowEngine engine, JdbcTemplate jdbc) {
         this.engine = engine;
+        this.jdbc = jdbc;
         engine.setProcessParser(new YamlProcessParser());
     }
-
-    private String key(String userId, String id) { return userId + ":" + id; }
-    private String versionedKey(String userId, String id, int version) { return userId + ":" + id + ":" + version; }
 
     @PostMapping
     public ProcessDefinition deploy(@RequestHeader("X-User-Id") String userId,
                                     @RequestBody DeployRequest req) {
         ProcessDefinition def = engine.deploy(req.getYaml());
-        // Store by version so old instances see their original graph
-        store.put(versionedKey(userId, def.getId(), def.getVersion()), def);
-        // Also update latest reference
-        store.put(key(userId, def.getId()), def);
-        if (req.getPositions() != null) {
-            positionsStore.put(versionedKey(userId, def.getId(), def.getVersion()), req.getPositions());
-            positionsStore.put(key(userId, def.getId()), req.getPositions());
-        }
+        String positionsJson = req.getPositions() != null ? gson.toJson(req.getPositions()) : null;
+        jdbc.update(
+            "INSERT INTO definition (id, version, user_id, name, positions_json) VALUES (?, ?, ?, ?, ?) " +
+            "ON DUPLICATE KEY UPDATE name = VALUES(name), positions_json = VALUES(positions_json)",
+            def.getId(), def.getVersion(), userId, def.getName(), positionsJson);
         return def;
     }
 
     @GetMapping
     public List<ProcessDefinition> list(@RequestHeader("X-User-Id") String userId) {
-        // Collect latest version per definition id
         Map<String, ProcessDefinition> latest = new LinkedHashMap<>();
-        String prefix = userId + ":";
-        for (var entry : store.entrySet()) {
-            if (!entry.getKey().startsWith(prefix)) continue;
-            ProcessDefinition def = entry.getValue();
-            latest.merge(def.getId(), def, (a, b) -> a.getVersion() >= b.getVersion() ? a : b);
-        }
+        jdbc.query(
+            "SELECT id, version, name FROM definition WHERE user_id = ? ORDER BY id, version DESC",
+            (rs) -> {
+                String id = rs.getString("id");
+                latest.putIfAbsent(id, new ProcessDefinition(id, rs.getString("name"), rs.getInt("version"), List.of(), List.of()));
+            }, userId);
         return new ArrayList<>(latest.values());
     }
 
     @GetMapping("/{id}")
     public ProcessDefinition get(@RequestHeader("X-User-Id") String userId,
                                   @PathVariable("id") String id) {
-        ProcessDefinition def = store.get(key(userId, id));
-        if (def == null) throw new RuntimeException("Not found: " + id);
-        return def;
+        List<ProcessDefinition> list = jdbc.query(
+            "SELECT id, version, name FROM definition WHERE user_id = ? AND id = ? ORDER BY version DESC LIMIT 1",
+            (rs, rowNum) -> new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                rs.getInt("version"), List.of(), List.of()),
+            userId, id);
+        if (list.isEmpty()) throw new RuntimeException("Not found: " + id);
+        return list.get(0);
     }
 
     @GetMapping("/{id}/graph")
     public GraphResponse graph(@RequestHeader("X-User-Id") String userId,
                                 @PathVariable("id") String id,
                                 @RequestParam(value = "version", required = false) Integer version) {
-        ProcessDefinition def = null;
-        if (version != null) {
-            // Try exact version first, fall back to latest
-            def = store.get(versionedKey(userId, id, version));
-        }
-        if (def == null) {
-            def = store.get(key(userId, id)); // latest
-        }
-        if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
+        ProcessDefinition def;
         Map<String, Map<String, Double>> positions = null;
         if (version != null) {
-            positions = positionsStore.get(versionedKey(userId, id, version));
+            def = engine.processRepository.findLatestById(id); // fallback
+        } else {
+            def = engine.processRepository.findLatestById(id);
         }
-        if (positions == null) {
-            positions = positionsStore.get(key(userId, id));
+        if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
+        // Load positions from DB
+        String sql = version != null
+            ? "SELECT positions_json FROM definition WHERE user_id = ? AND id = ? AND version = ?"
+            : "SELECT positions_json FROM definition WHERE user_id = ? AND id = ? ORDER BY version DESC LIMIT 1";
+        List<Object> params = new ArrayList<>(List.of(userId, id));
+        if (version != null) params.add(version);
+        List<String> posList = jdbc.query(sql, (rs, rowNum) -> rs.getString("positions_json"), params.toArray());
+        String posJson = posList.isEmpty() ? null : posList.get(0);
+        if (posJson != null) {
+            positions = gson.fromJson(posJson, new TypeToken<Map<String, Map<String, Double>>>() {}.getType());
         }
         return convertToGraph(def, positions);
     }
@@ -90,8 +93,7 @@ public class DefinitionController {
     @DeleteMapping("/{id}")
     public void delete(@RequestHeader("X-User-Id") String userId,
                        @PathVariable("id") String id) {
-        store.remove(key(userId, id));
-        positionsStore.remove(key(userId, id));
+        jdbc.update("DELETE FROM definition WHERE user_id = ? AND id = ?", userId, id);
     }
 
     private GraphResponse convertToGraph(ProcessDefinition def, Map<String, Map<String, Double>> positions) {
