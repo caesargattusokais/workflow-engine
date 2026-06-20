@@ -96,24 +96,7 @@ public class UserTaskRunner implements NodeRunner {
 
         // Evaluate assignee expression or use literal
         if (userTask.getAssignee() != null) {
-            String assigneeExpr = userTask.getAssignee();
-            if (assigneeExpr.startsWith("${") && assigneeExpr.endsWith("}")) {
-                assigneeExpr = assigneeExpr.substring(2, assigneeExpr.length() - 1);
-                // Support ${variable}.manager → resolve variable then look up manager via OrgService
-                if (assigneeExpr.endsWith(".manager") && orgService != null) {
-                    String varName = assigneeExpr.substring(0, assigneeExpr.length() - 8);
-                    Object val = context.getExpressionEvaluator().evaluate(varName, variables);
-                    if (val != null) {
-                        String mgr = orgService.getManager(val.toString());
-                        task.setAssignee(mgr != null ? mgr : val.toString());
-                    }
-                } else {
-                    Object assignee = context.getExpressionEvaluator().evaluate(assigneeExpr, variables);
-                    task.setAssignee(assignee != null ? assignee.toString() : null);
-                }
-            } else {
-                task.setAssignee(assigneeExpr);
-            }
+            task.setAssignee(resolveAssignee(userTask.getAssignee(), variables, context.getExpressionEvaluator()));
         }
 
         task.setCandidateGroups(userTask.getCandidateGroups());
@@ -168,5 +151,84 @@ public class UserTaskRunner implements NodeRunner {
         }
 
         return true;
+    }
+
+    /**
+     * Resolve an assignee expression:
+     *   ${var}                  → evaluate SpEL variable
+     *   ${var}.manager          → resolve var → getManager (1 level)
+     *   ${var}.manager.manager  → resolve var → getManager(2 levels)
+     *   group:name              → assign to candidate group (returns null, sets group)
+     *   role:roleName:context   → resolveRole(role, context)
+     *   literal                 → use directly as uid
+     */
+    private String resolveAssignee(String expr, Map<String, Object> variables,
+                                    com.github.wf.expression.ExpressionEvaluator eval) {
+        // ── group:xxx → return null, caller adds to candidateGroups ──
+        if (expr.startsWith("group:") && expr.length() > 6) {
+            return null; // group name used as candidate group, not assignee
+        }
+
+        // ── role:roleName:context → resolve via OrgService ──
+        if (expr.startsWith("role:") && orgService != null) {
+            String rest = expr.substring(5);
+            int colon = rest.indexOf(':');
+            if (colon > 0) {
+                String role = rest.substring(0, colon);
+                String ctx = rest.substring(colon + 1);
+                // ctx may be a variable like ${department}
+                ctx = interpolateVars(ctx, variables, eval);
+                String uid = orgService.resolveRole(role, ctx);
+                if (uid != null) return uid;
+            }
+        }
+
+        // ── ${var} or ${var}.manager... ──
+        if (expr.startsWith("${") && expr.contains("}")) {
+            int end = expr.indexOf('}');
+            String varPart = expr.substring(2, end);
+            String suffix = expr.substring(end + 1); // .manager or .manager.manager etc.
+
+            // Resolve variable
+            Object val = eval.evaluate(varPart, variables);
+            if (val == null) return null;
+            String uid = val.toString();
+
+            // Parse suffix for manager levels
+            if (orgService != null && suffix.startsWith(".manager")) {
+                int levels = 1;
+                String rest = suffix.substring(8); // after ".manager"
+                while (rest.startsWith(".manager")) {
+                    levels++;
+                    rest = rest.substring(8);
+                }
+                String mgr = orgService.getManager(uid, levels);
+                return mgr != null ? mgr : uid; // fallback to self if manager not found
+            }
+            return uid;
+        }
+
+        // ── literal uid ──
+        return expr;
+    }
+
+    /** Simple ${var} interpolation in template strings */
+    private String interpolateVars(String template, Map<String, Object> vars,
+                                    com.github.wf.expression.ExpressionEvaluator eval) {
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        while (i < template.length()) {
+            if (template.startsWith("${", i)) {
+                int end = template.indexOf('}', i + 2);
+                if (end < 0) { sb.append(template.substring(i)); break; }
+                String varName = template.substring(i + 2, end);
+                Object val = eval.evaluate(varName, vars);
+                sb.append(val != null ? val.toString() : "");
+                i = end + 1;
+            } else {
+                sb.append(template.charAt(i++));
+            }
+        }
+        return sb.toString();
     }
 }

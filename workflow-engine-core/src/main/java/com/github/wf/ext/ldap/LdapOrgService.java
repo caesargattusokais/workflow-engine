@@ -129,6 +129,64 @@ public class LdapOrgService implements OrgService {
         return u != null ? u.getManager() : null;
     }
 
+    @Override
+    public List<String> getReports(String uid) {
+        List<String> reports = new ArrayList<>();
+        try {
+            DirContext ctx = connect();
+            try {
+                String userDn = getUserDn(ctx, uid);
+                if (userDn == null) return reports;
+                SearchControls sc = new SearchControls();
+                sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                sc.setReturningAttributes(new String[]{"sAMAccountName"});
+                // AD: manager attribute contains DN. LDAP: may use directReports
+                NamingEnumeration<SearchResult> results = ctx.search(userBase,
+                    "(&(objectClass=user)(manager=" + escape(userDn) + "))", sc);
+                while (results.hasMore()) {
+                    String rUid = attr(results.next().getAttributes(), "sAMAccountName", null);
+                    if (rUid != null) reports.add(rUid);
+                }
+            } finally { ctx.close(); }
+        } catch (NamingException ignored) {}
+        return reports;
+    }
+
+    @Override
+    public boolean isGroupMember(String uid, String group) {
+        // Check direct membership first, then recursive (AD tokenGroups)
+        if (getGroups(uid).contains(group)) return true;
+        // Recursive: check if any parent group contains the user
+        try {
+            DirContext ctx = connect();
+            try {
+                String userDn = getUserDn(ctx, uid);
+                if (userDn == null) return false;
+                SearchControls sc = new SearchControls();
+                sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                sc.setReturningAttributes(new String[]{"cn"});
+                // AD recursive: use member:1.2.840.113556.1.4.1941 (LDAP_MATCHING_RULE_IN_CHAIN)
+                String filter = "(&(objectClass=group)(cn=" + escape(group)
+                    + ")(member:1.2.840.113556.1.4.1941:=" + escape(userDn) + "))";
+                NamingEnumeration<SearchResult> results = ctx.search(groupBase, filter, sc);
+                return results.hasMore();
+            } finally { ctx.close(); }
+        } catch (NamingException ignored) {}
+        return false;
+    }
+
+    @Override
+    public String resolveRole(String role, String context) {
+        // Look up a group named like "role-approver-dept-engineering"
+        // or "app-approver-engineering"
+        String groupName = "role-" + role;
+        if (context != null && !context.isEmpty()) {
+            groupName += "-" + context.replaceAll("[^a-zA-Z0-9]", "-");
+        }
+        List<String> members = getGroupMembers(groupName);
+        return members.isEmpty() ? null : members.get(0);
+    }
+
     // -- helpers --
 
     private String getUserDn(DirContext ctx, String uid) throws NamingException {
