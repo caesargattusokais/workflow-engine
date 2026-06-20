@@ -25,12 +25,15 @@ public class EngineConfig {
     @Profile("!memory")
     public WorkflowEngine workflowEngine(DataSource dataSource) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-        return WorkflowEngine.builder()
+        WorkflowEngine engine = WorkflowEngine.builder()
                 .processRepository(new JdbcProcessRepository(jdbc))
                 .instanceRepository(new JdbcInstanceRepository(jdbc))
                 .taskRepository(new JdbcTaskRepository(jdbc))
                 .baseUrl(baseUrl)
                 .build();
+        // Recover pending timer/retry executions after restart
+        engine.recover();
+        return engine;
     }
 
     @Bean

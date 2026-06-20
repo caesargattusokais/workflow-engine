@@ -55,6 +55,12 @@ public class InstanceController {
         return engine.history(id);
     }
 
+    @PostMapping("/recover")
+    public Map<String, Object> recover() {
+        engine.recover();
+        return Map.of("status", "ok", "message", "Recovery triggered — check logs for details");
+    }
+
     @PostMapping("/{id}/resume")
     public InstanceDetailResponse resume(@PathVariable("id") String id) {
         engine.resume(id);

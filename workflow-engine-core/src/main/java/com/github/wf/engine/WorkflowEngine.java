@@ -72,6 +72,35 @@ public class WorkflowEngine {
 
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
 
+    /**
+     * Recover pending timer/retry executions after server restart.
+     * Scans all RUNNING instances for WAITING+TIMER_PENDING or WAITING+RETRY_PENDING
+     * executions and re-triggers them so the daemon can pick them up.
+     */
+    public void recover() {
+        log.warn("Starting recovery scan...");
+        int count = 0;
+        List<ProcessInstance> all = instanceRepository.findAll();
+        for (ProcessInstance inst : all) {
+            if (!inst.isRunning()) continue;
+            List<Execution> execs = instanceRepository.findActiveExecutions(inst.getId());
+            for (Execution exec : execs) {
+                if (exec.isWaiting() && ("TIMER_PENDING".equals(exec.getRetryState())
+                        || "RETRY_PENDING".equals(exec.getRetryState()))) {
+                    log.warn("Recovering pending execution: instance=" + inst.getId()
+                            + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
+                    // Re-trigger immediately — the runner will re-evaluate and re-schedule if needed
+                    exec.setStatus(ExecutionStatus.ACTIVE);
+                    exec.setRetryState(null);
+                    instanceRepository.updateExecution(exec);
+                    trigger(inst.getId());
+                    count++;
+                }
+            }
+        }
+        log.warn("Recovery complete: " + count + " executions re-triggered");
+    }
+
     public void setProcessParser(ProcessParser processParser) { this.processParser = processParser; }
 
     /**
