@@ -1,0 +1,54 @@
+id: leave-approval
+name: '请假审批'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: apply
+    type: userTask
+    name: 提交请假申请
+    assignee: "${applicant}"
+  - id: gateway
+    type: exclusiveGateway
+    name: 天数判断
+  - id: manager
+    type: userTask
+    name: 经理审批
+    assignee: manager
+    boundaryTimer: "PT30M"
+  - id: director
+    type: userTask
+    name: 总监审批
+    assignee: director
+  - id: hr
+    type: userTask
+    name: HR备案
+    assignee: hr
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: apply
+  - from: apply
+    to: gateway
+  - from: gateway
+    to: manager
+    type: conditional
+    expr: "days <= 3"
+  - from: gateway
+    to: director
+    type: conditional
+    expr: "days > 3"
+  - from: manager
+    to: hr
+  - from: manager
+    to: escalation
+    type: timeout
+  - from: director
+    to: hr
+  - from: hr
+    to: end
+  - from: escalation
+    to: end

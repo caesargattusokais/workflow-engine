@@ -1,0 +1,60 @@
+id: contract-review
+name: '合同审批'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: draft
+    type: userTask
+    name: 起草合同
+    assignee: "${applicant}"
+  - id: check
+    type: serviceTask
+    name: 合同合规检查
+    handlerClass: com.myapp.ContractComplianceHandler
+  - id: gateway
+    type: exclusiveGateway
+    name: 金额判断
+  - id: legal
+    type: userTask
+    name: 法务审批
+    assignee: legal
+    boundaryTimer: "PT1H"
+  - id: ceo
+    type: userTask
+    name: CEO审批
+    assignee: ceo
+  - id: sign
+    type: userTask
+    name: 盖章归档
+    assignee: admin
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: draft
+  - from: draft
+    to: check
+  - from: check
+    to: gateway
+  - from: gateway
+    to: legal
+    type: conditional
+    expr: "amount <= 100000"
+  - from: gateway
+    to: ceo
+    type: conditional
+    expr: "amount > 100000"
+  - from: legal
+    to: sign
+  - from: legal
+    to: escalation
+    type: timeout
+  - from: ceo
+    to: sign
+  - from: sign
+    to: end
+  - from: escalation
+    to: end

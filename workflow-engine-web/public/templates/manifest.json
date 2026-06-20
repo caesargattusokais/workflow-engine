@@ -1,0 +1,7 @@
+[
+  { "file": "leave-approval.yaml", "name": "请假审批", "desc": "员工请假 → 3天内经理批，超3天总监批 → HR备案，30分钟超时升级" },
+  { "file": "expense-claim.yaml", "name": "报销审批", "desc": "提交报销 → 金额校验 → 1000以内经理批，超1000财务批" },
+  { "file": "purchase-order.yaml", "name": "采购审批", "desc": "采购申请 → 5000以内经理批，以上总监批 → 财务+法务并行审核" },
+  { "file": "onboarding.yaml", "name": "新员工入职", "desc": "入职前一天定时触发 → HR准备 → IT开账号 → 领导分配mentor" },
+  { "file": "contract-review.yaml", "name": "合同审批", "desc": "起草合同 → 合规检查 → 10万以内法务批，以上CEO批，1小时超时升级" }
+]

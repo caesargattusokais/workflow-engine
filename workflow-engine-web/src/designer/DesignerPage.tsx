@@ -37,6 +37,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [showYaml, setShowYaml] = useState(false);
   const [deployedId, setDeployedId] = useState<string | null>(null);
   const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
 
   const [instances, setInstances] = useState<any[]>([]);
 
@@ -170,6 +172,27 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       }
     };
     input.click();
+  };
+
+  const loadTemplates = async () => {
+    try {
+      const res = await fetch('/templates/manifest.json');
+      setTemplates(await res.json());
+      setShowTemplates(true);
+    } catch { alert('加载模板列表失败'); }
+  };
+
+  const importTemplate = async (file: string) => {
+    try {
+      const res = await fetch(`/templates/${file}`);
+      const yaml = await res.text();
+      const { name, nodes: importedNodes, edges: importedEdges } = yamlToGraph(yaml);
+      const d = await importDraft(name, importedNodes, importedEdges);
+      setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
+      setActiveId(d.id);
+      setShowTemplates(false);
+      setToast(`Imported: ${name}`);
+    } catch (e: any) { alert('Import failed: ' + e.message); }
   };
 
   const switchDraft = (id: string) => setActiveId(id);
@@ -315,6 +338,10 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
           <div className="p-2 border-b border-gray-700 flex items-center gap-1">
             <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
+            <button onClick={loadTemplates}
+              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title="模板">
+              T
+            </button>
             <button onClick={importYamlAction}
               className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title="导入 YAML">
               {t.designer.import}
@@ -407,6 +434,35 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         />
         <PropertyPanel node={selectedNode} onChange={handleNodeChange} edges={edges} onEdgesChange={setEdges} />
       </div>
+
+      {/* Template Browser Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+          onClick={() => setShowTemplates(false)}>
+          <div className="bg-gray-800 rounded-lg shadow-2xl w-[600px] max-h-[80vh] overflow-y-auto p-6"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg text-gray-200 font-bold">流程模板</h2>
+              <button onClick={() => setShowTemplates(false)}
+                className="text-gray-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {templates.map((tpl: any) => (
+                <div key={tpl.file} className="bg-gray-750 border border-gray-600 rounded-lg p-4 hover:border-purple-500 transition-colors">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-gray-200 font-semibold">{tpl.name}</span>
+                    <button onClick={() => importTemplate(tpl.file)}
+                      className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1 rounded">
+                      使用此模板
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">{tpl.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

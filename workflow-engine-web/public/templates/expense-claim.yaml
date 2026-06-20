@@ -1,0 +1,48 @@
+id: expense-claim
+name: '报销审批'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: apply
+    type: userTask
+    name: 提交报销单
+    assignee: "${applicant}"
+  - id: check
+    type: serviceTask
+    name: 金额校验
+    handlerClass: com.myapp.ExpenseCheckHandler
+  - id: gateway
+    type: exclusiveGateway
+    name: 金额判断
+  - id: manager
+    type: userTask
+    name: 经理审批
+    assignee: manager
+  - id: finance
+    type: userTask
+    name: 财务审批
+    assignee: finance
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: apply
+  - from: apply
+    to: check
+  - from: check
+    to: gateway
+  - from: gateway
+    to: manager
+    type: conditional
+    expr: "amount <= 1000"
+  - from: gateway
+    to: finance
+    type: conditional
+    expr: "amount > 1000"
+  - from: manager
+    to: end
+  - from: finance
+    to: end

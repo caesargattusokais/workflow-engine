@@ -1,0 +1,61 @@
+id: purchase-order
+name: '采购审批'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: apply
+    type: userTask
+    name: 提交采购申请
+    assignee: "${applicant}"
+  - id: gateway1
+    type: exclusiveGateway
+    name: 金额判断
+  - id: manager
+    type: userTask
+    name: 部门经理审批
+    assignee: manager
+  - id: director
+    type: userTask
+    name: 总监审批
+    assignee: director
+  - id: gateway2
+    type: parallelGateway
+    name: 并行
+  - id: finance
+    type: userTask
+    name: 财务审核
+    assignee: finance
+  - id: legal
+    type: userTask
+    name: 法务审核
+    assignee: legal
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: apply
+  - from: apply
+    to: gateway1
+  - from: gateway1
+    to: manager
+    type: conditional
+    expr: "amount <= 5000"
+  - from: gateway1
+    to: director
+    type: conditional
+    expr: "amount > 5000"
+  - from: manager
+    to: gateway2
+  - from: director
+    to: gateway2
+  - from: gateway2
+    to: finance
+  - from: gateway2
+    to: legal
+  - from: finance
+    to: end
+  - from: legal
+    to: end

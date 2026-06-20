@@ -1,0 +1,37 @@
+id: onboarding
+name: '新员工入职'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 入职触发
+  - id: timer
+    type: timer
+    name: 入职前一天
+    duration: "PT5M"
+  - id: hr
+    type: userTask
+    name: HR准备材料
+    assignee: hr
+  - id: it
+    type: userTask
+    name: IT开通账号
+    assignee: it
+  - id: manager
+    type: userTask
+    name: 直属领导分配mentor
+    assignee: manager
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: timer
+  - from: timer
+    to: hr
+  - from: hr
+    to: it
+  - from: it
+    to: manager
+  - from: manager
+    to: end
