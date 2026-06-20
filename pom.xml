@@ -15,6 +15,7 @@
     <modules>
         <module>workflow-engine-core</module>
         <module>workflow-engine-memory</module>
+        <module>workflow-engine-mock-ldap</module>
         <module>workflow-engine-examples</module>
         <module>workflow-engine-server</module>
     </modules>

@@ -34,7 +34,14 @@ public class EngineConfig {
 
     // ── OrgService (LDAP) — only created if ldap.url is configured ──
     @Bean
+    @Profile("mock-ldap")
+    public OrgService mockOrgService() {
+        return new com.github.wf.mockldap.MockOrgService();
+    }
+
+    @Bean
     @ConditionalOnProperty("ldap.url")
+    @Profile("!mock-ldap")
     public OrgService orgService(Environment env) {
         Properties p = new Properties();
         for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","userBase","groupBase"}) {
