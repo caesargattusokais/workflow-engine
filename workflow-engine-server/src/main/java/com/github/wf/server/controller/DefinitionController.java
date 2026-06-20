@@ -45,19 +45,14 @@ public class DefinitionController {
 
     @GetMapping
     public List<ProcessDefinition> list(@RequestHeader("X-User-Id") String userId) {
-        // Deduplicate by id, keep latest version
+        // Collect latest version per definition id
         Map<String, ProcessDefinition> latest = new LinkedHashMap<>();
         String prefix = userId + ":";
-        store.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(prefix) && !e.getKey().contains(":"))
-                .forEach(e -> latest.put(e.getValue().getId(), e.getValue()));
-        // Also include versioned entries to find latest
-        store.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(prefix) && e.getKey().contains(":"))
-                .forEach(e -> {
-                    ProcessDefinition def = e.getValue();
-                    latest.merge(def.getId(), def, (a, b) -> a.getVersion() >= b.getVersion() ? a : b);
-                });
+        for (var entry : store.entrySet()) {
+            if (!entry.getKey().startsWith(prefix)) continue;
+            ProcessDefinition def = entry.getValue();
+            latest.merge(def.getId(), def, (a, b) -> a.getVersion() >= b.getVersion() ? a : b);
+        }
         return new ArrayList<>(latest.values());
     }
 
@@ -73,17 +68,23 @@ public class DefinitionController {
     public GraphResponse graph(@RequestHeader("X-User-Id") String userId,
                                 @PathVariable("id") String id,
                                 @RequestParam(value = "version", required = false) Integer version) {
-        ProcessDefinition def;
-        String posKey;
+        ProcessDefinition def = null;
         if (version != null) {
+            // Try exact version first, fall back to latest
             def = store.get(versionedKey(userId, id, version));
-            posKey = versionedKey(userId, id, version);
-        } else {
-            def = store.get(key(userId, id));
-            posKey = key(userId, id);
+        }
+        if (def == null) {
+            def = store.get(key(userId, id)); // latest
         }
         if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
-        return convertToGraph(def, positionsStore.get(posKey));
+        Map<String, Map<String, Double>> positions = null;
+        if (version != null) {
+            positions = positionsStore.get(versionedKey(userId, id, version));
+        }
+        if (positions == null) {
+            positions = positionsStore.get(key(userId, id));
+        }
+        return convertToGraph(def, positions);
     }
 
     @DeleteMapping("/{id}")
