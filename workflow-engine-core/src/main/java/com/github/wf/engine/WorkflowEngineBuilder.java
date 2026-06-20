@@ -2,6 +2,7 @@ package com.github.wf.engine;
 
 import com.github.wf.expression.ExpressionEvaluator;
 import com.github.wf.expression.SpelExpressionEvaluator;
+import com.github.wf.ext.OrgService;
 import com.github.wf.spi.InstanceRepository;
 import com.github.wf.spi.ProcessRepository;
 import com.github.wf.spi.TaskRepository;
@@ -14,6 +15,7 @@ public class WorkflowEngineBuilder {
     private InstanceRepository instanceRepository;
     private TaskRepository taskRepository;
     private ExpressionEvaluator expressionEvaluator;
+    private OrgService orgService;
     private String baseUrl;
 
     WorkflowEngineBuilder() {}
@@ -38,6 +40,11 @@ public class WorkflowEngineBuilder {
         return this;
     }
 
+    public WorkflowEngineBuilder orgService(OrgService orgService) {
+        this.orgService = orgService;
+        return this;
+    }
+
     public WorkflowEngineBuilder baseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
         return this;
@@ -50,6 +57,6 @@ public class WorkflowEngineBuilder {
         if (expressionEvaluator == null) {
             expressionEvaluator = new SpelExpressionEvaluator();
         }
-        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, baseUrl);
+        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, orgService, baseUrl);
     }
 }

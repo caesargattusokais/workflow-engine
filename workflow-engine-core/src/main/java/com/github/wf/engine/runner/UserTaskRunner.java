@@ -2,6 +2,7 @@ package com.github.wf.engine.runner;
 
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
+import com.github.wf.ext.OrgService;
 import com.github.wf.ext.http.HttpClientUtil;
 import com.github.wf.model.ExecutionStatus;
 import com.github.wf.model.Node;
@@ -26,23 +27,34 @@ public class UserTaskRunner implements NodeRunner {
     private final TaskRepository taskRepository;
     private final BiConsumer<String, Long> scheduler;
     private final String baseUrl;
+    private final OrgService orgService;
 
     public UserTaskRunner(TaskRepository taskRepository) {
         this.taskRepository = Objects.requireNonNull(taskRepository);
         this.scheduler = null;
         this.baseUrl = null;
+        this.orgService = null;
     }
 
     public UserTaskRunner(TaskRepository taskRepository, BiConsumer<String, Long> scheduler) {
         this.taskRepository = Objects.requireNonNull(taskRepository);
         this.scheduler = scheduler;
         this.baseUrl = null;
+        this.orgService = null;
     }
 
     public UserTaskRunner(TaskRepository taskRepository, BiConsumer<String, Long> scheduler, String baseUrl) {
         this.taskRepository = Objects.requireNonNull(taskRepository);
         this.scheduler = scheduler;
         this.baseUrl = baseUrl;
+        this.orgService = null;
+    }
+
+    public UserTaskRunner(TaskRepository taskRepository, BiConsumer<String, Long> scheduler, String baseUrl, OrgService orgService) {
+        this.taskRepository = Objects.requireNonNull(taskRepository);
+        this.scheduler = scheduler;
+        this.baseUrl = baseUrl;
+        this.orgService = orgService;
     }
 
     @Override
@@ -87,8 +99,18 @@ public class UserTaskRunner implements NodeRunner {
             String assigneeExpr = userTask.getAssignee();
             if (assigneeExpr.startsWith("${") && assigneeExpr.endsWith("}")) {
                 assigneeExpr = assigneeExpr.substring(2, assigneeExpr.length() - 1);
-                Object assignee = context.getExpressionEvaluator().evaluate(assigneeExpr, variables);
-                task.setAssignee(assignee != null ? assignee.toString() : null);
+                // Support ${variable}.manager → resolve variable then look up manager via OrgService
+                if (assigneeExpr.endsWith(".manager") && orgService != null) {
+                    String varName = assigneeExpr.substring(0, assigneeExpr.length() - 8);
+                    Object val = context.getExpressionEvaluator().evaluate(varName, variables);
+                    if (val != null) {
+                        String mgr = orgService.getManager(val.toString());
+                        task.setAssignee(mgr != null ? mgr : val.toString());
+                    }
+                } else {
+                    Object assignee = context.getExpressionEvaluator().evaluate(assigneeExpr, variables);
+                    task.setAssignee(assignee != null ? assignee.toString() : null);
+                }
             } else {
                 task.setAssignee(assigneeExpr);
             }

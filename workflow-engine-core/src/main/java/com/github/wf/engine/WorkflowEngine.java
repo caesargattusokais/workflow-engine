@@ -38,13 +38,14 @@ public class WorkflowEngine {
                    InstanceRepository instanceRepository,
                    TaskRepository taskRepository,
                    ExpressionEvaluator expressionEvaluator,
+                   com.github.wf.ext.OrgService orgService,
                    String baseUrl) {
         this.processRepository = processRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
         this.baseUrl = baseUrl;
-        registerDefaultRunners();
+        registerDefaultRunners(orgService);
         // Delay daemon: picks up delayed triggers (retry/timer), wakes instances
         Thread delayDaemon = new Thread(() -> {
             while (true) {
@@ -59,10 +60,10 @@ public class WorkflowEngine {
         delayDaemon.start();
     }
 
-    private void registerDefaultRunners() {
+    private void registerDefaultRunners(com.github.wf.ext.OrgService orgService) {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
-        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay, baseUrl));
+        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay, baseUrl, orgService));
         runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleDelay));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
