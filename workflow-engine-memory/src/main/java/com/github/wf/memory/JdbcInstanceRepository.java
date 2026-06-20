@@ -25,26 +25,25 @@ public class JdbcInstanceRepository implements InstanceRepository {
     // Write-through caches — same references as InMemory mode
     private final Map<String, ProcessInstance> instances = new ConcurrentHashMap<>();
     private final Map<String, Execution> executions = new ConcurrentHashMap<>();
-    private final List<HistoricActivity> history = Collections.synchronizedList(new ArrayList<>());
-
     public JdbcInstanceRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        // Load existing data from DB into cache on startup
-        loadAll();
+        loadRunning();
     }
 
-    private void loadAll() {
-        jdbc.query("SELECT * FROM process_instance", (rs) -> {
+    private void loadRunning() {
+        List<String> runningIds = new ArrayList<>();
+        jdbc.query("SELECT * FROM process_instance WHERE status = 'RUNNING'", (rs) -> {
             ProcessInstance inst = mapInstance(rs);
             instances.put(inst.getId(), inst);
+            runningIds.add(inst.getId());
         });
-        jdbc.query("SELECT * FROM execution", (rs) -> {
-            Execution exec = mapExecution(rs);
-            executions.put(exec.getId(), exec);
-        });
-        jdbc.query("SELECT * FROM historic_activity ORDER BY timestamp ASC", (rs) -> {
-            history.add(mapHistory(rs));
-        });
+        // Only load executions for RUNNING instances
+        for (String id : runningIds) {
+            jdbc.query("SELECT * FROM execution WHERE instance_id = ?", (rs) -> {
+                Execution exec = mapExecution(rs);
+                executions.put(exec.getId(), exec);
+            }, id);
+        }
     }
 
     // ── ProcessInstance ─────────────────
@@ -57,7 +56,13 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public ProcessInstance findById(String id) {
-        return instances.get(id);
+        ProcessInstance inst = instances.get(id);
+        if (inst != null) return inst;
+        // Fallback: query DB for completed/terminated/suspended instances
+        List<ProcessInstance> list = jdbc.query(
+            "SELECT * FROM process_instance WHERE id = ?",
+            (rs, rowNum) -> mapInstance(rs), id);
+        return list.isEmpty() ? null : list.get(0);
     }
 
     @Override
@@ -75,7 +80,14 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public List<ProcessInstance> findAll() {
-        return new ArrayList<>(instances.values());
+        // Cache has all RUNNING instances; query DB for the rest
+        Set<String> cached = new HashSet<>(instances.keySet());
+        List<ProcessInstance> all = new ArrayList<>(instances.values());
+        jdbc.query("SELECT * FROM process_instance WHERE status != 'RUNNING'", (rs) -> {
+            ProcessInstance inst = mapInstance(rs);
+            if (!cached.contains(inst.getId())) all.add(inst);
+        });
+        return all;
     }
 
     @Override
@@ -145,7 +157,6 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public void saveHistoricActivity(HistoricActivity activity) {
-        history.add(activity);
         jdbc.update(
             "INSERT INTO historic_activity (id, instance_id, node_id, node_name, node_type, executor, action, timestamp, comment) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -157,9 +168,9 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public List<HistoricActivity> findHistory(String instanceId) {
-        return history.stream()
-                .filter(h -> h.getInstanceId().equals(instanceId))
-                .toList();
+        return jdbc.query(
+            "SELECT * FROM historic_activity WHERE instance_id = ? ORDER BY timestamp ASC",
+            (rs, rowNum) -> mapHistory(rs), instanceId);
     }
 
     // ── Mapping helpers ──────────────────
@@ -177,7 +188,7 @@ public class JdbcInstanceRepository implements InstanceRepository {
         // Preserve original timestamps
         long created = rs.getLong("created_at");
         long completed = rs.getLong("completed_at");
-        ProcessInstance inst = new ProcessInstance(id, defId, defVer, vars);
+        ProcessInstance inst = new ProcessInstance(id, defId, defVer, vars, Instant.ofEpochMilli(created), Instant.ofEpochMilli(completed));
         inst.setStatus(InstanceStatus.valueOf(rs.getString("status")));
         String activeJson = rs.getString("active_node_ids_json");
         if (activeJson != null && !activeJson.isEmpty()) {
