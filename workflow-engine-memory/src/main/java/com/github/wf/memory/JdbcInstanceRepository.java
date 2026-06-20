@@ -67,7 +67,14 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public void update(ProcessInstance instance) {
-        instances.put(instance.getId(), instance); // same ref
+        if (instance.isRunning()) {
+            instances.put(instance.getId(), instance);
+        } else {
+            // Evict from cache — no longer running, engine won't modify it anymore
+            instances.remove(instance.getId());
+            // Also evict its executions
+            executions.values().removeIf(e -> e.getInstanceId().equals(instance.getId()));
+        }
         writeToDb(instance);
     }
 
