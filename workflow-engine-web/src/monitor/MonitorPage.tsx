@@ -170,6 +170,7 @@ export default function MonitorPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance}
+          defNames={Object.fromEntries(definitions.map((d:any) => [d.id, d.name || d.id]))}
           onTerminate={async (id) => { await terminateInstance(id); listInstances().then(setInstances); }}
           onResume={async (id) => { await resumeInstance(id); listInstances().then(setInstances); loadInstance(id); }}
           onDelete={async (id) => { await deleteInstance(id); listInstances().then(setInstances); setSelectedId(null); }}

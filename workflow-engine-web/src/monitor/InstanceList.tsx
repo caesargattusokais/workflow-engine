@@ -7,8 +7,8 @@ interface Instance {
   activeNodeIds: string[];
 }
 
-export default function InstanceList({ onSelect, selectedId, instances, onTerminate, onResume, onDelete, onRestart }:
-    { onSelect: (id: string) => void; selectedId: string | null; instances: Instance[];
+export default function InstanceList({ onSelect, selectedId, instances, defNames, onTerminate, onResume, onDelete, onRestart }:
+    { onSelect: (id: string) => void; selectedId: string | null; instances: Instance[]; defNames: Record<string, string>;
       onTerminate: (id: string) => void; onResume: (id: string) => void;
       onDelete: (id: string) => void; onRestart: (id: string) => void; }) {
 
@@ -58,7 +58,7 @@ export default function InstanceList({ onSelect, selectedId, instances, onTermin
         <div key={defId} className="mb-2">
           <div className="text-[10px] text-gray-500 px-1 mb-0.5 font-semibold truncate cursor-pointer hover:text-gray-300"
             onClick={() => setCollapsed(prev => ({...prev, [defId]: !prev[defId]}))}>
-            {collapsed[defId] ? '▸' : '▾'} {defId} ({insts.length})
+            {collapsed[defId] ? '▸' : '▾'} {defNames[defId] || defId} ({insts.length})
           </div>
           {!collapsed[defId] && insts.map(inst => (
             <div key={inst.id}
