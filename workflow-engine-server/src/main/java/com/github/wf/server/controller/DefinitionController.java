@@ -2,7 +2,7 @@ package com.github.wf.server.controller;
 
 import com.github.wf.dsl.YamlProcessParser;
 import com.github.wf.engine.WorkflowEngine;
-import com.github.wf.memory.JdbcDefinitionRepository;
+import com.github.wf.memory.DefinitionRepository;
 import com.github.wf.model.*;
 import com.github.wf.model.node.*;
 import com.github.wf.server.dto.GraphResponse;
@@ -17,9 +17,9 @@ import java.util.*;
 public class DefinitionController {
 
     private final WorkflowEngine engine;
-    private final JdbcDefinitionRepository repo;
+    private final DefinitionRepository repo;
 
-    public DefinitionController(WorkflowEngine engine, JdbcDefinitionRepository repo) {
+    public DefinitionController(WorkflowEngine engine, DefinitionRepository repo) {
         this.engine = engine;
         this.repo = repo;
         engine.setProcessParser(new YamlProcessParser());

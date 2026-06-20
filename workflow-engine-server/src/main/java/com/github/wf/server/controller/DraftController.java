@@ -1,6 +1,6 @@
 package com.github.wf.server.controller;
 
-import com.github.wf.memory.JdbcDraftRepository;
+import com.github.wf.memory.DraftRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -10,9 +10,9 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class DraftController {
 
-    private final JdbcDraftRepository repo;
+    private final DraftRepository repo;
 
-    public DraftController(JdbcDraftRepository repo) {
+    public DraftController(DraftRepository repo) {
         this.repo = repo;
     }
 

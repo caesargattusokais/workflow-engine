@@ -10,7 +10,7 @@ import java.util.*;
 /**
  * JDBC repository for definitions metadata — used by DefinitionController.
  */
-public class JdbcDefinitionRepository {
+public class JdbcDefinitionRepository implements DefinitionRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();

@@ -1,6 +1,10 @@
 package com.github.wf.server.config;
 
 import com.github.wf.engine.WorkflowEngine;
+import com.github.wf.memory.DefinitionRepository;
+import com.github.wf.memory.DraftRepository;
+import com.github.wf.memory.InMemoryDefinitionRepository;
+import com.github.wf.memory.InMemoryDraftRepository;
 import com.github.wf.memory.InMemoryInstanceRepository;
 import com.github.wf.memory.InMemoryProcessRepository;
 import com.github.wf.memory.InMemoryTaskRepository;
@@ -50,12 +54,26 @@ public class EngineConfig {
     }
 
     @Bean
-    public JdbcDraftRepository draftRepository(DataSource dataSource) {
+    @Profile("!memory")
+    public DraftRepository draftRepository(DataSource dataSource) {
         return new JdbcDraftRepository(new JdbcTemplate(dataSource));
     }
 
     @Bean
-    public JdbcDefinitionRepository definitionRepository(DataSource dataSource) {
+    @Profile("memory")
+    public DraftRepository draftRepositoryMemory() {
+        return new InMemoryDraftRepository();
+    }
+
+    @Bean
+    @Profile("!memory")
+    public DefinitionRepository definitionRepository(DataSource dataSource) {
         return new JdbcDefinitionRepository(new JdbcTemplate(dataSource));
+    }
+
+    @Bean
+    @Profile("memory")
+    public DefinitionRepository definitionRepositoryMemory() {
+        return new InMemoryDefinitionRepository();
     }
 }

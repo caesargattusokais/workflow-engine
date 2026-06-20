@@ -9,7 +9,7 @@ import java.util.*;
 /**
  * JDBC repository for drafts — used by DraftController.
  */
-public class JdbcDraftRepository {
+public class JdbcDraftRepository implements DraftRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();
