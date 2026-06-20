@@ -35,7 +35,7 @@ class DefinitionControllerTest {
                 """);
         ctrl.deploy("test-user", req);
 
-        GraphResponse graph = ctrl.graph("test-user", "test");
+        GraphResponse graph = ctrl.graph("test-user", "test",1);
         assertThat(graph.getNodes()).hasSize(2);
         assertThat(graph.getEdges()).hasSize(1);
         assertThat(graph.getNodes().get(0).getType()).isEqualTo("startEvent");
