@@ -8,3 +8,5 @@ target/
 .settings/
 .project
 .classpath
+/docker/ldap_data/
+/docker/ldap_config/
