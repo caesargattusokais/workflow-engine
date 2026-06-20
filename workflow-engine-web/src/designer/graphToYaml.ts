@@ -9,9 +9,10 @@ function y(s: string): string {
 
 interface ConditionItem { expr: string; to: string; isDefault: boolean; }
 
-export function graphToYaml(nodes: Node[], edges: Edge[], name = 'workflow', version = 1): string {
+export function graphToYaml(nodes: Node[], edges: Edge[], defId: string, defName: string, version = 1): string {
   const lines: string[] = [];
-  lines.push(`id: ${name}`);
+  lines.push(`id: ${defId}`);
+  lines.push(`name: ${y(defName)}`);
   lines.push(`version: ${version}`);
   lines.push('nodes:');
 

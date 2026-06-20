@@ -74,7 +74,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   // Live-refresh YAML panel while open
   useEffect(() => {
     if (showYaml && activeDraft) {
-      setDeployedYaml(graphToYaml(nodes, edges, activeDraft.name, activeDraft.version || 1));
+      setDeployedYaml(graphToYaml(nodes, edges, activeDraft.id, activeDraft.name, activeDraft.version || 1));
     }
   }, [nodes, edges, showYaml]);
 
@@ -141,7 +141,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   const downloadYaml = (draft: Draft) => {
     const d = draft.id === activeId ? { ...draft, nodes, edges } : draft;
-    const yaml = graphToYaml(d.nodes, d.edges, d.name);
+    const yaml = graphToYaml(d.nodes, d.edges, d.id, d.name);
     const blob = new Blob([yaml], { type: 'text/yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -190,7 +190,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const handleDeploy = async () => {
     if (nodes.length === 0) { setToast(t.designer.addNodes); return; }
     try {
-      const yaml = graphToYaml(nodes, edges, activeDraft?.name || 'workflow', activeDraft?.version || 1);
+      const yaml = graphToYaml(nodes, edges, activeDraft?.id || 'workflow', activeDraft?.name || 'workflow', activeDraft?.version || 1);
       const positions: Record<string, {x:number;y:number}> = {};
       for (const n of nodes) positions[n.id] = n.position;
       const result = await deployDefinition(yaml, positions);
@@ -368,7 +368,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               </div>
               <button onClick={() => {
                 const d = draftMenu.draft.id === activeId ? { ...draftMenu.draft, nodes, edges } : draftMenu.draft;
-                const yaml = graphToYaml(d.nodes, d.edges, d.name);
+                const yaml = graphToYaml(d.nodes, d.edges, d.id, d.name);
                 setDeployedYaml(yaml);
                 setShowYaml(true);
                 setToast(`YAML for: ${draftMenu.draft.name}`);
