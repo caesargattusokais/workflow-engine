@@ -26,13 +26,18 @@ public class DefinitionController {
     }
 
     private String key(String userId, String id) { return userId + ":" + id; }
+    private String versionedKey(String userId, String id, int version) { return userId + ":" + id + ":" + version; }
 
     @PostMapping
     public ProcessDefinition deploy(@RequestHeader("X-User-Id") String userId,
                                     @RequestBody DeployRequest req) {
         ProcessDefinition def = engine.deploy(req.getYaml());
+        // Store by version so old instances see their original graph
+        store.put(versionedKey(userId, def.getId(), def.getVersion()), def);
+        // Also update latest reference
         store.put(key(userId, def.getId()), def);
         if (req.getPositions() != null) {
+            positionsStore.put(versionedKey(userId, def.getId(), def.getVersion()), req.getPositions());
             positionsStore.put(key(userId, def.getId()), req.getPositions());
         }
         return def;
@@ -40,11 +45,20 @@ public class DefinitionController {
 
     @GetMapping
     public List<ProcessDefinition> list(@RequestHeader("X-User-Id") String userId) {
+        // Deduplicate by id, keep latest version
+        Map<String, ProcessDefinition> latest = new LinkedHashMap<>();
         String prefix = userId + ":";
-        return store.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(prefix))
-                .map(Map.Entry::getValue)
-                .collect(Collectors.toList());
+        store.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(prefix) && !e.getKey().contains(":"))
+                .forEach(e -> latest.put(e.getValue().getId(), e.getValue()));
+        // Also include versioned entries to find latest
+        store.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(prefix) && e.getKey().contains(":"))
+                .forEach(e -> {
+                    ProcessDefinition def = e.getValue();
+                    latest.merge(def.getId(), def, (a, b) -> a.getVersion() >= b.getVersion() ? a : b);
+                });
+        return new ArrayList<>(latest.values());
     }
 
     @GetMapping("/{id}")
@@ -57,10 +71,19 @@ public class DefinitionController {
 
     @GetMapping("/{id}/graph")
     public GraphResponse graph(@RequestHeader("X-User-Id") String userId,
-                                @PathVariable("id") String id) {
-        ProcessDefinition def = store.get(key(userId, id));
-        if (def == null) throw new RuntimeException("Not found: " + id);
-        return convertToGraph(def, positionsStore.get(key(userId, id)));
+                                @PathVariable("id") String id,
+                                @RequestParam(value = "version", required = false) Integer version) {
+        ProcessDefinition def;
+        String posKey;
+        if (version != null) {
+            def = store.get(versionedKey(userId, id, version));
+            posKey = versionedKey(userId, id, version);
+        } else {
+            def = store.get(key(userId, id));
+            posKey = key(userId, id);
+        }
+        if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
+        return convertToGraph(def, positionsStore.get(posKey));
     }
 
     @DeleteMapping("/{id}")

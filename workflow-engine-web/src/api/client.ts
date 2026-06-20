@@ -61,8 +61,9 @@ export async function completeTask(taskId: string, vars?: Record<string,unknown>
 export async function deployDefinition(yaml: string, positions?: Record<string, {x:number;y:number}>) {
   return apiPost('/definitions', { yaml, positions });
 }
-export async function getDefinitionGraph(definitionId: string) {
-  return apiGet(`/definitions/${encodeURIComponent(definitionId)}/graph`);
+export async function getDefinitionGraph(definitionId: string, version?: number) {
+  const q = version != null ? `?version=${version}` : '';
+  return apiGet(`/definitions/${encodeURIComponent(definitionId)}/graph${q}`);
 }
 
 export async function listDrafts() { return apiGet('/drafts'); }

@@ -35,7 +35,7 @@ export default function MonitorPage() {
         setInstances(prev => prev.map(i => i.id === inst.id ? inst : i));
         // Refresh graph with active nodes
         try {
-          const graph = await getDefinitionGraph(inst.definitionId);
+          const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
           const activeIds: string[] = inst.activeNodeIds || [];
           setNodes((graph.nodes || []).map((n: any) => ({
             ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
@@ -66,7 +66,7 @@ export default function MonitorPage() {
 
     setError(null);
     try {
-      const graph = await getDefinitionGraph(inst.definitionId);
+      const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
       const activeIds: string[] = inst.activeNodeIds || [];
       setNodes((graph.nodes || []).map((n: any) => ({
         ...n,
@@ -85,7 +85,7 @@ export default function MonitorPage() {
     } catch { setHistory([]); }
     // Build node name map from graph
     try {
-      const graph = await getDefinitionGraph(inst.definitionId);
+      const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
       const names: Record<string,string> = {};
       (graph.nodes||[]).forEach((n:any) => { names[n.id] = n.data?.name || n.id; });
       setNodeNames(names);
