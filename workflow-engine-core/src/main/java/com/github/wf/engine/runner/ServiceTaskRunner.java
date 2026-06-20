@@ -205,13 +205,26 @@ public class ServiceTaskRunner implements NodeRunner {
     private ServiceTaskHandler getHandler(String handlerClass) {
         ServiceTaskHandler handler = handlerRegistry.get(handlerClass);
         if (handler == null) {
+            // 1. Try direct class loading by name
             try {
                 Class<?> clazz = Class.forName(handlerClass);
                 handler = (ServiceTaskHandler) clazz.getDeclaredConstructor().newInstance();
                 handlerRegistry.put(handlerClass, handler);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot instantiate ServiceTaskHandler: " + handlerClass, e);
+            } catch (Exception ignored) {}
+        }
+        if (handler == null) {
+            // 2. Try SPI — scan ServiceLoader for matching class name or simple name
+            for (ServiceTaskHandler h : java.util.ServiceLoader.load(ServiceTaskHandler.class)) {
+                if (h.getClass().getName().equals(handlerClass)
+                        || h.getClass().getSimpleName().equals(handlerClass)) {
+                    handler = h;
+                    handlerRegistry.put(handlerClass, handler);
+                    break;
+                }
             }
+        }
+        if (handler == null) {
+            throw new RuntimeException("Cannot instantiate ServiceTaskHandler: " + handlerClass);
         }
         return handler;
     }
