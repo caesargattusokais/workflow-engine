@@ -34,21 +34,41 @@ public class JdbcDefinitionRepository implements DefinitionRepository {
     public List<ProcessDefinition> listLatestByUser(String userId) {
         Map<String, ProcessDefinition> latest = new LinkedHashMap<>();
         jdbc.query(
-            "SELECT id, version, name FROM definition WHERE user_id = ? ORDER BY id, version DESC",
+            "SELECT d.id, d.version, d.name, p.nodes_json, p.transitions_json " +
+            "FROM definition d LEFT JOIN process_definition p ON d.id = p.id AND d.version = p.version " +
+            "WHERE d.user_id = ? ORDER BY d.id, d.version DESC",
             (rs) -> {
                 String id = rs.getString("id");
-                latest.putIfAbsent(id, new ProcessDefinition(id, rs.getString("name"),
-                    rs.getInt("version"), List.of(), List.of()));
+                String nodesJson = rs.getString("nodes_json");
+                String transJson = rs.getString("transitions_json");
+                ProcessDefinition def;
+                if (nodesJson != null) {
+                    def = JdbcProcessRepository.buildDefStatic(id, rs.getInt("version"),
+                        rs.getString("name"), nodesJson, transJson);
+                } else {
+                    def = new ProcessDefinition(id, rs.getString("name"),
+                        rs.getInt("version"), List.of(), List.of());
+                }
+                latest.putIfAbsent(id, def);
             }, userId);
         return new ArrayList<>(latest.values());
     }
 
     public ProcessDefinition findByUserAndId(String userId, String id) {
         List<ProcessDefinition> list = jdbc.query(
-            "SELECT id, version, name FROM definition WHERE user_id = ? AND id = ? ORDER BY version DESC LIMIT 1",
-            (rs, rowNum) -> new ProcessDefinition(rs.getString("id"), rs.getString("name"),
-                rs.getInt("version"), List.of(), List.of()),
-            userId, id);
+            "SELECT d.id, d.version, d.name, p.nodes_json, p.transitions_json " +
+            "FROM definition d LEFT JOIN process_definition p ON d.id = p.id AND d.version = p.version " +
+            "WHERE d.user_id = ? AND d.id = ? ORDER BY d.version DESC LIMIT 1",
+            (rs, rowNum) -> {
+                String nodesJson = rs.getString("nodes_json");
+                if (nodesJson != null) {
+                    return JdbcProcessRepository.buildDefStatic(rs.getString("id"),
+                        rs.getInt("version"), rs.getString("name"),
+                        nodesJson, rs.getString("transitions_json"));
+                }
+                return new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                    rs.getInt("version"), List.of(), List.of());
+            }, userId, id);
         return list.isEmpty() ? null : list.get(0);
     }
 

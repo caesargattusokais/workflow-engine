@@ -47,7 +47,7 @@ public class JdbcProcessRepository implements ProcessRepository {
     public ProcessDefinition findLatestById(String id) {
         List<ProcessDefinition> list = jdbc.query(
             "SELECT version, name, nodes_json, transitions_json FROM process_definition WHERE id = ? ORDER BY version DESC LIMIT 1",
-            (rs, rowNum) -> buildDef(id, rs.getInt("version"), rs.getString("name"),
+            (rs, rowNum) -> buildDefStatic(id, rs.getInt("version"), rs.getString("name"),
                 rs.getString("nodes_json"), rs.getString("transitions_json")),
             id);
         return list.isEmpty() ? null : list.get(0);
@@ -57,14 +57,14 @@ public class JdbcProcessRepository implements ProcessRepository {
     public List<ProcessDefinition> findAllVersions(String id) {
         return jdbc.query(
             "SELECT version, name, nodes_json, transitions_json FROM process_definition WHERE id = ? ORDER BY version ASC",
-            (rs, rowNum) -> buildDef(id, rs.getInt("version"), rs.getString("name"),
+            (rs, rowNum) -> buildDefStatic(id, rs.getInt("version"), rs.getString("name"),
                 rs.getString("nodes_json"), rs.getString("transitions_json")),
             id);
     }
 
     // -- Build helpers --
 
-    private ProcessDefinition buildDef(String id, int version, String name,
+    public static ProcessDefinition buildDefStatic(String id, int version, String name,
                                         String nodesJson, String transitionsJson) {
         Map<String, Map<String, Object>> nodeMap = gson.fromJson(nodesJson,
             new TypeToken<Map<String, Map<String, Object>>>() {}.getType());
@@ -91,7 +91,7 @@ public class JdbcProcessRepository implements ProcessRepository {
         return new ProcessDefinition(id, name, version, nodes, transitions);
     }
 
-    private Transition buildTransition(String from, String to, String type, String expr, String className) {
+    private static Transition buildTransition(String from, String to, String type, String expr, String className) {
         switch (type) {
             case "CONDITIONAL": {
                 var c = className != null ? com.github.wf.model.Condition.javaClass(className)
@@ -115,7 +115,7 @@ public class JdbcProcessRepository implements ProcessRepository {
     }
 
     @SuppressWarnings("unchecked")
-    private Node deserializeNode(String id, Map<String, Object> d) {
+    private static Node deserializeNode(String id, Map<String, Object> d) {
         String type = (String) d.get("type");
         String name = (String) d.get("name");
         List<String> listeners = d.containsKey("listeners") ? (List<String>) d.get("listeners") : List.of();

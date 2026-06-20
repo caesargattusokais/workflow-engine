@@ -1,6 +1,5 @@
 package com.github.wf.model;
 
-import com.github.wf.model.node.StartEvent;
 import java.util.*;
 
 public class ProcessDefinition {
