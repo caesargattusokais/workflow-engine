@@ -41,7 +41,6 @@ public class EngineConfig {
 
     @Bean
     @ConditionalOnProperty("ldap.url")
-    @Profile("!mock-ldap")
     public OrgService orgService(Environment env) {
         Properties p = new Properties();
         for (String key : new String[]{"url","base","user","password","userFilter","groupFilter","groupMemberAttr","uidAttr","userBase","groupBase"}) {
