@@ -41,7 +41,7 @@ public class FeishuOrgService implements OrgService {
         this.appSecret = props.getProperty("feishu.app-secret");
     }
 
-    private synchronized String getToken() {
+    public synchronized String getToken() {
         if (accessToken != null && System.currentTimeMillis() < tokenExpiresAt) return accessToken;
         try {
             JsonObject body = new JsonObject();

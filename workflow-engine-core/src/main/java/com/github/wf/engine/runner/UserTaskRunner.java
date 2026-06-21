@@ -3,6 +3,8 @@ package com.github.wf.engine.runner;
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
 import com.github.wf.ext.OrgService;
+import com.github.wf.ext.feishu.FeishuNotifier;
+import com.github.wf.ext.feishu.FeishuOrgService;
 import com.github.wf.ext.http.HttpClientUtil;
 import com.github.wf.model.ExecutionStatus;
 import com.github.wf.model.Node;
@@ -102,6 +104,19 @@ public class UserTaskRunner implements NodeRunner {
         task.setCandidateGroups(userTask.getCandidateGroups());
         task.setVariables(new java.util.HashMap<>(variables));
         taskRepository.save(task);
+
+        // ── Feishu notification — auto if FeishuOrgService is configured ──
+        if (!userTask.isHttpTask() && orgService instanceof FeishuOrgService) {
+            String assignee = task.getAssignee();
+            if (assignee != null && baseUrl != null && !baseUrl.isBlank()) {
+                String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+                FeishuNotifier notifier = new FeishuNotifier((FeishuOrgService) orgService);
+                String msgId = notifier.sendApprovalCard(assignee, task.getId(),
+                    exec.getInstanceId(), userTask.getName() != null ? userTask.getName() : "审批",
+                    String.valueOf(variables.getOrDefault("applicant", "系统")), base);
+                log.warn("Feishu card sent: task=" + task.getId() + " to=" + assignee + " msgId=" + msgId);
+            }
+        }
 
         // ── HTTP callback mode ─────────────────
         if (userTask.isHttpTask() && userTask.getUrl() != null && !userTask.getUrl().isBlank()) {
