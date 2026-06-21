@@ -6,13 +6,13 @@ engine:
 
 # Feishu (飞书) — uncomment to enable
 feishu:
-  app-id: xxx
-  app-secret: xxx
+  app-id: cli_aabdd43036381cef
+  app-secret: Dm1WYw9K6NBrBThFMgCF9foGSLIuvEsq
 
 # DingTalk (钉钉) — uncomment to enable
 #dingtalk:
-#  app-key: xx
-#  app-secret: xxx
+#  app-key: dingc8yvu3vi1qrfxnah
+#  app-secret: tmm8G-1Selh13EgDsTlNQuNJS5I2lp2pFR3Iqivl9ixBy5J61yMal0RaYdYw8Ahr
 
 # LDAP — local Docker (osixia/openldap)
 #ldap:

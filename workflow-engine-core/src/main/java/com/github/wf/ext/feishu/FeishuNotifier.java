@@ -18,41 +18,43 @@ public class FeishuNotifier {
     private static final Log log = LogFactory.getLog(FeishuNotifier.class);
     private final FeishuOrgService orgService;
 
-    public FeishuNotifier(FeishuOrgService orgService) { this.orgService = orgService; }
+    public FeishuNotifier(FeishuOrgService orgService) {
+        this.orgService = orgService;
+    }
 
     public String sendApprovalCard(String userId, String taskId, String instanceId,
-                                    String title, String applicant, String baseUrl) {
+                                   String title, String applicant, String baseUrl) {
         try {
             String token = orgService.getToken();
             String completeUrl = baseUrl + "/api/tasks/" + taskId + "/complete";
             String rejectUrl = baseUrl + "/api/tasks/" + taskId + "/reject";
             String cardJson = String.format(
-                "{\"config\":{\"wide_screen_mode\":true}," +
-                "\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: %s\"},\"template\":\"blue\"}," +
-                "\"elements\":[" +
-                  "{\"tag\":\"div\",\"fields\":[" +
-                    "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**申请人**\n%s\"}}," +
-                    "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**实例**\n%s\"}}" +
-                  "]}," +
-                  "{\"tag\":\"hr\"}," +
-                  "{\"tag\":\"action\",\"actions\":[" +
-                    "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\"," +
-                      "\"url\":\"%s\"}," +
-                    "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\"," +
-                      "\"url\":\"%s\"}" +
-                  "]}" +
-                "]}",
-                title, applicant, instanceId.substring(0,8), completeUrl, rejectUrl);
+                    "{\"schema\":\"2.0\"," +
+                            "\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: %s\"},\"template\":\"blue\"}," +
+                            "\"body\":{" +
+                            "\"elements\":[" +
+                            "{\"tag\":\"div\",\"fields\":[" +
+                            "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**申请人**\\n%s\"}}," +
+                            "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**实例**\\n%s\"}}" +
+                            "]}," +
+                            "{\"tag\":\"hr\"}," +
+                            "{\"tag\":\"card_action\",\"actions\":[" +
+                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\",\"url\":\"%s\"}," +
+                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\",\"url\":\"%s\"}" +
+                            "]}" +
+                            "]}" +
+                            "}",
+                    title, applicant, instanceId.substring(0, 8), completeUrl, rejectUrl);
 
             JsonObject body = new JsonObject();
             body.addProperty("receive_id", userId);
             body.addProperty("msg_type", "interactive");
             body.addProperty("content", cardJson);
             HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(BASE + "/im/v1/messages?receive_id_type=user_id"))
-                .header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body))).build();
+                    .uri(URI.create(BASE + "/im/v1/messages?receive_id_type=user_id"))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body))).build();
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             JsonObject r = gson.fromJson(resp.body(), JsonObject.class);
             return r.get("code").getAsInt() == 0 ? r.getAsJsonObject("data").get("message_id").getAsString() : null;
