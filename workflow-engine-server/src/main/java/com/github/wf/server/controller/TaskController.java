@@ -47,9 +47,25 @@ public class TaskController {
         engine.completeTask(id, req.getVariables(), req.getComment());
     }
 
+    /** Feishu card callback — browser GET */
+    @GetMapping("/{id}/complete")
+    public String completeGet(@PathVariable("id") String id,
+            @RequestParam(value = "comment", defaultValue = "飞书审批通过") String comment) {
+        engine.completeTask(id, Map.of("source", "feishu"), comment);
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:green'>✓ 已通过</h2><p>审批完成</p></body></html>";
+    }
+
     @PostMapping("/{id}/reject")
     public void reject(@PathVariable("id") String id, @RequestBody Map<String, String> body) {
         engine.rejectTask(id, body.getOrDefault("comment", ""));
+    }
+
+    /** Feishu card callback — browser GET */
+    @GetMapping("/{id}/reject")
+    public String rejectGet(@PathVariable("id") String id,
+            @RequestParam(value = "comment", defaultValue = "飞书驳回") String comment) {
+        engine.rejectTask(id, comment);
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:red'>✗ 已驳回</h2><p>任务已驳回</p></body></html>";
     }
 
     @PostMapping("/{id}/delegate")

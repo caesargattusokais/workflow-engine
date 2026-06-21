@@ -2,7 +2,7 @@ server:
   port: 8080
 
 engine:
-  base-url: http://localhost:8080
+  base-url: http://338q032e33.qicp.vip
 
 # Feishu (飞书) — uncomment to enable
 feishu:
