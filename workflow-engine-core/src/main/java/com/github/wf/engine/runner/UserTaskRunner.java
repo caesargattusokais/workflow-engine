@@ -113,7 +113,7 @@ public class UserTaskRunner implements NodeRunner {
                 FeishuNotifier notifier = new FeishuNotifier((FeishuOrgService) orgService);
                 String msgId = notifier.sendApprovalCard(assignee, task.getId(),
                     exec.getInstanceId(), userTask.getName() != null ? userTask.getName() : "审批",
-                    String.valueOf(variables.getOrDefault("applicant", "系统")), base);
+                    String.valueOf(variables.getOrDefault("applicant", "系统")), base, variables);
                 log.warn("Feishu card sent: task=" + task.getId() + " to=" + assignee + " msgId=" + msgId);
             }
         }

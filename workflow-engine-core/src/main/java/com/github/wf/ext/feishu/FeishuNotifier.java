@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 
 public class FeishuNotifier {
     private static final String BASE = "https://open.feishu.cn/open-apis";
@@ -23,28 +24,40 @@ public class FeishuNotifier {
     }
 
     public String sendApprovalCard(String userId, String taskId, String instanceId,
-                                   String title, String applicant, String baseUrl) {
+                                   String title, String applicant, String baseUrl,
+                                   Map<String, Object> variables) {
         try {
             String token = orgService.getToken();
             String completeUrl = baseUrl + "/api/tasks/" + taskId + "/complete";
             String rejectUrl = baseUrl + "/api/tasks/" + taskId + "/reject";
-            String cardJson = String.format(
-                    "{\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: %s\"},\"template\":\"blue\"}," +
-                            "\"elements\":[" +
-                            "{\"tag\":\"div\",\"fields\":[" +
-                            "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**申请人**\\n%s\"}}," +
-                            "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**实例**\\n%s\"}}" +
-                            "]}," +
-                            "{\"tag\":\"hr\"}," +
-                            "{\"tag\":\"action\",\"actions\":[" +
-                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\"," +
-                            "\"multi_url\":{\"url\":\"%s\",\"android_url\":\"%s\",\"ios_url\":\"%s\"}}," +
-                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\"," +
-                            "\"multi_url\":{\"url\":\"%s\",\"android_url\":\"%s\",\"ios_url\":\"%s\"}}" +
-                            "]}" +
-                            "]}",
-                    title, applicant, instanceId.substring(0, 8),
-                    completeUrl, completeUrl, completeUrl, rejectUrl, rejectUrl, rejectUrl);
+
+            // Build fields from variables
+            StringBuilder fields = new StringBuilder();
+            fields.append("{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**申请人**\\n")
+                  .append(escapeLarkMd(applicant)).append("\"}}");
+            if (variables != null) {
+                for (var entry : variables.entrySet()) {
+                    String key = entry.getKey();
+                    if (key.startsWith("_")) continue; // skip internal vars
+                    String val = entry.getValue() != null ? entry.getValue().toString() : "";
+                    fields.append(",{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**")
+                          .append(escapeLarkMd(key)).append("**\\n").append(escapeLarkMd(val)).append("\"}}");
+                }
+            }
+
+            String cardJson =
+                "{\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: " + escapePlainText(title) + "\"},\"template\":\"blue\"}," +
+                "\"elements\":[" +
+                  "{\"tag\":\"div\",\"fields\":[" + fields + "]}," +
+                  "{\"tag\":\"hr\"}," +
+                  "{\"tag\":\"note\",\"elements\":[{\"tag\":\"plain_text\",\"content\":\"实例: " + instanceId.substring(0, 8) + "\"}]}," +
+                  "{\"tag\":\"action\",\"actions\":[" +
+                    "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\"," +
+                    "\"multi_url\":{\"url\":\"" + completeUrl + "\",\"android_url\":\"" + completeUrl + "\",\"ios_url\":\"" + completeUrl + "\"}}," +
+                    "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\"," +
+                    "\"multi_url\":{\"url\":\"" + rejectUrl + "\",\"android_url\":\"" + rejectUrl + "\",\"ios_url\":\"" + rejectUrl + "\"}}" +
+                  "]}" +
+                "]}";
 
             JsonObject body = new JsonObject();
             body.addProperty("receive_id", userId);
@@ -62,5 +75,16 @@ public class FeishuNotifier {
             log.error(e.getMessage(), e);
             return null;
         }
+    }
+
+    private static String escapeLarkMd(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "");
+    }
+
+    private static String escapePlainText(String s) {
+        if (s == null) return "";
+        return s.replace("\"", "\\\"");
     }
 }
