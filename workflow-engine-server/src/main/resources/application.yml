@@ -4,6 +4,11 @@ server:
 engine:
   base-url: http://localhost:8080
 
+# DingTalk (钉钉) — uncomment to enable
+#dingtalk:
+#  app-key: dingxxx
+#  app-secret: xxx
+
 # LDAP — local Docker (osixia/openldap)
 ldap:
   url: ldap://localhost:389

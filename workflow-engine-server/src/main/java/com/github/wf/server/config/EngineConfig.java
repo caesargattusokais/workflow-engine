@@ -42,6 +42,17 @@ public class EngineConfig {
     }
 
     @Bean
+    @ConditionalOnProperty("dingtalk.app-key")
+    public OrgService dingTalkOrgService(Environment env) {
+        Properties p = new Properties();
+        for (String key : new String[]{"app-key","app-secret"}) {
+            String val = env.getProperty("dingtalk." + key);
+            if (val != null) p.setProperty("dingtalk." + key, val);
+        }
+        return new com.github.wf.ext.dingtalk.DingTalkOrgService(p);
+    }
+
+    @Bean
     @ConditionalOnProperty("ldap.url")
     public OrgService orgService(Environment env) {
         log.info("[EngineConfig] Creating LdapOrgService — ldap.url={}", env.getProperty("ldap.url"));
