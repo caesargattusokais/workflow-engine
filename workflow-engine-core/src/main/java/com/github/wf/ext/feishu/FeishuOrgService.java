@@ -112,7 +112,7 @@ public class FeishuOrgService implements OrgService {
             String pageToken = "";
             do {
                 JsonObject resp = get("/contact/v3/users/find_by_department?department_id="
-                    + deptId + "&page_size=100&page_token=" + pageToken);
+                    + deptId + "&page_size=50&page_token=" + pageToken);
                 if (resp.get("code").getAsInt() != 0) break;
                 JsonObject data = resp.getAsJsonObject("data");
                 JsonArray items = data.getAsJsonArray("items");
@@ -165,14 +165,14 @@ public class FeishuOrgService implements OrgService {
             String pageToken = "";
             do {
                 JsonObject resp = get("/contact/v3/departments?parent_department_id=" + parentId
-                    + "&page_size=100&page_token=" + pageToken);
+                    + "&page_size=50&page_token=" + pageToken);
                 if (resp.get("code").getAsInt() != 0) break;
                 JsonObject data = resp.getAsJsonObject("data");
                 JsonArray items = data.getAsJsonArray("items");
                 if (items != null) {
                     for (int i = 0; i < items.size(); i++) {
                         JsonObject d = items.get(i).getAsJsonObject();
-                        String deptId = d.get("department_id").getAsString();
+                        String deptId = d.get("open_department_id").getAsString();
                         result.add(d.get("name").getAsString());
                         loadAllDeptNames(deptId, result);
                     }
@@ -193,14 +193,14 @@ public class FeishuOrgService implements OrgService {
             String pageToken = "";
             do {
                 JsonObject resp = get("/contact/v3/departments?parent_department_id=" + parentId
-                    + "&fetch_child=true&page_size=100&page_token=" + pageToken);
+                    + "&fetch_child=true&page_size=50&page_token=" + pageToken);
                 if (resp.get("code").getAsInt() != 0) break;
                 JsonObject data = resp.getAsJsonObject("data");
                 JsonArray items = data.getAsJsonArray("items");
                 if (items != null) {
                     for (int i = 0; i < items.size(); i++) {
                         JsonObject d = items.get(i).getAsJsonObject();
-                        String deptId = d.get("department_id").getAsString();
+                        String deptId = d.get("open_department_id").getAsString();
                         String deptName = d.get("name").getAsString();
                         OrgTree deptNode = new OrgTree("dept-" + deptId, deptName, "");
                         // Add users under this department
@@ -223,7 +223,7 @@ public class FeishuOrgService implements OrgService {
             String pageToken = "";
             do {
                 JsonObject resp = get("/contact/v3/users/find_by_department?department_id="
-                    + deptId + "&page_size=100&page_token=" + pageToken);
+                    + deptId + "&page_size=2&page_token=" + pageToken);
                 if (resp.get("code").getAsInt() != 0) break;
                 JsonObject data = resp.getAsJsonObject("data");
                 JsonArray items = data.getAsJsonArray("items");
@@ -257,7 +257,7 @@ public class FeishuOrgService implements OrgService {
         try {
             String pageToken = "";
             do {
-                JsonObject resp = get("/contact/v3/departments?page_size=100&page_token=" + pageToken);
+                JsonObject resp = get("/contact/v3/departments?page_size=50&page_token=" + pageToken);
                 if (resp.get("code").getAsInt() != 0) break;
                 JsonObject data = resp.getAsJsonObject("data");
                 JsonArray items = data.getAsJsonArray("items");
@@ -265,7 +265,7 @@ public class FeishuOrgService implements OrgService {
                     for (int i = 0; i < items.size(); i++) {
                         JsonObject d = items.get(i).getAsJsonObject();
                         if (name.equals(d.get("name").getAsString()))
-                            return d.get("department_id").getAsString();
+                            return d.get("open_department_id").getAsString();
                     }
                 }
                 pageToken = data.has("page_token") ? data.get("page_token").getAsString() : "";
