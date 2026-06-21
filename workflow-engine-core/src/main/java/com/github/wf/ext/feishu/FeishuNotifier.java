@@ -29,22 +29,22 @@ public class FeishuNotifier {
             String completeUrl = baseUrl + "/api/tasks/" + taskId + "/complete";
             String rejectUrl = baseUrl + "/api/tasks/" + taskId + "/reject";
             String cardJson = String.format(
-                    "{\"schema\":\"2.0\"," +
-                            "\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: %s\"},\"template\":\"blue\"}," +
-                            "\"body\":{" +
+                    "{\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"待审批: %s\"},\"template\":\"blue\"}," +
                             "\"elements\":[" +
                             "{\"tag\":\"div\",\"fields\":[" +
                             "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**申请人**\\n%s\"}}," +
                             "{\"is_short\":true,\"text\":{\"tag\":\"lark_md\",\"content\":\"**实例**\\n%s\"}}" +
                             "]}," +
                             "{\"tag\":\"hr\"}," +
-                            "{\"tag\":\"card_action\",\"actions\":[" +
-                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\",\"url\":\"%s\"}," +
-                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\",\"url\":\"%s\"}" +
+                            "{\"tag\":\"action\",\"actions\":[" +
+                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"同意\"},\"type\":\"primary\"," +
+                            "\"multi_url\":{\"url\":\"%s\",\"android_url\":\"%s\",\"ios_url\":\"%s\"}}," +
+                            "{\"tag\":\"button\",\"text\":{\"tag\":\"plain_text\",\"content\":\"驳回\"},\"type\":\"danger\"," +
+                            "\"multi_url\":{\"url\":\"%s\",\"android_url\":\"%s\",\"ios_url\":\"%s\"}}" +
                             "]}" +
-                            "]}" +
-                            "}",
-                    title, applicant, instanceId.substring(0, 8), completeUrl, rejectUrl);
+                            "]}",
+                    title, applicant, instanceId.substring(0, 8),
+                    completeUrl, completeUrl, completeUrl, rejectUrl, rejectUrl, rejectUrl);
 
             JsonObject body = new JsonObject();
             body.addProperty("receive_id", userId);
