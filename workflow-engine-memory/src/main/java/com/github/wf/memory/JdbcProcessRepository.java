@@ -127,10 +127,28 @@ public class JdbcProcessRepository implements ProcessRepository {
                 (String) d.get("boundaryTimer"), Boolean.TRUE.equals(d.get("httpMode")),
                 (String) d.get("url"), (String) d.get("method"),
                 (Map<String, String>) d.get("headers"), (String) d.get("body"), listeners);
-            case "SERVICE_TASK": return new ServiceTask(id, name, (String) d.get("handlerClass"),
-                Boolean.TRUE.equals(d.get("httpMode")), (String) d.get("url"), (String) d.get("method"),
-                (Map<String, String>) d.get("headers"), (String) d.get("body"),
-                null, List.of(), List.of(), listeners);
+            case "SERVICE_TASK": {
+                com.github.wf.model.RetryConfig rc = null;
+                if (d.get("retryMaxAttempts") != null) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> retryOnRaw = (List<Map<String, Object>>) d.get("retryOn");
+                    List<com.github.wf.model.Condition> retryOn = deserializeConditions(retryOnRaw);
+                    rc = new com.github.wf.model.RetryConfig(
+                        ((Number) d.get("retryMaxAttempts")).intValue(),
+                        ((Number) d.get("retryDelayMs")).longValue(),
+                        ((Number) d.get("retryBackoff")).doubleValue(), retryOn);
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> rrRaw = (List<Map<String, Object>>) d.get("resultRouting");
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> erRaw = (List<Map<String, Object>>) d.get("exceptionRouting");
+                List<com.github.wf.model.RoutingRule> resultRoutes = deserializeRoutes(rrRaw);
+                List<com.github.wf.model.RoutingRule> exceptionRoutes = deserializeRoutes(erRaw);
+                return new ServiceTask(id, name, (String) d.get("handlerClass"),
+                    Boolean.TRUE.equals(d.get("httpMode")), (String) d.get("url"), (String) d.get("method"),
+                    (Map<String, String>) d.get("headers"), (String) d.get("body"),
+                    rc, resultRoutes, exceptionRoutes, listeners);
+            }
             case "EXCLUSIVE_GATEWAY": return new ExclusiveGateway(id, name, listeners);
             case "PARALLEL_GATEWAY": return new ParallelGateway(id, name, listeners);
             case "INCLUSIVE_GATEWAY": return new InclusiveGateway(id, name, listeners);
@@ -147,11 +165,69 @@ public class JdbcProcessRepository implements ProcessRepository {
             d.put("id", n.getId()); d.put("name", n.getName());
             d.put("type", n.getType().name()); d.put("listeners", n.getListeners());
             if (n instanceof UserTask ut) { d.put("assignee", ut.getAssignee()); d.put("candidateGroups", ut.getCandidateGroups()); d.put("dynamicRouter", ut.getDynamicRouter()); d.put("boundaryTimer", ut.getBoundaryTimer()); d.put("httpMode", ut.isHttpTask()); d.put("url", ut.getUrl()); d.put("method", ut.getMethod()); d.put("headers", ut.getHeaders()); d.put("body", ut.getBody()); }
-            else if (n instanceof ServiceTask st) { d.put("handlerClass", st.getHandlerClass()); d.put("httpMode", st.isHttpTask()); d.put("url", st.getUrl()); d.put("method", st.getMethod()); d.put("headers", st.getHeaders()); d.put("body", st.getBody()); }
+            else if (n instanceof ServiceTask st) { d.put("handlerClass", st.getHandlerClass()); d.put("httpMode", st.isHttpTask()); d.put("url", st.getUrl()); d.put("method", st.getMethod()); d.put("headers", st.getHeaders()); d.put("body", st.getBody()); if (st.getRetryConfig() != null) { d.put("retryMaxAttempts", st.getRetryConfig().getMaxAttempts()); d.put("retryDelayMs", st.getRetryConfig().getDelayMs()); d.put("retryBackoff", st.getRetryConfig().getBackoffMultiplier()); d.put("retryOn", serializeConditions(st.getRetryConfig().getRetryOn())); } d.put("resultRouting", serializeRoutes(st.getResultRouting())); d.put("exceptionRouting", serializeRoutes(st.getExceptionRouting())); }
             else if (n instanceof TimerNode tn) { d.put("duration", tn.getDuration()); d.put("deadline", tn.getDeadline()); }
             m.put(e.getKey(), d);
         }
         return m;
+    }
+
+    // -- Routing/Condition helpers --
+
+    private static List<Map<String, Object>> serializeConditions(List<com.github.wf.model.Condition> conds) {
+        if (conds == null || conds.isEmpty()) return List.of();
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (var c : conds) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            if (c.getExpr() != null) m.put("expr", c.getExpr());
+            if (c.getClassName() != null) m.put("className", c.getClassName());
+            list.add(m);
+        }
+        return list;
+    }
+
+    private static List<com.github.wf.model.Condition> deserializeConditions(List<Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<com.github.wf.model.Condition> list = new ArrayList<>();
+        for (var r : raw) {
+            String expr = (String) r.get("expr");
+            String cls = (String) r.get("className");
+            list.add(cls != null ? com.github.wf.model.Condition.javaClass(cls)
+                : com.github.wf.model.Condition.expression(expr));
+        }
+        return list;
+    }
+
+    private static List<Map<String, Object>> serializeRoutes(List<com.github.wf.model.RoutingRule> routes) {
+        if (routes == null || routes.isEmpty()) return List.of();
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (var r : routes) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("to", r.getTo());
+            m.put("isDefault", r.isDefault());
+            if (r.getCondition() != null) {
+                if (r.getCondition().getExpr() != null) m.put("expr", r.getCondition().getExpr());
+                if (r.getCondition().getClassName() != null) m.put("className", r.getCondition().getClassName());
+            }
+            list.add(m);
+        }
+        return list;
+    }
+
+    private static List<com.github.wf.model.RoutingRule> deserializeRoutes(List<Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<com.github.wf.model.RoutingRule> list = new ArrayList<>();
+        for (var r : raw) {
+            String to = (String) r.get("to");
+            boolean isDefault = Boolean.TRUE.equals(r.get("isDefault"));
+            String expr = (String) r.get("expr");
+            String cls = (String) r.get("className");
+            com.github.wf.model.Condition cond = cls != null ? com.github.wf.model.Condition.javaClass(cls)
+                : expr != null ? com.github.wf.model.Condition.expression(expr) : null;
+            list.add(isDefault ? com.github.wf.model.RoutingRule.defaultRule(to)
+                : com.github.wf.model.RoutingRule.matched(cond, to));
+        }
+        return list;
     }
 
     private List<Map<String, Object>> serializeTransitions(List<Transition> transitions) {
