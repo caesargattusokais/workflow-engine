@@ -116,7 +116,9 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
           <div className="border-t border-green-500/50 pt-3 mt-2">
             <span className="text-green-400 text-xs font-semibold">{t.props.initialVars}</span>
             <div className="text-[10px] text-gray-500 mb-2">{t.props.initialVarsHint}</div>
-            <VarEditor addLabel={t.props.addVar} vars={(node.data.initialVars as string[]) || []} onChange={v => updateData('initialVars', v)} />
+            <KvEditor label="" entries={(node.data.initialVars as Array<{key:string;value:string}>) || []}
+              onChange={v => updateData('initialVars', v)}
+              keyPlaceholder="变量名" valPlaceholder="默认值" />
           </div>
         )}
 

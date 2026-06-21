@@ -220,9 +220,13 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setDeployedYaml(yaml);
       setShowYaml(true);
       setDeployedId(result.id);
-      // Auto-start instance
+      // Auto-start instance with startEvent initialVars
       try {
-        const inst = await startInstance(result.id, {});
+        const startNode = nodes.find(n => n.type === 'startEvent');
+        const initVars: Record<string, string> = {};
+        const vars = (startNode?.data?.initialVars as Array<{key:string;value:string}>) || [];
+        vars.forEach(v => { if (v.key) initVars[v.key] = v.value || ''; });
+        const inst = await startInstance(result.id, initVars);
         setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
         listInstances().then(setInstances).catch(() => {});
       } catch {
@@ -236,8 +240,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     const vars: VarInfo[] = [];
     for (const node of nodes) {
       if (node.type === 'startEvent') {
-        for (const v of (node.data.initialVars as string[]) || []) {
-          if (v.trim()) vars.push({ name: v.trim(), source: 'Start' });
+        for (const v of (node.data.initialVars as Array<{key:string;value:string}>) || []) {
+          if (v.key) vars.push({ name: v.key, source: v.value ? `Start (默认: ${v.value})` : 'Start' });
         }
       }
       if (node.type === 'serviceTask') {
