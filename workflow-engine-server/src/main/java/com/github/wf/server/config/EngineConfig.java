@@ -42,6 +42,17 @@ public class EngineConfig {
     }
 
     @Bean
+    @ConditionalOnProperty("feishu.app-id")
+    public OrgService feishuOrgService(Environment env) {
+        Properties p = new Properties();
+        for (String key : new String[]{"app-id","app-secret"}) {
+            String val = env.getProperty("feishu." + key);
+            if (val != null) p.setProperty("feishu." + key, val);
+        }
+        return new com.github.wf.ext.feishu.FeishuOrgService(p);
+    }
+
+    @Bean
     @ConditionalOnProperty("dingtalk.app-key")
     public OrgService dingTalkOrgService(Environment env) {
         Properties p = new Properties();

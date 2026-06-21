@@ -4,20 +4,25 @@ server:
 engine:
   base-url: http://localhost:8080
 
-# DingTalk (钉钉) — uncomment to enable
-#dingtalk:
-#  app-key: dingxxx
+# Feishu (飞书) — uncomment to enable
+#feishu:
+#  app-id: cli_xxx
 #  app-secret: xxx
 
+# DingTalk (钉钉) — uncomment to enable
+dingtalk:
+  app-key: dingc8yvu3vi1qrfxnah
+  app-secret: tmm8G-1Selh13EgDsTlNQuNJS5I2lp2pFR3Iqivl9ixBy5J61yMal0RaYdYw8Ahr
+
 # LDAP — local Docker (osixia/openldap)
-ldap:
-  url: ldap://localhost:389
-  base: dc=example,dc=com
-  user: cn=admin,dc=example,dc=com
-  password: LDAP_password
-  userFilter: "(&(objectClass=inetOrgPerson)(uid={0}))"
-  uidAttr: uid
-  userObjectClass: inetOrgPerson
+#ldap:
+#  url: ldap://localhost:389
+#  base: dc=example,dc=com
+#  user: cn=admin,dc=example,dc=com
+#  password: LDAP_password
+#  userFilter: "(&(objectClass=inetOrgPerson)(uid={0}))"
+#  uidAttr: uid
+#  userObjectClass: inetOrgPerson
 
 # LDAP — public test server (forumsys.com)
 #ldap:
