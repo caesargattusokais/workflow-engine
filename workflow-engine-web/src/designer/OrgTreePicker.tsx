@@ -15,22 +15,36 @@ interface Props {
   multi?: boolean;
 }
 
+// Module-level cache — fetch once across all OrgTreePicker instances
+let treeCache: OrgNode[] | null = null;
+let treePromise: Promise<OrgNode[]> | null = null;
+
+function fetchTree(): Promise<OrgNode[]> {
+  if (treeCache) return Promise.resolve(treeCache);
+  if (treePromise) return treePromise;
+  treePromise = fetch('/api/org/tree').then(r => r.json()).then(data => {
+    treeCache = (data || []) as OrgNode[];
+    return treeCache;
+  }).catch(() => {
+    treePromise = null;
+    treeCache = [];
+    return treeCache;
+  });
+  return treePromise;
+}
+
 export default function OrgTreePicker({ value, values, onChange, onChangeMulti, multi }: Props) {
   const [tree, setTree] = useState<OrgNode[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
-
   const [status, setStatus] = useState<'loading'|'empty'|'ok'>('loading');
 
   useEffect(() => {
-    fetch('/api/org/tree').then(r => r.json())
-      .then(data => {
-        const nodes = data || [];
-        setTree(nodes);
-        setStatus(nodes.length > 0 ? 'ok' : 'empty');
-        if (nodes.length > 0) expandAll(nodes, 2);
-      })
-      .catch(() => setStatus('empty'));
+    fetchTree().then(data => {
+      setTree(data);
+      setStatus(data.length > 0 ? 'ok' : 'empty');
+      if (data.length > 0) expandAll(data, 2);
+    });
   }, []);
 
   const expandAll = (nodes: OrgNode[], depth: number) => {
