@@ -96,25 +96,21 @@ export default function MonitorPage() {
     listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
   }, []);
 
-  // Poll: refresh first page of instances for each definition every 5s
-  useEffect(() => {
-    const poll = () => {
-      for (const g of defGroups) {
-        if (g.instPage > 0) {
-          listInstances(1, 10, g.defId).then((r: any) => {
-            const fresh = r.items || r;
-            setDefGroups(prev => prev.map(pg => {
-              if (pg.defId !== g.defId) return pg;
-              const map = new Map(pg.instances.map((i: any) => [i.id, i]));
-              for (const item of fresh) map.set(item.id, item);
-              return { ...pg, instances: [...map.values()] };
-            }));
-          }).catch(() => {});
-        }
+  // Manual refresh: reload first page of instances for all loaded definitions
+  const refreshAll = useCallback(() => {
+    for (const g of defGroups) {
+      if (g.instances.length > 0) {
+        listInstances(1, 10, g.defId).then((r: any) => {
+          const fresh = r.items || r;
+          setDefGroups(prev => prev.map(pg => {
+            if (pg.defId !== g.defId) return pg;
+            const map = new Map(pg.instances.map((i: any) => [i.id, i]));
+            for (const item of fresh) map.set(item.id, item);
+            return { ...pg, instances: [...map.values()] };
+          }));
+        }).catch(() => {});
       }
-    };
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
+    }
   }, [defGroups]);
 
   // ── Auto-refresh selected instance detail every 3s ──
@@ -294,6 +290,7 @@ export default function MonitorPage() {
           defHasMore={defHasMore}
           defLoading={defLoadingState}
           onLoadMoreDefs={() => { if (defHasMore && !defLoading.current) loadDefinitions(defPage + 1); }}
+          onRefresh={refreshAll}
         />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />

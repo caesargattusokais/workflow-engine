@@ -16,12 +16,13 @@ interface DefGroup {
 }
 
 export default function InstanceList({ onSelect, selectedId, groups, onTerminate, onResume, onDelete, onRestart,
-    onLoadInstances, defHasMore, defLoading, onLoadMoreDefs }:
+    onLoadInstances, defHasMore, defLoading, onLoadMoreDefs, onRefresh }:
     { onSelect: (id: string) => void; selectedId: string | null; groups: DefGroup[];
       onTerminate: (id: string) => void; onResume: (id: string) => void;
       onDelete: (id: string) => void; onRestart: (id: string) => void;
       onLoadInstances: (defId: string) => void;
-      defHasMore: boolean; defLoading: boolean; onLoadMoreDefs: () => void; }) {
+      defHasMore: boolean; defLoading: boolean; onLoadMoreDefs: () => void;
+      onRefresh?: () => void; }) {
 
   const { t } = useT();
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
@@ -64,7 +65,14 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
           if (defHasMore && !defLoading) onLoadMoreDefs();
         }
       }}>
-      <div className="text-xs text-gray-500 mb-2">{t.monitor.instances} ({totalInstances})</div>
+      <div className="text-xs text-gray-500 mb-2 flex items-center justify-between">
+        <span>{t.monitor.instances} ({totalInstances})</span>
+        {onRefresh && (
+          <button onClick={onRefresh} className="text-gray-500 hover:text-gray-300 text-[10px]" title={t.monitor.refresh}>
+            {t.monitor.refresh}
+          </button>
+        )}
+      </div>
       {groups.length === 0 && (
         <div className="text-gray-600 text-xs">{t.monitor.noInstances}</div>
       )}
