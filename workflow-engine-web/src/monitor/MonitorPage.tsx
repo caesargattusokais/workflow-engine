@@ -18,7 +18,7 @@ export default function MonitorPage() {
   const [nodeNames, setNodeNames] = useState<Record<string,string>>({});
 
   useEffect(() => {
-    const poll = () => listInstances().then(setInstances).catch(() => {});
+    const poll = () => listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
     poll();
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);

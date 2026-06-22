@@ -11,6 +11,8 @@ public interface InstanceRepository {
     void update(ProcessInstance instance);
     List<ProcessInstance> findByDefinitionId(String definitionId);
     default List<ProcessInstance> findAll() { return List.of(); }
+    default List<ProcessInstance> findAllPaginated(int page, int size) { return findAll().stream().skip((long)(page-1)*size).limit(size).toList(); }
+    default long count() { return findAll().size(); }
     default void deleteById(String id) {}
 
     void saveExecution(Execution execution);

@@ -39,7 +39,7 @@ async function apiDelete(path: string) {
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
 }
 
-export async function listInstances() { return apiGet('/instances'); }
+export async function listInstances(page = 1, size = 200) { return apiGet(`/instances?page=${page}&size=${size}`); }
 export async function startInstance(defId: string, vars: Record<string, unknown>) {
   return apiPost('/instances', { definitionId: defId, variables: vars });
 }

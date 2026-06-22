@@ -26,21 +26,29 @@ public class InstanceController {
     }
 
     @GetMapping
-    public List<InstanceDetailResponse> list(
+    public Map<String, Object> list(
             @RequestHeader("X-User-Id") String userId,
             @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "definitionId", required = false) String definitionId) {
+            @RequestParam(value = "definitionId", required = false) String definitionId,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
         java.util.List<com.github.wf.model.ProcessInstance> all;
         if (definitionId != null && !definitionId.isEmpty()) {
             all = engine.instanceRepository.findByDefinitionId(definitionId);
         } else {
-            all = engine.instanceRepository.findAll();
+            all = engine.instanceRepository.findAllPaginated(page, size);
         }
-        return all.stream()
+        var filtered = all.stream()
                 .filter(i -> userId.equals(i.getVariable("_userId")))
                 .filter(i -> status == null || i.getStatus().name().equals(status))
                 .map(InstanceDetailResponse::new)
                 .toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", filtered);
+        result.put("page", page);
+        result.put("size", size);
+        result.put("total", engine.instanceRepository.count());
+        return result;
     }
 
     @GetMapping("/{id}")

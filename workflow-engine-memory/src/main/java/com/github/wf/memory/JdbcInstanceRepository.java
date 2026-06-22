@@ -87,7 +87,6 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public List<ProcessInstance> findAll() {
-        // Cache has all RUNNING instances; query DB for the rest
         Set<String> cached = new HashSet<>(instances.keySet());
         List<ProcessInstance> all = new ArrayList<>(instances.values());
         jdbc.query("SELECT * FROM process_instance WHERE status != 'RUNNING'", (rs) -> {
@@ -95,6 +94,19 @@ public class JdbcInstanceRepository implements InstanceRepository {
             if (!cached.contains(inst.getId())) all.add(inst);
         });
         return all;
+    }
+
+    @Override
+    public List<ProcessInstance> findAllPaginated(int page, int size) {
+        int offset = (page - 1) * size;
+        return jdbc.query("SELECT * FROM process_instance ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (rs, rowNum) -> mapInstance(rs), size, offset);
+    }
+
+    @Override
+    public long count() {
+        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM process_instance", Long.class);
+        return c != null ? c : 0;
     }
 
     @Override

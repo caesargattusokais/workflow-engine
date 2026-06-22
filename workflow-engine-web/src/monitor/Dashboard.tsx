@@ -9,7 +9,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     apiGet('/dashboard/stats').then(setStats).catch(() => {});
-    apiGet('/instances').then(setInstances).catch(() => {});
+    apiGet('/instances?size=200').then((r: any) => setInstances(r.items || r)).catch(() => {});
   }, []);
 
   const loadTimeline = async (id: string) => {
