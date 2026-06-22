@@ -138,6 +138,15 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public List<com.github.wf.engine.Execution> findPendingTimerRetry() {
+        return jdbc.query(
+            "SELECT e.* FROM execution e INNER JOIN process_instance i ON e.instance_id = i.id " +
+            "WHERE e.status = 'WAITING' AND i.status = 'RUNNING' " +
+            "AND e.retry_state IN ('TIMER_PENDING', 'RETRY_PENDING')",
+            (rs, rowNum) -> mapExecution(rs));
+    }
+
+    @Override
     public void deleteById(String id) {
         instances.remove(id);
         jdbc.update("DELETE FROM execution WHERE instance_id = ?", id);

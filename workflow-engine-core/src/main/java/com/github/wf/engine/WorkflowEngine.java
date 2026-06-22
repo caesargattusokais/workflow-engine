@@ -81,23 +81,15 @@ public class WorkflowEngine {
     public void recover() {
         log.warn("Starting recovery scan...");
         int count = 0;
-        List<ProcessInstance> all = instanceRepository.findAll();
-        for (ProcessInstance inst : all) {
-            if (!inst.isRunning()) continue;
-            List<Execution> execs = instanceRepository.findActiveExecutions(inst.getId());
-            for (Execution exec : execs) {
-                if (exec.isWaiting() && ("TIMER_PENDING".equals(exec.getRetryState())
-                        || "RETRY_PENDING".equals(exec.getRetryState()))) {
-                    log.warn("Recovering pending execution: instance=" + inst.getId()
-                            + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
-                    // Re-trigger immediately — the runner will re-evaluate and re-schedule if needed
-                    exec.setStatus(ExecutionStatus.ACTIVE);
-                    exec.setRetryState(null);
-                    instanceRepository.updateExecution(exec);
-                    trigger(inst.getId());
-                    count++;
-                }
-            }
+        List<Execution> pending = instanceRepository.findPendingTimerRetry();
+        for (Execution exec : pending) {
+            log.warn("Recovering pending execution: instance=" + exec.getInstanceId()
+                    + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
+            exec.setStatus(ExecutionStatus.ACTIVE);
+            exec.setRetryState(null);
+            instanceRepository.updateExecution(exec);
+            trigger(exec.getInstanceId());
+            count++;
         }
         log.warn("Recovery complete: " + count + " executions re-triggered");
     }

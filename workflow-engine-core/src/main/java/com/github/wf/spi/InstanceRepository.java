@@ -44,4 +44,19 @@ public interface InstanceRepository {
 
     void saveHistoricActivity(HistoricActivity activity);
     List<HistoricActivity> findHistory(String instanceId);
+
+    /** Find all WAITING executions with pending timer/retry states (for recovery). */
+    default List<Execution> findPendingTimerRetry() {
+        List<Execution> result = new java.util.ArrayList<>();
+        for (ProcessInstance i : findAll()) {
+            if (!i.isRunning()) continue;
+            for (Execution e : findActiveExecutions(i.getId())) {
+                if (e.isWaiting() && ("TIMER_PENDING".equals(e.getRetryState())
+                        || "RETRY_PENDING".equals(e.getRetryState()))) {
+                    result.add(e);
+                }
+            }
+        }
+        return result;
+    }
 }
