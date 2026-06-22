@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
-import { apiGet } from '../api/client';
+import { apiGet, authHeaders } from '../api/client';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
-  const [instId, setInstId] = useState('');
+  const [instances, setInstances] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<any[] | null>(null);
 
-  useEffect(() => { apiGet('/dashboard/stats').then(setStats).catch(() => {}); }, []);
+  useEffect(() => {
+    apiGet('/dashboard/stats').then(setStats).catch(() => {});
+    apiGet('/instances').then(setInstances).catch(() => {});
+  }, []);
 
-  const loadTimeline = async () => {
-    if (!instId.trim()) return;
-    const data = await apiGet(`/dashboard/timeline/${instId.trim()}`);
+  const loadTimeline = async (id: string) => {
+    setSelectedId(id);
+    const data = await apiGet(`/dashboard/timeline/${id}`);
     setTimeline(data);
   };
 
@@ -84,30 +88,39 @@ export default function Dashboard() {
       </div>
 
       {/* ── Instance Timeline Panel ── */}
-      <div className="w-80 bg-gray-800 rounded p-3 flex flex-col">
+      <div className="w-80 bg-gray-800 rounded p-3 flex flex-col" style={{ minHeight: 0 }}>
         <h3 className="text-xs text-gray-400 font-semibold mb-2">实例耗时分析</h3>
-        <div className="flex gap-1 mb-3">
-          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
-            placeholder="输入实例ID" value={instId}
-            onChange={e => setInstId(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && loadTimeline()} />
-          <button onClick={loadTimeline}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded">查看</button>
-        </div>
-        {timeline === null && <div className="text-xs text-gray-600 text-center mt-4">输入实例ID查看各步骤耗时</div>}
-        {timeline && timeline.length === 0 && <div className="text-xs text-gray-500">无历史记录</div>}
-        {timeline && timeline.map((step: any, i: number) => (
-          <div key={i} className="flex items-center gap-2 py-1.5 border-b border-gray-750 text-xs">
-            <div className={`w-2 h-2 rounded-full ${step.action === 'enter' ? 'bg-blue-500' : step.action === 'complete' ? 'bg-green-500' : 'bg-gray-500'}`} />
-            <div className="flex-1">
-              <div className="text-gray-300">{step.nodeName || step.nodeId}</div>
-              <div className="text-[10px] text-gray-500">{step.action} · {step.time?.substring(11, 19)}</div>
+        <div className="flex-1 overflow-y-auto mb-2">
+          {instances.map((inst: any) => (
+            <div key={inst.id}
+              onClick={() => loadTimeline(inst.id)}
+              className={`p-1.5 rounded mb-0.5 cursor-pointer text-xs flex items-center gap-1.5
+                ${selectedId === inst.id ? 'bg-blue-600/30' : 'hover:bg-gray-750'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                inst.status === 'RUNNING' ? 'bg-green-500' :
+                inst.status === 'COMPLETED' ? 'bg-blue-500' :
+                inst.status === 'SUSPENDED' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+              <span className="text-gray-300 truncate flex-1">{inst.id.substring(0,8)}</span>
+              <span className="text-[10px] text-gray-500">{inst.definitionId}</span>
             </div>
-            {step.durationMs != null && (
-              <div className="text-gray-400 font-mono">{formatDuration(step.durationMs)}</div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="border-t border-gray-700 pt-2 flex-1 overflow-y-auto">
+          {!selectedId && <div className="text-xs text-gray-600 text-center mt-2">点击左侧实例查看耗时</div>}
+          {timeline && timeline.length === 0 && <div className="text-xs text-gray-500">无历史记录</div>}
+          {timeline && timeline.map((step: any, i: number) => (
+            <div key={i} className="flex items-center gap-2 py-1.5 border-b border-gray-750 text-xs">
+              <div className={`w-2 h-2 rounded-full ${step.action === 'enter' ? 'bg-blue-500' : step.action === 'complete' ? 'bg-green-500' : 'bg-gray-500'}`} />
+              <div className="flex-1">
+                <div className="text-gray-300">{step.nodeName || step.nodeId}</div>
+                <div className="text-[10px] text-gray-500">{step.action} · {step.time?.substring(11, 19)}</div>
+              </div>
+              {step.durationMs != null && (
+                <div className="text-gray-400 font-mono">{formatDuration(step.durationMs)}</div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
