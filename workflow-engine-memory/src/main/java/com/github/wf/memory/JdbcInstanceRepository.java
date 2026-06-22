@@ -153,6 +153,26 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public com.github.wf.model.InstanceStats getStatsByDefinition(String definitionId) {
+        var s = new com.github.wf.model.InstanceStats();
+        jdbc.query("SELECT status, COUNT(*) c FROM process_instance WHERE definition_id = ? GROUP BY status", (rs) -> {
+            String st = rs.getString("status"); long c = rs.getLong("c");
+            s.setTotal(s.getTotal() + c);
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
+                case RUNNING -> s.setRunning(c);
+                case COMPLETED -> s.setCompleted(c);
+                case SUSPENDED -> s.setSuspended(c);
+                case TERMINATED -> s.setTerminated(c);
+            }
+        }, definitionId);
+        Double avg = jdbc.queryForObject(
+            "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL AND definition_id = ?",
+            Double.class, definitionId);
+        if (avg != null) s.setAvgDurationMs(avg);
+        return s;
+    }
+
+    @Override
     public List<com.github.wf.engine.Execution> findPendingTimerRetry() {
         return jdbc.query(
             "SELECT e.* FROM execution e INNER JOIN process_instance i ON e.instance_id = i.id " +

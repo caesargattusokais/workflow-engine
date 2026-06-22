@@ -41,6 +41,27 @@ public interface InstanceRepository {
         }
         return s;
     }
+    /** Stats for a single definition — scoped to the user who owns the draft */
+    default InstanceStats getStatsByDefinition(String definitionId) {
+        InstanceStats s = new InstanceStats();
+        for (ProcessInstance i : findAll()) {
+            if (!definitionId.equals(i.getDefinitionId())) continue;
+            s.setTotal(s.getTotal() + 1);
+            switch (i.getStatus()) {
+                case RUNNING: s.setRunning(s.getRunning() + 1); break;
+                case COMPLETED: s.setCompleted(s.getCompleted() + 1); break;
+                case SUSPENDED: s.setSuspended(s.getSuspended() + 1); break;
+                case TERMINATED: s.setTerminated(s.getTerminated() + 1); break;
+            }
+            if (i.getCompletedAt() != null) {
+                long dur = i.getCompletedAt().toEpochMilli() - i.getCreatedAt().toEpochMilli();
+                double old = s.getAvgDurationMs();
+                s.setAvgDurationMs(old == 0 ? dur : (old + dur) / 2);
+            }
+        }
+        return s;
+    }
+
     /** Return per-definitionId counts: {defId: {running: N, total: N}} */
     default Map<String, Map<String, Long>> getSummary() {
         Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
