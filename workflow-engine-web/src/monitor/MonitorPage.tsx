@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
@@ -16,10 +16,45 @@ export default function MonitorPage() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [nodeNames, setNodeNames] = useState<Record<string,string>>({});
+  const [instPage, setInstPage] = useState(1);
+  const [instHasMore, setInstHasMore] = useState(true);
+  const [instLoadingState, setInstLoadingState] = useState(false);
+  const instLoading = useRef(false);
+
+  const loadInstances = useCallback(async (page: number) => {
+    if (instLoading.current) return;
+    instLoading.current = true;
+    setInstLoadingState(true);
+    try {
+      const r: any = await listInstances(page, 10);
+      const list = r.items || r;
+      setInstHasMore(list.length >= 10);
+      if (page === 1) {
+        setInstances(list);
+      } else {
+        setInstances(prev => [...prev, ...list]);
+      }
+      setInstPage(page);
+    } catch {} finally {
+      instLoading.current = false;
+      setInstLoadingState(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const poll = () => listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
-    poll();
+    loadInstances(1);
+  }, [loadInstances]);
+
+  // Poll first page every 5s, merge into existing list to preserve scrolled pages
+  useEffect(() => {
+    const poll = () => listInstances(1, 10).then((r: any) => {
+      const fresh = r.items || r;
+      setInstances(prev => {
+        const map = new Map(prev.map((i: any) => [i.id, i]));
+        for (const item of fresh) map.set(item.id, item);
+        return [...map.values()];
+      });
+    }).catch(() => {});
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -107,14 +142,14 @@ export default function MonitorPage() {
   const handleResume = async () => {
     if (!selectedId) return;
     await resumeInstance(selectedId);
-    listInstances().then(setInstances);
+    loadInstances(1);
     loadInstance(selectedId);
   };
 
   const handleTerminate = async () => {
     if (!selectedId) return;
     await terminateInstance(selectedId);
-    listInstances().then(setInstances);
+    loadInstances(1);
   };
 
   const [definitions, setDefinitions] = useState<any[]>([]);
@@ -131,7 +166,7 @@ export default function MonitorPage() {
       const vars = startVars ? JSON.parse(startVars) : {};
       await startInstance(startDefId, vars);
       setStartVars('');
-      listInstances().then(setInstances);
+      loadInstances(1);
     } catch (e: any) { alert('Start failed: ' + e.message); }
   };
 
@@ -171,13 +206,15 @@ export default function MonitorPage() {
       <div className="flex flex-1 overflow-hidden">
         <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance}
           defNames={Object.fromEntries(definitions.map((d:any) => [d.id, d.name || d.id]))}
-          onTerminate={async (id) => { await terminateInstance(id); listInstances().then(setInstances); }}
-          onResume={async (id) => { await resumeInstance(id); listInstances().then(setInstances); loadInstance(id); }}
-          onDelete={async (id) => { await deleteInstance(id); listInstances().then(setInstances); setSelectedId(null); }}
+          onTerminate={async (id) => { await terminateInstance(id); loadInstances(1); }}
+          onResume={async (id) => { await resumeInstance(id); loadInstances(1); loadInstance(id); }}
+          onDelete={async (id) => { await deleteInstance(id); loadInstances(1); setSelectedId(null); }}
           onRestart={async (id) => {
             const inst = instances.find(i => i.id === id);
-            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); listInstances().then(setInstances); }
-          }} />
+            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); loadInstances(1); }
+          }}
+          onScrollToBottom={() => { if (instHasMore && !instLoading.current) loadInstances(instPage + 1); }}
+          hasMore={instHasMore} loading={instLoadingState} />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {selectedInst && (

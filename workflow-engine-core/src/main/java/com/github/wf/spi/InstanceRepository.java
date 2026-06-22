@@ -5,6 +5,7 @@ import com.github.wf.model.HistoricActivity;
 import com.github.wf.model.InstanceStats;
 import com.github.wf.model.ProcessInstance;
 import java.util.List;
+import java.util.Map;
 
 public interface InstanceRepository {
     void save(ProcessInstance instance);
@@ -34,6 +35,22 @@ public interface InstanceRepository {
         }
         return s;
     }
+    /** Return per-definitionId counts: {defId: {running: N, total: N}} */
+    default Map<String, Map<String, Long>> getSummary() {
+        Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
+        for (ProcessInstance i : findAll()) {
+            result.computeIfAbsent(i.getDefinitionId(), k -> {
+                var m = new java.util.LinkedHashMap<String, Long>();
+                m.put("running", 0L); m.put("total", 0L);
+                return m;
+            });
+            var m = result.get(i.getDefinitionId());
+            m.put("total", m.get("total") + 1);
+            if (i.isRunning()) m.put("running", m.get("running") + 1);
+        }
+        return result;
+    }
+
     default void deleteById(String id) {}
 
     void saveExecution(Execution execution);

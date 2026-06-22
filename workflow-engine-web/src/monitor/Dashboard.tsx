@@ -1,16 +1,40 @@
-import { useState, useEffect } from 'react';
-import { apiGet, authHeaders } from '../api/client';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiGet, listInstances } from '../api/client';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<any[] | null>(null);
+  const [instPage, setInstPage] = useState(1);
+  const [instHasMore, setInstHasMore] = useState(true);
+  const [instLoadingState, setInstLoadingState] = useState(false);
+  const instLoading = useRef(false);
+
+  const loadInstances = useCallback(async (page: number) => {
+    if (instLoading.current) return;
+    instLoading.current = true;
+    setInstLoadingState(true);
+    try {
+      const r: any = await listInstances(page, 10);
+      const list = r.items || r;
+      setInstHasMore(list.length >= 10);
+      if (page === 1) {
+        setInstances(list);
+      } else {
+        setInstances(prev => [...prev, ...list]);
+      }
+      setInstPage(page);
+    } catch {} finally {
+      instLoading.current = false;
+      setInstLoadingState(false);
+    }
+  }, []);
 
   useEffect(() => {
     apiGet('/dashboard/stats').then(setStats).catch(() => {});
-    apiGet('/instances?size=200').then((r: any) => setInstances(r.items || r)).catch(() => {});
-  }, []);
+    loadInstances(1);
+  }, [loadInstances]);
 
   const loadTimeline = async (id: string) => {
     setSelectedId(id);
@@ -90,7 +114,13 @@ export default function Dashboard() {
       {/* ── Instance Timeline Panel ── */}
       <div className="w-80 bg-gray-800 rounded p-3 flex flex-col" style={{ minHeight: 0 }}>
         <h3 className="text-xs text-gray-400 font-semibold mb-2">实例耗时分析</h3>
-        <div className="flex-1 overflow-y-auto mb-2">
+        <div className="flex-1 overflow-y-auto mb-2"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && instHasMore && !instLoading.current) {
+              loadInstances(instPage + 1);
+            }
+          }}>
           {instances.map((inst: any) => (
             <div key={inst.id}
               onClick={() => loadTimeline(inst.id)}
@@ -104,6 +134,13 @@ export default function Dashboard() {
               <span className="text-[10px] text-gray-500">{inst.definitionId}</span>
             </div>
           ))}
+          {instHasMore && (
+            <button onClick={() => loadInstances(instPage + 1)}
+              disabled={instLoadingState}
+              className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 rounded disabled:text-gray-600">
+              {instLoadingState ? '加载中...' : '加载更多'}
+            </button>
+          )}
         </div>
         <div className="border-t border-gray-700 pt-2 flex-1 overflow-y-auto">
           {!selectedId && <div className="text-xs text-gray-600 text-center mt-2">点击左侧实例查看耗时</div>}

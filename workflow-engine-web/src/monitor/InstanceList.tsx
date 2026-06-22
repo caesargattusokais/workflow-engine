@@ -7,10 +7,11 @@ interface Instance {
   activeNodeIds: string[];
 }
 
-export default function InstanceList({ onSelect, selectedId, instances, defNames, onTerminate, onResume, onDelete, onRestart }:
+export default function InstanceList({ onSelect, selectedId, instances, defNames, onTerminate, onResume, onDelete, onRestart, onScrollToBottom, hasMore, loading }:
     { onSelect: (id: string) => void; selectedId: string | null; instances: Instance[]; defNames: Record<string, string>;
       onTerminate: (id: string) => void; onResume: (id: string) => void;
-      onDelete: (id: string) => void; onRestart: (id: string) => void; }) {
+      onDelete: (id: string) => void; onRestart: (id: string) => void;
+      onScrollToBottom?: () => void; hasMore?: boolean; loading?: boolean; }) {
 
   const { t } = useT();
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
@@ -49,7 +50,12 @@ export default function InstanceList({ onSelect, selectedId, instances, defNames
   };
 
   return (
-    <div className="w-56 bg-gray-800 border-r border-gray-700 p-2 overflow-y-auto">
+    <div className="w-56 bg-gray-800 border-r border-gray-700 p-2 overflow-y-auto"
+      onScroll={(e) => {
+        if (!onScrollToBottom) return;
+        const el = e.currentTarget;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 50) onScrollToBottom();
+      }}>
       <div className="text-xs text-gray-500 mb-2">{t.monitor.instances}</div>
       {instances.length === 0 && (
         <div className="text-gray-600 text-xs">{t.monitor.noInstances}</div>
@@ -77,6 +83,15 @@ export default function InstanceList({ onSelect, selectedId, instances, defNames
           ))}
         </div>
       ))}
+
+      {/* Load more button */}
+      {hasMore && (
+        <button onClick={onScrollToBottom}
+          disabled={loading}
+          className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 rounded disabled:text-gray-600">
+          {loading ? '加载中...' : '加载更多'}
+        </button>
+      )}
 
       {/* Context menu */}
       {menu && (

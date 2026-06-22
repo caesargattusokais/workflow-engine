@@ -3,7 +3,7 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, listInstances, copyDraft, importDraft } from '../api/client';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary } from '../api/client';
 import { graphToYaml } from './graphToYaml';
 import { yamlToGraph } from './yamlToGraph';
 import { useT } from '../i18n';
@@ -40,7 +40,11 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
 
-  const [instances, setInstances] = useState<any[]>([]);
+  const [instanceSummary, setInstanceSummary] = useState<Record<string, {running: number, total: number}>>({});
+  const [draftPage, setDraftPage] = useState(1);
+  const [draftHasMore, setDraftHasMore] = useState(true);
+  const [draftLoadingState, setDraftLoadingState] = useState(false);
+  const draftLoading = useRef(false);
 
   // Close draft context menu on click outside
   useEffect(() => {
@@ -49,20 +53,37 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     return () => window.removeEventListener('click', close);
   }, []);
 
-  // Fetch instances once when drafts change (for count display)
+  // Fetch instance summary for per-draft counts (lightweight, no pagination)
   useEffect(() => {
-    if (drafts.length > 0) listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
+    if (drafts.length > 0) fetchInstanceSummary().then(setInstanceSummary).catch(() => {});
   }, [drafts.length]);
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
-    listDrafts().then((r: any) => {
-      const list = r.items || r;
-      if (list.length > 0) {
-        setDrafts(list.map((d: any) => ({ ...d, nodes: d.nodes || [], edges: d.edges || [] })));
-      }
-    }).catch(() => {}).finally(() => setLoaded(true));
+    loadDrafts(1);
   }, []);
+
+  const loadDrafts = async (page: number) => {
+    if (draftLoading.current) return;
+    draftLoading.current = true;
+    setDraftLoadingState(true);
+    try {
+      const r: any = await listDrafts(page);
+      const list = r.items || r;
+      setDraftHasMore(list.length >= 10);
+      const mapped = list.map((d: any) => ({ ...d, nodes: d.nodes || [], edges: d.edges || [] }));
+      if (page === 1) {
+        setDrafts(mapped);
+      } else {
+        setDrafts(prev => [...prev, ...mapped]);
+      }
+      setDraftPage(page);
+    } catch {} finally {
+      draftLoading.current = false;
+      setDraftLoadingState(false);
+      setLoaded(true);
+    }
+  };
 
   // When switching drafts, load full data
   useEffect(() => {
@@ -229,7 +250,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         vars.forEach(v => { if (v.key) initVars[v.key] = v.value || ''; });
         const inst = await startInstance(result.id, initVars);
         setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
-        listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
+        fetchInstanceSummary().then(setInstanceSummary).catch(() => {});
       } catch {
         setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
       }
@@ -356,7 +377,13 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               {t.designer.newDraft}
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && draftHasMore && !draftLoading.current) {
+                loadDrafts(draftPage + 1);
+              }
+            }}>
             {drafts.map(d => (
               <div key={d.id}
                 onClick={() => switchDraft(d.id)}
@@ -368,10 +395,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                   <div className="text-[10px] text-gray-600">
                     {d.nodes.length} nodes
                     {(() => {
-                      const count = instances.filter(i => i.definitionId === d.name).length;
-                      if (count > 0) {
-                        const running = instances.filter(i => i.definitionId === d.name && i.status === 'RUNNING').length;
-                        return <span className="ml-1">| <span className="text-green-500">{running} running</span> / {count} total</span>;
+                      const s = instanceSummary[d.name];
+                      if (s && s.total > 0) {
+                        return <span className="ml-1">| <span className="text-green-500">{s.running || 0} running</span> / {s.total} total</span>;
                       }
                       return null;
                     })()}
@@ -389,6 +415,13 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               <div className="p-3 text-xs text-gray-600 text-center">
                 {t.designer.clickNew}
               </div>
+            )}
+            {draftHasMore && (
+              <button onClick={() => loadDrafts(draftPage + 1)}
+                disabled={draftLoadingState}
+                className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 disabled:text-gray-600">
+                {draftLoadingState ? '加载中...' : '加载更多'}
+              </button>
             )}
           </div>
           {/* Draft context menu */}

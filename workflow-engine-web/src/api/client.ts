@@ -39,7 +39,7 @@ async function apiDelete(path: string) {
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
 }
 
-export async function listInstances(page = 1, size = 200) { return apiGet(`/instances?page=${page}&size=${size}`); }
+export async function listInstances(page = 1, size = 10) { return apiGet(`/instances?page=${page}&size=${size}`); }
 export async function startInstance(defId: string, vars: Record<string, unknown>) {
   return apiPost('/instances', { definitionId: defId, variables: vars });
 }
@@ -66,7 +66,7 @@ export async function getDefinitionGraph(definitionId: string, version?: number)
   return apiGet(`/definitions/${encodeURIComponent(definitionId)}/graph${q}`);
 }
 
-export async function listDrafts(page?: number) { return apiGet(`/drafts?page=${page||1}&size=200`); }
+export async function listDrafts(page?: number) { return apiGet(`/drafts?page=${page||1}&size=10`); }
 export async function getDraft(id: string) { return apiGet(`/drafts/${id}`); }
 export async function createDraft(name: string) {
   return apiPost('/drafts', { name, nodes: [], edges: [] });
@@ -80,5 +80,7 @@ export async function copyDraft(id: string) { return apiPost(`/drafts/${id}/copy
 export async function importDraft(name: string, nodes: unknown[], edges: unknown[]) {
   return apiPost('/drafts/import', { name, nodes, edges });
 }
+
+export async function fetchInstanceSummary() { return apiGet('/instances/summary'); }
 
 export { userId, authHeaders, apiGet, apiPost };

@@ -147,6 +147,26 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public Map<String, Map<String, Long>> getSummary() {
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        jdbc.query("SELECT definition_id, status, COUNT(*) c FROM process_instance GROUP BY definition_id, status",
+            (rs) -> {
+                String defId = rs.getString("definition_id");
+                String st = rs.getString("status");
+                long c = rs.getLong("c");
+                result.computeIfAbsent(defId, k -> {
+                    var m = new LinkedHashMap<String, Long>();
+                    m.put("running", 0L); m.put("total", 0L);
+                    return m;
+                });
+                var m = result.get(defId);
+                m.put("total", m.get("total") + c);
+                if ("RUNNING".equals(st)) m.put("running", m.get("running") + c);
+            });
+        return result;
+    }
+
+    @Override
     public void deleteById(String id) {
         instances.remove(id);
         jdbc.update("DELETE FROM execution WHERE instance_id = ?", id);
