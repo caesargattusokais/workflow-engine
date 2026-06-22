@@ -1,5 +1,5 @@
 const zh = {
-  app: { designer: '设计器', monitor: '监控' },
+  app: { designer: '设计器', monitor: '监控', dashboard: '看板' },
   designer: {
     draftList: '草稿列表',
     import: '导入',

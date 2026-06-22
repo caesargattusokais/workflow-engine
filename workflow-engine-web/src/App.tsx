@@ -21,7 +21,7 @@ export default function App() {
         </button>
         <button onClick={() => setTab('dashboard')}
           className={`px-4 py-1 rounded ${tab === 'dashboard' ? 'bg-blue-600' : 'bg-gray-700'}`}>
-          Dashboard
+          {t.app.dashboard}
         </button>
         <div className="flex-1" />
         <LanguageSwitcher />

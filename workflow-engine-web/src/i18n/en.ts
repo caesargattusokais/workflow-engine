@@ -1,7 +1,7 @@
 import type { Translations } from './zh';
 
 const en: Translations = {
-  app: { designer: 'Designer', monitor: 'Monitor' },
+  app: { designer: 'Designer', monitor: 'Monitor', dashboard: 'Dashboard' },
   designer: {
     draftList: 'Drafts',
     import: 'Import',
