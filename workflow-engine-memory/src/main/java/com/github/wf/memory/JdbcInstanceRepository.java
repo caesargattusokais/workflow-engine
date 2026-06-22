@@ -110,6 +110,34 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public com.github.wf.model.InstanceStats getStats() {
+        var s = new com.github.wf.model.InstanceStats();
+        // Status counts
+        jdbc.query("SELECT status, COUNT(*) c FROM process_instance GROUP BY status", (rs) -> {
+            String st = rs.getString("status"); long c = rs.getLong("c");
+            s.setTotal(s.getTotal() + c);
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
+                case RUNNING -> s.setRunning(c);
+                case COMPLETED -> s.setCompleted(c);
+                case SUSPENDED -> s.setSuspended(c);
+                case TERMINATED -> s.setTerminated(c);
+            }
+        });
+        // Avg duration
+        Double avg = jdbc.queryForObject(
+            "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL", Double.class);
+        if (avg != null) s.setAvgDurationMs(avg);
+        // By definition
+        jdbc.query("SELECT definition_id, status, COUNT(*) c FROM process_instance GROUP BY definition_id, status",
+            (rs) -> {
+                s.getByDefinition()
+                    .computeIfAbsent(rs.getString("definition_id"), k -> new java.util.LinkedHashMap<>())
+                    .put(rs.getString("status"), rs.getLong("c"));
+            });
+        return s;
+    }
+
+    @Override
     public void deleteById(String id) {
         instances.remove(id);
         jdbc.update("DELETE FROM execution WHERE instance_id = ?", id);

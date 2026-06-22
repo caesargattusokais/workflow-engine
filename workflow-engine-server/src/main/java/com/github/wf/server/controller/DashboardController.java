@@ -19,27 +19,8 @@ public class DashboardController {
 
     @GetMapping("/stats")
     public Map<String, Object> stats(@RequestHeader("X-User-Id") String userId) {
-        List<ProcessInstance> all = engine.instanceRepository.findAll().stream()
-                .filter(i -> userId.equals(i.getVariable("_userId"))).toList();
-
-        long total = all.size();
-        long running = all.stream().filter(i -> i.getStatus() == InstanceStatus.RUNNING).count();
-        long completed = all.stream().filter(i -> i.getStatus() == InstanceStatus.COMPLETED).count();
-        long suspended = all.stream().filter(i -> i.getStatus() == InstanceStatus.SUSPENDED).count();
-        long terminated = all.stream().filter(i -> i.getStatus() == InstanceStatus.TERMINATED).count();
-
-        // Average duration for completed instances
-        double avgDuration = all.stream()
-                .filter(i -> i.getCompletedAt() != null && i.getCreatedAt() != null)
-                .mapToLong(i -> i.getCompletedAt().toEpochMilli() - i.getCreatedAt().toEpochMilli())
-                .average().orElse(0);
-
-        // Per-definition breakdown
-        Map<String, Map<String, Long>> byDef = new LinkedHashMap<>();
-        for (ProcessInstance i : all) {
-            byDef.computeIfAbsent(i.getDefinitionId(), k -> new LinkedHashMap<>())
-                 .merge(i.getStatus().name(), 1L, Long::sum);
-        }
+        // Instance stats via SQL aggregation (DB) or in-memory streams
+        InstanceStats stats = engine.instanceRepository.getStats();
 
         // Approver workload — count tasks by assignee
         Map<String, Long> workload = new LinkedHashMap<>();
@@ -49,14 +30,7 @@ public class DashboardController {
                 .filter(t -> t.getAssignee() != null)
                 .forEach(t -> workload.merge(t.getAssignee(), 1L, Long::sum));
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", total);
-        result.put("running", running);
-        result.put("completed", completed);
-        result.put("suspended", suspended);
-        result.put("terminated", terminated);
-        result.put("avgDurationMs", Math.round(avgDuration));
-        result.put("byDefinition", byDef);
+        Map<String, Object> result = stats.toMap();
         result.put("workload", workload);
         return result;
     }
