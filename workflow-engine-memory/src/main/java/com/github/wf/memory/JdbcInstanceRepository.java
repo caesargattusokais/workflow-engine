@@ -80,9 +80,24 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     @Override
     public List<ProcessInstance> findByDefinitionId(String definitionId) {
-        return instances.values().stream()
-                .filter(i -> definitionId.equals(i.getDefinitionId()))
-                .toList();
+        // Query DB for ALL instances (not just cached running ones)
+        return jdbc.query(
+            "SELECT * FROM process_instance WHERE definition_id = ? ORDER BY created_at DESC",
+            (rs, rowNum) -> mapInstance(rs), definitionId);
+    }
+
+    @Override
+    public List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size) {
+        return jdbc.query(
+            "SELECT * FROM process_instance WHERE definition_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (rs, rowNum) -> mapInstance(rs), definitionId, size, (page - 1) * size);
+    }
+
+    @Override
+    public long countByDefinitionId(String definitionId) {
+        Long c = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM process_instance WHERE definition_id = ?", Long.class, definitionId);
+        return c != null ? c : 0;
     }
 
     @Override

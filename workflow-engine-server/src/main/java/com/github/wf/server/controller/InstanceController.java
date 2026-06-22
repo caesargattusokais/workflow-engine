@@ -35,11 +35,8 @@ public class InstanceController {
         java.util.List<com.github.wf.model.ProcessInstance> all;
         long total;
         if (definitionId != null && !definitionId.isEmpty()) {
-            all = engine.instanceRepository.findByDefinitionId(definitionId);
-            total = all.size();
-            // Apply pagination in-memory for definition-filtered queries
-            int from = (page - 1) * size;
-            all = all.stream().skip(from).limit(size).toList();
+            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size);
+            total = engine.instanceRepository.countByDefinitionId(definitionId);
         } else {
             all = engine.instanceRepository.findAllPaginated(page, size);
             total = engine.instanceRepository.count();
