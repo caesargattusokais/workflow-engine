@@ -35,15 +35,14 @@ public class InstanceController {
         java.util.List<com.github.wf.model.ProcessInstance> all;
         long total;
         if (definitionId != null && !definitionId.isEmpty()) {
-            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size);
+            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size, status);
             total = engine.instanceRepository.countByDefinitionId(definitionId);
         } else {
-            all = engine.instanceRepository.findAllPaginated(page, size);
-            total = engine.instanceRepository.count();
+            all = engine.instanceRepository.findAllPaginated(page, size, status);
+            total = engine.instanceRepository.count(status);
         }
         var filtered = all.stream()
                 .filter(i -> userId.equals(i.getVariable("_userId")))
-                .filter(i -> status == null || i.getStatus().name().equals(status))
                 .map(InstanceDetailResponse::new)
                 .toList();
         Map<String, Object> result = new LinkedHashMap<>();

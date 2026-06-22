@@ -12,15 +12,26 @@ public interface InstanceRepository {
     ProcessInstance findById(String id);
     void update(ProcessInstance instance);
     List<ProcessInstance> findByDefinitionId(String definitionId);
-    default List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size) {
-        return findByDefinitionId(definitionId).stream().skip((long)(page-1)*size).limit(size).toList();
+    default List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size, String status) {
+        return findByDefinitionId(definitionId).stream()
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .skip((long)(page-1)*size).limit(size).toList();
     }
     default long countByDefinitionId(String definitionId) {
         return findByDefinitionId(definitionId).size();
     }
     default List<ProcessInstance> findAll() { return List.of(); }
-    default List<ProcessInstance> findAllPaginated(int page, int size) { return findAll().stream().skip((long)(page-1)*size).limit(size).toList(); }
+    default List<ProcessInstance> findAllPaginated(int page, int size, String status) {
+        return findAll().stream()
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .skip((long)(page-1)*size).limit(size).toList();
+    }
     default long count() { return findAll().size(); }
+    default long count(String status) {
+        return findAll().stream()
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .count();
+    }
     default InstanceStats getStats() {
         InstanceStats s = new InstanceStats();
         for (ProcessInstance i : findAll()) {

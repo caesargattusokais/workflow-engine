@@ -87,10 +87,14 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
-    public List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size) {
-        return jdbc.query(
-            "SELECT * FROM process_instance WHERE definition_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (rs, rowNum) -> mapInstance(rs), definitionId, size, (page - 1) * size);
+    public List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size, String status) {
+        boolean hasStatus = status != null && !status.isEmpty();
+        String sql = "SELECT * FROM process_instance WHERE definition_id = ?" +
+            (hasStatus ? " AND status = ?" : "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        Object[] params = hasStatus
+            ? new Object[]{definitionId, status, size, (page - 1) * size}
+            : new Object[]{definitionId, size, (page - 1) * size};
+        return jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), params);
     }
 
     @Override
@@ -112,15 +116,25 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
-    public List<ProcessInstance> findAllPaginated(int page, int size) {
-        int offset = (page - 1) * size;
-        return jdbc.query("SELECT * FROM process_instance ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (rs, rowNum) -> mapInstance(rs), size, offset);
+    public List<ProcessInstance> findAllPaginated(int page, int size, String status) {
+        boolean hasStatus = status != null && !status.isEmpty();
+        String sql = "SELECT * FROM process_instance" +
+            (hasStatus ? " WHERE status = ?" : "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        return hasStatus
+            ? jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), status, size, (page - 1) * size)
+            : jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), size, (page - 1) * size);
     }
 
     @Override
     public long count() {
         Long c = jdbc.queryForObject("SELECT COUNT(*) FROM process_instance", Long.class);
+        return c != null ? c : 0;
+    }
+
+    @Override
+    public long count(String status) {
+        if (status == null || status.isEmpty()) return count();
+        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM process_instance WHERE status = ?", Long.class, status);
         return c != null ? c : 0;
     }
 
