@@ -29,6 +29,7 @@ export default function MonitorPage() {
   const [defHasMore, setDefHasMore] = useState(true);
   const [defLoadingState, setDefLoadingState] = useState(false);
   const defLoading = useRef(false);
+  const [statusFilter, setStatusFilter] = useState('');
 
   // For start dropdown — load all definitions (lightweight, no nodes)
   const [allDefs, setAllDefs] = useState<any[]>([]);
@@ -67,7 +68,7 @@ export default function MonitorPage() {
       return { ...g, instLoading: true };
     }));
     try {
-      const r: any = await listInstances(page, 10, defId);
+      const r: any = await listInstances(page, 10, defId, statusFilter || undefined);
       const list = r.items || r;
       setDefGroups(prev => prev.map(g => {
         if (g.defId !== defId) return g;
@@ -77,7 +78,7 @@ export default function MonitorPage() {
     } catch {
       setDefGroups(prev => prev.map(g => g.defId === defId ? { ...g, instLoading: false } : g));
     }
-  }, []);
+  }, [statusFilter]);
 
   // Initial load
   useEffect(() => { loadDefinitions(1); }, [loadDefinitions]);
@@ -100,7 +101,7 @@ export default function MonitorPage() {
   const refreshAll = useCallback(() => {
     for (const g of defGroups) {
       if (g.instances.length > 0) {
-        listInstances(1, 10, g.defId).then((r: any) => {
+        listInstances(1, 10, g.defId, statusFilter || undefined).then((r: any) => {
           const fresh = r.items || r;
           setDefGroups(prev => prev.map(pg => {
             if (pg.defId !== g.defId) return pg;
@@ -111,7 +112,7 @@ export default function MonitorPage() {
         }).catch(() => {});
       }
     }
-  }, [defGroups]);
+  }, [defGroups, statusFilter]);
 
   // ── Auto-refresh selected instance detail every 3s ──
   useEffect(() => {
@@ -291,6 +292,18 @@ export default function MonitorPage() {
           defLoading={defLoadingState}
           onLoadMoreDefs={() => { if (defHasMore && !defLoading.current) loadDefinitions(defPage + 1); }}
           onRefresh={refreshAll}
+          statusFilter={statusFilter}
+          onStatusChange={(s) => {
+            setStatusFilter(s);
+            for (const g of defGroups) {
+              listInstances(1, 10, g.defId, s || undefined).then((r: any) => {
+                const list = r.items || r;
+                setDefGroups(prev => prev.map(pg => pg.defId === g.defId
+                  ? { ...pg, instances: list, instPage: 1, instHasMore: list.length >= 10 }
+                  : pg));
+              }).catch(() => {});
+            }
+          }}
         />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />

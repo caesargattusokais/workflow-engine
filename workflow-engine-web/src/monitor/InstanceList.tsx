@@ -15,14 +15,17 @@ interface DefGroup {
   instLoading: boolean;
 }
 
+const STATUSES = ['', 'RUNNING', 'COMPLETED', 'SUSPENDED', 'TERMINATED'];
+
 export default function InstanceList({ onSelect, selectedId, groups, onTerminate, onResume, onDelete, onRestart,
-    onLoadInstances, defHasMore, defLoading, onLoadMoreDefs, onRefresh }:
+    onLoadInstances, defHasMore, defLoading, onLoadMoreDefs, onRefresh, statusFilter, onStatusChange }:
     { onSelect: (id: string) => void; selectedId: string | null; groups: DefGroup[];
       onTerminate: (id: string) => void; onResume: (id: string) => void;
       onDelete: (id: string) => void; onRestart: (id: string) => void;
       onLoadInstances: (defId: string) => void;
       defHasMore: boolean; defLoading: boolean; onLoadMoreDefs: () => void;
-      onRefresh?: () => void; }) {
+      onRefresh?: () => void;
+      statusFilter?: string; onStatusChange?: (s: string) => void; }) {
 
   const { t } = useT();
   const [menu, setMenu] = useState<{x:number;y:number;inst:Instance}|null>(null);
@@ -65,7 +68,7 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
           if (defHasMore && !defLoading) onLoadMoreDefs();
         }
       }}>
-      <div className="text-xs text-gray-500 mb-2 flex items-center justify-between">
+      <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
         <span>{t.monitor.instances} ({totalInstances})</span>
         {onRefresh && (
           <button onClick={onRefresh}
@@ -74,6 +77,20 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
           </button>
         )}
       </div>
+      {/* Status filter chips */}
+      {onStatusChange && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {STATUSES.map(s => (
+            <button key={s} onClick={() => onStatusChange(s)}
+              className={`text-[9px] px-1.5 py-0.5 rounded-full transition-colors
+                ${(statusFilter || '') === s
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
+              {s || 'ALL'}
+            </button>
+          ))}
+        </div>
+      )}
       {groups.length === 0 && (
         <div className="text-gray-600 text-xs">{t.monitor.noInstances}</div>
       )}
