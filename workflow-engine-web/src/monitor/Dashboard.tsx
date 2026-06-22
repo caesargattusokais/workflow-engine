@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiGet, listInstances } from '../api/client';
+import { apiGet, listInstances, listDrafts } from '../api/client';
 
 export default function Dashboard() {
   const [drafts, setDrafts] = useState<any[]>([]);
@@ -12,9 +12,9 @@ export default function Dashboard() {
   const [selectedInstId, setSelectedInstId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<any[] | null>(null);
 
-  // Load all drafts for sidebar (large enough to include all user's drafts)
+  // Load user drafts for sidebar
   useEffect(() => {
-    apiGet('/drafts?page=1&size=200').then((r: any) => setDrafts(r.items || r)).catch(() => {});
+    listDrafts(1, 200).then((r: any) => setDrafts(r.items || r)).catch(() => {});
   }, []);
 
   // Load stats + instances when draft selected

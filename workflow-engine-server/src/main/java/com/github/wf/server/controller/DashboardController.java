@@ -1,7 +1,6 @@
 package com.github.wf.server.controller;
 
 import com.github.wf.engine.WorkflowEngine;
-import com.github.wf.memory.DraftRepository;
 import com.github.wf.model.*;
 import com.github.wf.task.Task;
 import com.github.wf.task.TaskStatus;
@@ -16,26 +15,13 @@ import java.util.stream.Collectors;
 public class DashboardController {
 
     private final WorkflowEngine engine;
-    private final DraftRepository draftRepo;
 
-    public DashboardController(WorkflowEngine engine, DraftRepository draftRepo) {
+    public DashboardController(WorkflowEngine engine) {
         this.engine = engine;
-        this.draftRepo = draftRepo;
     }
 
-    /** List user's drafts for the dashboard sidebar */
-    @GetMapping("/definitions")
-    public List<Map<String, Object>> definitions(@RequestHeader("X-User-Id") String userId) {
-        return draftRepo.listByUser(userId).stream()
-                .map(d -> Map.of("id", d.get("id"), "name", d.get("name")))
-                .toList();
-    }
-
-    /** Stats for a specific definition (scoped to the user who owns the draft) */
     @GetMapping("/stats")
-    public Map<String, Object> stats(
-            @RequestHeader("X-User-Id") String userId,
-            @RequestParam("definitionId") String definitionId) {
+    public Map<String, Object> stats(@RequestParam("definitionId") String definitionId) {
         InstanceStats stats = engine.instanceRepository.getStatsByDefinition(definitionId);
 
         // Workload: only count tasks belonging to instances of this definition
