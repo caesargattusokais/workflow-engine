@@ -134,12 +134,14 @@ export default function Dashboard() {
               <span className="text-[10px] text-gray-500">{inst.definitionId}</span>
             </div>
           ))}
-          {instHasMore && (
+          {instHasMore ? (
             <button onClick={() => loadInstances(instPage + 1)}
               disabled={instLoadingState}
               className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 rounded disabled:text-gray-600">
-              {instLoadingState ? '加载中...' : '加载更多'}
+              {instLoadingState ? '加载中...' : `加载更多 (${instances.length} 个)`}
             </button>
+          ) : (
+            instances.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">共 {instances.length} 个实例</div>
           )}
         </div>
         <div className="border-t border-gray-700 pt-2 flex-1 overflow-y-auto">

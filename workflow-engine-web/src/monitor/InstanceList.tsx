@@ -91,30 +91,37 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
                   </div>
                 </div>
               ))}
-              {/* Per-definition load more */}
-              {g.instHasMore && (
+              {/* Per-definition pagination */}
+              {g.instHasMore ? (
                 <button onClick={() => onLoadInstances(g.defId)}
                   disabled={g.instLoading}
                   className="w-full text-center py-1 text-xs text-blue-400 hover:bg-gray-700 rounded disabled:text-gray-600 ml-1">
-                  {g.instLoading ? '加载中...' : '加载更多实例'}
+                  {g.instLoading ? '加载中...' : `加载更多 (已显示 ${g.instances.length})`}
                 </button>
-              )}
-              {g.instances.length === 0 && !g.instLoading && !g.instHasMore && (
-                <div className="text-[10px] text-gray-600 ml-1 mb-0.5">无实例</div>
+              ) : (
+                <div className="text-[10px] text-gray-600 ml-1 py-0.5">
+                  {g.instances.length > 0 ? `共 ${g.instances.length} 个实例` : '无实例'}
+                </div>
               )}
             </>
           )}
         </div>
       ))}
 
-      {/* Load more definitions button */}
-      {defHasMore && (
-        <button onClick={onLoadMoreDefs}
-          disabled={defLoading}
-          className="w-full text-center py-1.5 text-xs text-purple-400 hover:bg-gray-700 rounded disabled:text-gray-600 border-t border-gray-700 mt-1">
-          {defLoading ? '加载中...' : '加载更多流程定义'}
-        </button>
-      )}
+      {/* Pagination footer */}
+      <div className="border-t border-gray-700 mt-1 pt-1">
+        {defHasMore ? (
+          <button onClick={onLoadMoreDefs}
+            disabled={defLoading}
+            className="w-full text-center py-1.5 text-xs text-purple-400 hover:bg-gray-700 rounded disabled:text-gray-600">
+            {defLoading ? '加载中...' : `加载更多定义 (当前 ${groups.length} 个)`}
+          </button>
+        ) : (
+          <div className="text-center py-1 text-[10px] text-gray-600">
+            共 {groups.length} 个流程定义
+          </div>
+        )}
+      </div>
 
       {/* Context menu */}
       {menu && (

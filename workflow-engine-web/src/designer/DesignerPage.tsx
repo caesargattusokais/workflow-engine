@@ -416,12 +416,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 {t.designer.clickNew}
               </div>
             )}
-            {draftHasMore && (
+            {draftHasMore ? (
               <button onClick={() => loadDrafts(draftPage + 1)}
                 disabled={draftLoadingState}
                 className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 disabled:text-gray-600">
-                {draftLoadingState ? '加载中...' : '加载更多'}
+                {draftLoadingState ? '加载中...' : `加载更多 (${drafts.length} 个)`}
               </button>
+            ) : (
+              drafts.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">共 {drafts.length} 个草稿</div>
             )}
           </div>
           {/* Draft context menu */}
