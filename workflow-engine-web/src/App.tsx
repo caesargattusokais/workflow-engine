@@ -2,9 +2,10 @@ import { useState } from 'react';
 import LanguageSwitcher, { useT } from './i18n';
 import DesignerPage from './designer/DesignerPage';
 import MonitorPage from './monitor/MonitorPage';
+import Dashboard from './monitor/Dashboard';
 
 export default function App() {
-  const [tab, setTab] = useState<'designer' | 'monitor'>('designer');
+  const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
   const { t } = useT();
 
   return (
@@ -18,12 +19,17 @@ export default function App() {
           className={`px-4 py-1 rounded ${tab === 'monitor' ? 'bg-blue-600' : 'bg-gray-700'}`}>
           {t.app.monitor}
         </button>
+        <button onClick={() => setTab('dashboard')}
+          className={`px-4 py-1 rounded ${tab === 'dashboard' ? 'bg-blue-600' : 'bg-gray-700'}`}>
+          Dashboard
+        </button>
         <div className="flex-1" />
         <LanguageSwitcher />
       </header>
       <main className="flex-1 overflow-hidden">
         {tab === 'designer' && <DesignerPage onNavigate={setTab} />}
         {tab === 'monitor' && <MonitorPage />}
+        {tab === 'dashboard' && <Dashboard />}
       </main>
     </div>
   );
