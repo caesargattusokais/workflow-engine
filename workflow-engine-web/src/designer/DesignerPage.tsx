@@ -395,7 +395,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                   <div className="text-[10px] text-gray-600">
                     {d.nodes.length} nodes
                     {(() => {
-                      const s = instanceSummary[d.name];
+                      const s = instanceSummary[d.id];
                       if (s && s.total > 0) {
                         return <span className="ml-1">| <span className="text-green-500">{s.running || 0} running</span> / {s.total} total</span>;
                       }
