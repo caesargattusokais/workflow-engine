@@ -51,7 +51,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   // Fetch instances once when drafts change (for count display)
   useEffect(() => {
-    if (drafts.length > 0) listInstances().then(setInstances).catch(() => {});
+    if (drafts.length > 0) listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
   }, [drafts.length]);
 
   // ── Load drafts from server on mount ──
@@ -229,7 +229,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         vars.forEach(v => { if (v.key) initVars[v.key] = v.value || ''; });
         const inst = await startInstance(result.id, initVars);
         setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
-        listInstances().then(setInstances).catch(() => {});
+        listInstances().then((r: any) => setInstances(r.items || r)).catch(() => {});
       } catch {
         setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
       }
