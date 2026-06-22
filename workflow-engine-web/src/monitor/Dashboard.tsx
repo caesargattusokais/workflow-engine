@@ -105,22 +105,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Workload */}
-            {stats.workload && Object.keys(stats.workload).length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-xs text-gray-400 font-semibold mb-2">审批人工作量</h3>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(stats.workload as Record<string,number>)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([name, count]) => (
-                      <div key={name} className="bg-gray-750 rounded px-2 py-1 text-xs text-gray-300">
-                        {name} <span className="text-blue-400 font-bold ml-1">{count}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
             {/* Instance list + Timeline */}
             <div className="flex gap-4" style={{ minHeight: 0 }}>
               <div className="flex-1">

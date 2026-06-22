@@ -2,12 +2,9 @@ package com.github.wf.server.controller;
 
 import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.model.*;
-import com.github.wf.task.Task;
-import com.github.wf.task.TaskStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -22,22 +19,7 @@ public class DashboardController {
 
     @GetMapping("/stats")
     public Map<String, Object> stats(@RequestParam("definitionId") String definitionId) {
-        InstanceStats stats = engine.instanceRepository.getStatsByDefinition(definitionId);
-
-        // Workload: only count tasks belonging to instances of this definition
-        Set<String> instanceIds = engine.instanceRepository.findByDefinitionId(definitionId)
-                .stream().map(ProcessInstance::getId).collect(Collectors.toSet());
-        Map<String, Long> workload = new LinkedHashMap<>();
-        List<Task> allTasks = engine.queryTasks(engine.taskQuery());
-        allTasks.stream()
-                .filter(t -> instanceIds.contains(t.getInstanceId()))
-                .filter(t -> t.getStatus() == TaskStatus.PENDING || t.getStatus() == TaskStatus.COMPLETED)
-                .filter(t -> t.getAssignee() != null)
-                .forEach(t -> workload.merge(t.getAssignee(), 1L, Long::sum));
-
-        Map<String, Object> result = stats.toMap();
-        result.put("workload", workload);
-        return result;
+        return engine.instanceRepository.getStatsByDefinition(definitionId).toMap();
     }
 
     @GetMapping("/timeline/{instanceId}")
