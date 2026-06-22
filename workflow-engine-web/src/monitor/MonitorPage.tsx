@@ -97,22 +97,23 @@ export default function MonitorPage() {
     listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
   }, []);
 
-  // Manual refresh: reload first page of instances for all loaded definitions
+  // Manual refresh: reload definitions page 1, then refresh instances for all loaded defs
   const refreshAll = useCallback(() => {
+    // Reload first page of definitions to catch new ones
+    loadDefinitions(1);
+    // Refresh instances for all currently loaded definitions (including empty ones)
     for (const g of defGroups) {
-      if (g.instances.length > 0) {
-        listInstances(1, 10, g.defId, statusFilter || undefined).then((r: any) => {
-          const fresh = r.items || r;
-          setDefGroups(prev => prev.map(pg => {
-            if (pg.defId !== g.defId) return pg;
-            const map = new Map(pg.instances.map((i: any) => [i.id, i]));
-            for (const item of fresh) map.set(item.id, item);
-            return { ...pg, instances: [...map.values()] };
-          }));
-        }).catch(() => {});
-      }
+      listInstances(1, 10, g.defId, statusFilter || undefined).then((r: any) => {
+        const fresh = r.items || r;
+        setDefGroups(prev => prev.map(pg => {
+          if (pg.defId !== g.defId) return pg;
+          const map = new Map(pg.instances.map((i: any) => [i.id, i]));
+          for (const item of fresh) map.set(item.id, item);
+          return { ...pg, instances: [...map.values()] };
+        }));
+      }).catch(() => {});
     }
-  }, [defGroups, statusFilter]);
+  }, [defGroups, statusFilter, loadDefinitions]);
 
   // ── Auto-refresh selected instance detail every 3s ──
   useEffect(() => {
