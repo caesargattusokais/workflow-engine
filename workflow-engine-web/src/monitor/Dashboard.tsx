@@ -11,11 +11,24 @@ export default function Dashboard() {
   const [instLoading, setInstLoading] = useState(false);
   const [selectedInstId, setSelectedInstId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<any[] | null>(null);
+  const [draftPage, setDraftPage] = useState(1);
+  const [draftHasMore, setDraftHasMore] = useState(false);
+  const [draftLoading, setDraftLoading] = useState(false);
 
-  // Load user drafts for sidebar
-  useEffect(() => {
-    listDrafts(1, 200).then((r: any) => setDrafts(r.items || r)).catch(() => {});
+  // Load user drafts for sidebar (paginated)
+  const loadDrafts = useCallback(async (page: number) => {
+    setDraftLoading(true);
+    try {
+      const r: any = await listDrafts(page, 10);
+      const list = r.items || r;
+      setDraftHasMore(list.length >= 10);
+      if (page === 1) setDrafts(list);
+      else setDrafts(prev => [...prev, ...list]);
+      setDraftPage(page);
+    } catch {} finally { setDraftLoading(false); }
   }, []);
+
+  useEffect(() => { loadDrafts(1); }, [loadDrafts]);
 
   // Load stats + instances when draft selected
   const selectDraft = useCallback(async (draft: any) => {
@@ -56,7 +69,13 @@ export default function Dashboard() {
       {/* Left: Draft list */}
       <div className="w-48 bg-gray-800 border-r border-gray-700 flex flex-col">
         <div className="p-2 text-xs text-gray-400 font-semibold border-b border-gray-700">我的流程</div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && draftHasMore && !draftLoading) {
+              loadDrafts(draftPage + 1);
+            }
+          }}>
           {drafts.map((d: any) => (
             <div key={d.id}
               onClick={() => selectDraft(d)}
@@ -65,7 +84,15 @@ export default function Dashboard() {
               <div className="text-gray-300 truncate">{d.name}</div>
             </div>
           ))}
-          {drafts.length === 0 && (
+          {draftHasMore ? (
+            <button onClick={() => loadDrafts(draftPage + 1)} disabled={draftLoading}
+              className="w-full text-center py-1.5 text-xs text-purple-400 hover:bg-gray-700 disabled:text-gray-600">
+              {draftLoading ? '加载中...' : `加载更多 (${drafts.length} 个)`}
+            </button>
+          ) : (
+            drafts.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">共 {drafts.length} 个流程</div>
+          )}
+          {drafts.length === 0 && !draftLoading && (
             <div className="p-3 text-xs text-gray-600 text-center">暂无可显示的流程</div>
           )}
         </div>

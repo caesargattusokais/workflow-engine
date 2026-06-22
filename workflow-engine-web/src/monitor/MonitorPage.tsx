@@ -93,7 +93,7 @@ export default function MonitorPage() {
 
   // Load all definitions for the start dropdown (once)
   useEffect(() => {
-    listDefinitions(1, 200).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
+    listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
   }, []);
 
   // Poll: refresh first page of instances for each definition every 5s
