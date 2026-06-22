@@ -65,13 +65,19 @@ public class DashboardController {
     public List<Map<String, Object>> timeline(@PathVariable("instanceId") String instanceId) {
         List<HistoricActivity> history = engine.history(instanceId);
         List<Map<String, Object>> result = new ArrayList<>();
-        for (HistoricActivity h : history) {
+        for (int i = 0; i < history.size(); i++) {
+            HistoricActivity h = history.get(i);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("nodeId", h.getNodeId());
             m.put("nodeName", h.getNodeName());
             m.put("action", h.getAction());
-            m.put("executor", h.getExecutor());
             m.put("time", h.getTimestamp().toString());
+            // Calculate duration to next step
+            if (i + 1 < history.size()) {
+                long duration = history.get(i + 1).getTimestamp().toEpochMilli()
+                        - h.getTimestamp().toEpochMilli();
+                m.put("durationMs", duration);
+            }
             result.add(m);
         }
         return result;

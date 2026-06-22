@@ -3,10 +3,16 @@ import { apiGet } from '../api/client';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
+  const [instId, setInstId] = useState('');
+  const [timeline, setTimeline] = useState<any[] | null>(null);
 
-  useEffect(() => {
-    apiGet('/dashboard/stats').then(setStats).catch(() => {});
-  }, []);
+  useEffect(() => { apiGet('/dashboard/stats').then(setStats).catch(() => {}); }, []);
+
+  const loadTimeline = async () => {
+    if (!instId.trim()) return;
+    const data = await apiGet(`/dashboard/timeline/${instId.trim()}`);
+    setTimeline(data);
+  };
 
   if (!stats) return <div className="p-4 text-gray-500 text-sm">加载中...</div>;
 
@@ -14,76 +20,94 @@ export default function Dashboard() {
   const pct = (n: number) => Math.round((n / total) * 100);
 
   return (
-    <div className="p-4 overflow-y-auto h-full">
-      <h2 className="text-gray-200 font-bold mb-4">数据看板</h2>
+    <div className="p-4 overflow-y-auto h-full flex gap-4">
+      <div className="flex-1">
+        <h2 className="text-gray-200 font-bold mb-4">数据看板</h2>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <Kpi label="总实例" value={stats.total} color="text-blue-400" />
-        <Kpi label="运行中" value={stats.running} color="text-green-400" />
-        <Kpi label="已完成" value={stats.completed} color="text-gray-300" />
-        <Kpi label="挂起" value={stats.suspended} color="text-yellow-400" />
-      </div>
-
-      {/* Progress bar */}
-      <div className="bg-gray-750 rounded p-3 mb-6">
-        <div className="text-xs text-gray-400 mb-2">
-          平均耗时 <span className="text-gray-200 font-bold">{formatDuration(stats.avgDurationMs)}</span>
+        {/* KPI cards */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          <Kpi label="总实例" value={stats.total} color="text-blue-400" />
+          <Kpi label="运行中" value={stats.running} color="text-green-400" />
+          <Kpi label="已完成" value={stats.completed} color="text-gray-300" />
+          <Kpi label="挂起" value={stats.suspended} color="text-yellow-400" />
         </div>
-        <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden flex">
-          <div className="bg-green-500 h-full text-[10px] text-white flex items-center justify-center"
-            style={{ width: pct(stats.completed) + '%' }}>
-            {pct(stats.completed)}%
+
+        {/* Progress bar */}
+        <div className="bg-gray-750 rounded p-3 mb-6">
+          <div className="text-xs text-gray-400 mb-2">
+            平均耗时 <span className="text-gray-200 font-bold">{formatDuration(stats.avgDurationMs)}</span>
           </div>
-          <div className="bg-yellow-500 h-full text-[10px] text-white flex items-center justify-center"
-            style={{ width: pct(stats.suspended) + '%' }} />
-          <div className="bg-red-500 h-full text-[10px] text-white flex items-center justify-center"
-            style={{ width: pct(stats.terminated) + '%' }} />
-          <div className="bg-blue-500 h-full text-[10px] text-white flex items-center justify-center"
-            style={{ width: pct(stats.running) + '%' }}>
-            {pct(stats.running)}%
+          <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden flex">
+            <div className="bg-green-500 h-full text-[10px] text-white flex items-center justify-center"
+              style={{ width: pct(stats.completed) + '%' }}>{pct(stats.completed)}%</div>
+            <div className="bg-yellow-500 h-full text-[10px] text-white flex items-center justify-center"
+              style={{ width: pct(stats.suspended) + '%' }} />
+            <div className="bg-red-500 h-full text-[10px] text-white flex items-center justify-center"
+              style={{ width: pct(stats.terminated) + '%' }} />
+            <div className="bg-blue-500 h-full text-[10px] text-white flex items-center justify-center"
+              style={{ width: pct(stats.running) + '%' }}>{pct(stats.running)}%</div>
           </div>
         </div>
-        <div className="flex gap-3 text-[10px] text-gray-500 mt-1">
-          <span><span className="inline-block w-2 h-2 bg-green-500 rounded mr-1" />完成</span>
-          <span><span className="inline-block w-2 h-2 bg-blue-500 rounded mr-1" />运行</span>
-          <span><span className="inline-block w-2 h-2 bg-yellow-500 rounded mr-1" />挂起</span>
-        </div>
-      </div>
 
-      {/* Per-definition */}
-      <div className="mb-6">
-        <h3 className="text-xs text-gray-400 font-semibold mb-2">按流程定义</h3>
-        <table className="w-full text-xs">
-          <thead><tr className="text-gray-500">
-            <th className="text-left py-1">定义ID</th>
-            <th className="text-right">总计</th>
-            <th className="text-right">运行</th>
-            <th className="text-right">完成</th>
-          </tr></thead>
-          <tbody>
-            {Object.entries(stats.byDefinition || {}).map(([defId, counts]: [string, any]) => (
-              <tr key={defId} className="border-t border-gray-700">
-                <td className="py-1 text-gray-300">{defId}</td>
-                <td className="text-right text-gray-400">{sum(counts)}</td>
-                <td className="text-right text-green-400">{counts.RUNNING || 0}</td>
-                <td className="text-right text-blue-400">{counts.COMPLETED || 0}</td>
-              </tr>
+        {/* Per-definition */}
+        <div className="mb-6">
+          <h3 className="text-xs text-gray-400 font-semibold mb-2">按流程定义</h3>
+          <table className="w-full text-xs">
+            <thead><tr className="text-gray-500">
+              <th className="text-left py-1">定义ID</th><th className="text-right">总计</th>
+              <th className="text-right">运行</th><th className="text-right">完成</th>
+            </tr></thead>
+            <tbody>
+              {Object.entries(stats.byDefinition || {}).map(([defId, counts]: [string, any]) => (
+                <tr key={defId} className="border-t border-gray-700">
+                  <td className="py-1 text-gray-300">{defId}</td>
+                  <td className="text-right text-gray-400">{sum(counts)}</td>
+                  <td className="text-right text-green-400">{counts.RUNNING || 0}</td>
+                  <td className="text-right text-blue-400">{counts.COMPLETED || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Workload */}
+        <div>
+          <h3 className="text-xs text-gray-400 font-semibold mb-2">审批人工作量</h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.workload || {}).sort((a: any, b: any) => b[1] - a[1]).map(([a, c]: [string, any]) => (
+              <div key={a} className="bg-gray-750 rounded px-2 py-1 text-xs text-gray-300">
+                {a} <span className="text-blue-400 font-bold ml-1">{c}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
 
-      {/* Workload */}
-      <div>
-        <h3 className="text-xs text-gray-400 font-semibold mb-2">审批人工作量</h3>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(stats.workload || {}).sort((a: any, b: any) => b[1] - a[1]).map(([assignee, count]: [string, any]) => (
-            <div key={assignee} className="bg-gray-750 rounded px-2 py-1 text-xs text-gray-300">
-              {assignee} <span className="text-blue-400 font-bold ml-1">{count}</span>
-            </div>
-          ))}
+      {/* ── Instance Timeline Panel ── */}
+      <div className="w-80 bg-gray-800 rounded p-3 flex flex-col">
+        <h3 className="text-xs text-gray-400 font-semibold mb-2">实例耗时分析</h3>
+        <div className="flex gap-1 mb-3">
+          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+            placeholder="输入实例ID" value={instId}
+            onChange={e => setInstId(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && loadTimeline()} />
+          <button onClick={loadTimeline}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded">查看</button>
         </div>
+        {timeline === null && <div className="text-xs text-gray-600 text-center mt-4">输入实例ID查看各步骤耗时</div>}
+        {timeline && timeline.length === 0 && <div className="text-xs text-gray-500">无历史记录</div>}
+        {timeline && timeline.map((step: any, i: number) => (
+          <div key={i} className="flex items-center gap-2 py-1.5 border-b border-gray-750 text-xs">
+            <div className={`w-2 h-2 rounded-full ${step.action === 'enter' ? 'bg-blue-500' : step.action === 'complete' ? 'bg-green-500' : 'bg-gray-500'}`} />
+            <div className="flex-1">
+              <div className="text-gray-300">{step.nodeName || step.nodeId}</div>
+              <div className="text-[10px] text-gray-500">{step.action} · {step.time?.substring(11, 19)}</div>
+            </div>
+            {step.durationMs != null && (
+              <div className="text-gray-400 font-mono">{formatDuration(step.durationMs)}</div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
