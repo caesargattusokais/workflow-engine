@@ -15,4 +15,8 @@ public interface DraftRepository {
     void updateVersion(String userId, String id, int version);
     void delete(String userId, String id);
     boolean nameExists(String userId, String name, String excludeId);
+    default List<Map<String, Object>> listByUserPaginated(String userId, int page, int size) {
+        return listByUser(userId).stream().skip((long)(page-1)*size).limit(size).toList();
+    }
+    default long countByUser(String userId) { return listByUser(userId).size(); }
 }

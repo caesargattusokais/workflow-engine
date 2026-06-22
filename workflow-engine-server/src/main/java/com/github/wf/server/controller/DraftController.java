@@ -22,8 +22,15 @@ public class DraftController {
     }
 
     @GetMapping
-    public List<Map<String, Object>> list(@RequestHeader("X-User-Id") String userId) {
-        return repo.listByUser(userId);
+    public Map<String, Object> list(@RequestHeader("X-User-Id") String userId,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "100") int size) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", repo.listByUserPaginated(userId, page, size));
+        result.put("page", page);
+        result.put("size", size);
+        result.put("total", repo.countByUser(userId));
+        return result;
     }
 
     @GetMapping("/{id}")

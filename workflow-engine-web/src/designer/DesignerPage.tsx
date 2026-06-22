@@ -56,7 +56,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   // ── Load drafts from server on mount ──
   useEffect(() => {
-    listDrafts().then(list => {
+    listDrafts().then((r: any) => {
+      const list = r.items || r;
       if (list.length > 0) {
         setDrafts(list.map((d: any) => ({ ...d, nodes: d.nodes || [], edges: d.edges || [] })));
       }

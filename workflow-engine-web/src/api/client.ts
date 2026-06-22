@@ -66,7 +66,7 @@ export async function getDefinitionGraph(definitionId: string, version?: number)
   return apiGet(`/definitions/${encodeURIComponent(definitionId)}/graph${q}`);
 }
 
-export async function listDrafts() { return apiGet('/drafts'); }
+export async function listDrafts(page?: number) { return apiGet(`/drafts?page=${page||1}&size=200`); }
 export async function getDraft(id: string) { return apiGet(`/drafts/${id}`); }
 export async function createDraft(name: string) {
   return apiPost('/drafts', { name, nodes: [], edges: [] });

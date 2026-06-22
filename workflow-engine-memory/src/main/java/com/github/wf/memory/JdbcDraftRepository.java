@@ -101,6 +101,19 @@ public class JdbcDraftRepository implements DraftRepository {
         return count != null && count > 0;
     }
 
+    @Override
+    public List<Map<String, Object>> listByUserPaginated(String userId, int page, int size) {
+        return jdbc.query(
+            "SELECT id, name, nodes_json, edges_json, version, created_at FROM draft WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (rs, rowNum) -> mapDraft(rs), userId, size, (page - 1) * size);
+    }
+
+    @Override
+    public long countByUser(String userId) {
+        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM draft WHERE user_id = ?", Long.class, userId);
+        return c != null ? c : 0;
+    }
+
     private Map<String, Object> mapDraft(java.sql.ResultSet rs) throws java.sql.SQLException {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("id", rs.getString("id"));
