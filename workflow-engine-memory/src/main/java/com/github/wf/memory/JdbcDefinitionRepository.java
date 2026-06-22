@@ -89,14 +89,23 @@ public class JdbcDefinitionRepository implements DefinitionRepository {
 
     @Override
     public List<ProcessDefinition> listLatestByUserPaginated(String userId, int page, int size) {
-        // Get latest version per definition with pagination
+        // Get latest version per definition with pagination, including nodes/transitions
         return jdbc.query(
-            "SELECT d.id, d.version, d.name FROM definition d " +
+            "SELECT d.id, d.version, d.name, p.nodes_json, p.transitions_json FROM definition d " +
             "INNER JOIN (SELECT id, MAX(version) mv FROM definition WHERE user_id = ? GROUP BY id) latest " +
             "ON d.id = latest.id AND d.version = latest.mv AND d.user_id = ? " +
+            "LEFT JOIN process_definition p ON d.id = p.id AND d.version = p.version " +
             "ORDER BY d.id LIMIT ? OFFSET ?",
-            (rs, rowNum) -> new ProcessDefinition(rs.getString("id"), rs.getString("name"),
-                rs.getInt("version"), List.of(), List.of()),
+            (rs, rowNum) -> {
+                String nodesJson = rs.getString("nodes_json");
+                if (nodesJson != null) {
+                    return JdbcProcessRepository.buildDefStatic(rs.getString("id"),
+                        rs.getInt("version"), rs.getString("name"),
+                        nodesJson, rs.getString("transitions_json"));
+                }
+                return new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                    rs.getInt("version"), List.of(), List.of());
+            },
             userId, userId, size, (page - 1) * size);
     }
 
