@@ -68,7 +68,8 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
       <div className="text-xs text-gray-500 mb-2 flex items-center justify-between">
         <span>{t.monitor.instances} ({totalInstances})</span>
         {onRefresh && (
-          <button onClick={onRefresh} className="text-gray-500 hover:text-gray-300 text-[10px]" title={t.monitor.refresh}>
+          <button onClick={onRefresh}
+            className="bg-gray-700 hover:bg-gray-600 text-gray-300 text-[10px] px-2 py-0.5 rounded">
             {t.monitor.refresh}
           </button>
         )}
