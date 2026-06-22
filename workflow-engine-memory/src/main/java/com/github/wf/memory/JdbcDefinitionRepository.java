@@ -87,6 +87,26 @@ public class JdbcDefinitionRepository implements DefinitionRepository {
         return gson.fromJson(json, new TypeToken<Map<String, Map<String, Double>>>() {}.getType());
     }
 
+    @Override
+    public List<ProcessDefinition> listLatestByUserPaginated(String userId, int page, int size) {
+        // Get latest version per definition with pagination
+        return jdbc.query(
+            "SELECT d.id, d.version, d.name FROM definition d " +
+            "INNER JOIN (SELECT id, MAX(version) mv FROM definition WHERE user_id = ? GROUP BY id) latest " +
+            "ON d.id = latest.id AND d.version = latest.mv AND d.user_id = ? " +
+            "ORDER BY d.id LIMIT ? OFFSET ?",
+            (rs, rowNum) -> new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                rs.getInt("version"), List.of(), List.of()),
+            userId, userId, size, (page - 1) * size);
+    }
+
+    @Override
+    public long countByUser(String userId) {
+        Long c = jdbc.queryForObject(
+            "SELECT COUNT(DISTINCT id) FROM definition WHERE user_id = ?", Long.class, userId);
+        return c != null ? c : 0;
+    }
+
     public void delete(String userId, String id) {
         jdbc.update("DELETE FROM definition WHERE user_id = ? AND id = ?", userId, id);
     }

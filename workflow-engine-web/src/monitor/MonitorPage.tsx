@@ -3,12 +3,21 @@ import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
-import { listInstances, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, authHeaders, getInstance } from '../api/client';
+import { listInstances, listDefinitions, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, getInstance } from '../api/client';
 import { useT } from '../i18n';
+
+interface DefGroup {
+  defId: string;
+  defName: string;
+  instances: any[];
+  instPage: number;
+  instHasMore: boolean;
+  instLoading: boolean;
+}
 
 export default function MonitorPage() {
   const { t } = useT();
-  const [instances, setInstances] = useState<any[]>([]);
+  const [defGroups, setDefGroups] = useState<DefGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -16,59 +25,109 @@ export default function MonitorPage() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [nodeNames, setNodeNames] = useState<Record<string,string>>({});
-  const [instPage, setInstPage] = useState(1);
-  const [instHasMore, setInstHasMore] = useState(true);
-  const [instLoadingState, setInstLoadingState] = useState(false);
-  const instLoading = useRef(false);
+  const [defPage, setDefPage] = useState(1);
+  const [defHasMore, setDefHasMore] = useState(true);
+  const [defLoadingState, setDefLoadingState] = useState(false);
+  const defLoading = useRef(false);
 
-  const loadInstances = useCallback(async (page: number) => {
-    if (instLoading.current) return;
-    instLoading.current = true;
-    setInstLoadingState(true);
+  // For start dropdown — load all definitions (lightweight, no nodes)
+  const [allDefs, setAllDefs] = useState<any[]>([]);
+
+  // ── Load definitions (paginated) ──
+  const loadDefinitions = useCallback(async (page: number) => {
+    if (defLoading.current) return;
+    defLoading.current = true;
+    setDefLoadingState(true);
     try {
-      const r: any = await listInstances(page, 10);
+      const r: any = await listDefinitions(page, 10);
       const list = r.items || r;
-      setInstHasMore(list.length >= 10);
+      setDefHasMore(list.length >= 10);
       if (page === 1) {
-        setInstances(list);
+        setDefGroups(list.map((d: any) => ({
+          defId: d.id, defName: d.name || d.id,
+          instances: [], instPage: 0, instHasMore: true, instLoading: false
+        })));
       } else {
-        setInstances(prev => [...prev, ...list]);
+        setDefGroups(prev => [...prev, ...list.map((d: any) => ({
+          defId: d.id, defName: d.name || d.id,
+          instances: [], instPage: 0, instHasMore: true, instLoading: false
+        }))]);
       }
-      setInstPage(page);
+      setDefPage(page);
     } catch {} finally {
-      instLoading.current = false;
-      setInstLoadingState(false);
+      defLoading.current = false;
+      setDefLoadingState(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadInstances(1);
-  }, [loadInstances]);
-
-  // Poll first page every 5s, merge into existing list to preserve scrolled pages
-  useEffect(() => {
-    const poll = () => listInstances(1, 10).then((r: any) => {
-      const fresh = r.items || r;
-      setInstances(prev => {
-        const map = new Map(prev.map((i: any) => [i.id, i]));
-        for (const item of fresh) map.set(item.id, item);
-        return [...map.values()];
-      });
-    }).catch(() => {});
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
+  // ── Load instances for a specific definition ──
+  const loadInstancesForDef = useCallback(async (defId: string, page: number) => {
+    setDefGroups(prev => prev.map(g => {
+      if (g.defId !== defId || g.instLoading) return g;
+      return { ...g, instLoading: true };
+    }));
+    try {
+      const r: any = await listInstances(page, 10, defId);
+      const list = r.items || r;
+      setDefGroups(prev => prev.map(g => {
+        if (g.defId !== defId) return g;
+        const merged = page === 1 ? list : [...g.instances, ...list];
+        return { ...g, instances: merged, instPage: page, instHasMore: list.length >= 10, instLoading: false };
+      }));
+    } catch {
+      setDefGroups(prev => prev.map(g => g.defId === defId ? { ...g, instLoading: false } : g));
+    }
   }, []);
 
-  // Auto-refresh selected instance detail every 3s
+  // Initial load
+  useEffect(() => { loadDefinitions(1); }, [loadDefinitions]);
+
+  // Load instances for each newly added definition group
+  useEffect(() => {
+    for (const g of defGroups) {
+      if (g.instPage === 0 && g.instHasMore && !g.instLoading) {
+        loadInstancesForDef(g.defId, 1);
+      }
+    }
+  }, [defGroups, loadInstancesForDef]);
+
+  // Load all definitions for the start dropdown (once)
+  useEffect(() => {
+    listDefinitions(1, 200).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
+  }, []);
+
+  // Poll: refresh first page of instances for each definition every 5s
+  useEffect(() => {
+    const poll = () => {
+      for (const g of defGroups) {
+        if (g.instPage > 0) {
+          listInstances(1, 10, g.defId).then((r: any) => {
+            const fresh = r.items || r;
+            setDefGroups(prev => prev.map(pg => {
+              if (pg.defId !== g.defId) return pg;
+              const map = new Map(pg.instances.map((i: any) => [i.id, i]));
+              for (const item of fresh) map.set(item.id, item);
+              return { ...pg, instances: [...map.values()] };
+            }));
+          }).catch(() => {});
+        }
+      }
+    };
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [defGroups]);
+
+  // ── Auto-refresh selected instance detail every 3s ──
   useEffect(() => {
     if (!selectedId) return;
     const refresh = async () => {
       try {
         const inst = await getInstance(selectedId);
         if (!inst) return;
-        // Update the instance in the list
-        setInstances(prev => prev.map(i => i.id === inst.id ? inst : i));
-        // Refresh graph with active nodes
+        // Update the instance in all groups
+        setDefGroups(prev => prev.map(g => ({
+          ...g, instances: g.instances.map(i => i.id === inst.id ? inst : i)
+        })));
         try {
           const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
           const activeIds: string[] = inst.activeNodeIds || [];
@@ -77,12 +136,10 @@ export default function MonitorPage() {
           })));
           setEdges(graph.edges || []);
         } catch {}
-        // Refresh tasks
         try {
           const ts = await queryTasks({ instanceId: selectedId });
           setTasks(ts.filter((t: any) => t.status === 'PENDING'));
         } catch {}
-        // Refresh history
         try {
           const h = await apiGet(`/instances/${selectedId}/history`);
           setHistory(h || []);
@@ -94,9 +151,12 @@ export default function MonitorPage() {
     return () => clearInterval(interval);
   }, [selectedId]);
 
+  // Flatten all instances for lookup
+  const allInstances = defGroups.flatMap(g => g.instances);
+
   const loadInstance = useCallback(async (id: string) => {
     setSelectedId(id);
-    const inst = instances.find(i => i.id === id);
+    const inst = allInstances.find(i => i.id === id);
     if (!inst) return;
 
     setError(null);
@@ -118,14 +178,13 @@ export default function MonitorPage() {
       const h = await apiGet(`/instances/${id}/history`);
       setHistory(h || []);
     } catch { setHistory([]); }
-    // Build node name map from graph
     try {
       const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
       const names: Record<string,string> = {};
       (graph.nodes||[]).forEach((n:any) => { names[n.id] = n.data?.name || n.id; });
       setNodeNames(names);
     } catch {}
-  }, [instances]);
+  }, [allInstances]);
 
   const handleComplete = async (taskId: string) => {
     await completeTask(taskId);
@@ -133,32 +192,31 @@ export default function MonitorPage() {
   };
 
   const handleReject = async (taskId: string) => {
-    try {
-      await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' });
-    } catch {}
+    try { await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' }); } catch {}
     if (selectedId) loadInstance(selectedId);
   };
 
   const handleResume = async () => {
     if (!selectedId) return;
     await resumeInstance(selectedId);
-    loadInstances(1);
+    const inst = allInstances.find(i => i.id === selectedId);
+    if (inst) loadInstancesForDef(inst.definitionId, 1);
     loadInstance(selectedId);
   };
 
   const handleTerminate = async () => {
     if (!selectedId) return;
     await terminateInstance(selectedId);
-    loadInstances(1);
+    const inst = allInstances.find(i => i.id === selectedId);
+    if (inst) loadInstancesForDef(inst.definitionId, 1);
   };
 
-  const [definitions, setDefinitions] = useState<any[]>([]);
+  const refreshDef = async (defId: string) => {
+    loadInstancesForDef(defId, 1);
+  };
+
   const [startDefId, setStartDefId] = useState('');
   const [startVars, setStartVars] = useState('');
-
-  useEffect(() => {
-    apiGet('/definitions').then(setDefinitions).catch(() => {});
-  }, [instances]);
 
   const handleStart = async () => {
     if (!startDefId) return;
@@ -166,7 +224,7 @@ export default function MonitorPage() {
       const vars = startVars ? JSON.parse(startVars) : {};
       await startInstance(startDefId, vars);
       setStartVars('');
-      loadInstances(1);
+      refreshDef(startDefId);
     } catch (e: any) { alert('Start failed: ' + e.message); }
   };
 
@@ -180,7 +238,7 @@ export default function MonitorPage() {
     return m[s] || s;
   };
 
-  const selectedInst = instances.find(i => i.id === selectedId);
+  const selectedInst = allInstances.find(i => i.id === selectedId);
 
   return (
     <div className="flex flex-col h-full">
@@ -190,7 +248,7 @@ export default function MonitorPage() {
         <select value={startDefId} onChange={e => setStartDefId(e.target.value)}
           className="bg-gray-700 rounded px-2 py-1 text-white text-xs">
           <option value="">-- pick definition --</option>
-          {definitions.map((d: any) => (
+          {allDefs.map((d: any) => (
             <option key={d.id} value={d.id}>{d.name || d.id} (v{d.version})</option>
           ))}
         </select>
@@ -204,17 +262,39 @@ export default function MonitorPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <InstanceList instances={instances} selectedId={selectedId} onSelect={loadInstance}
-          defNames={Object.fromEntries(definitions.map((d:any) => [d.id, d.name || d.id]))}
-          onTerminate={async (id) => { await terminateInstance(id); loadInstances(1); }}
-          onResume={async (id) => { await resumeInstance(id); loadInstances(1); loadInstance(id); }}
-          onDelete={async (id) => { await deleteInstance(id); loadInstances(1); setSelectedId(null); }}
-          onRestart={async (id) => {
-            const inst = instances.find(i => i.id === id);
-            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); loadInstances(1); }
+        <InstanceList
+          groups={defGroups}
+          selectedId={selectedId}
+          onSelect={loadInstance}
+          onTerminate={async (id) => {
+            await terminateInstance(id);
+            const inst = allInstances.find(i => i.id === id);
+            if (inst) refreshDef(inst.definitionId);
           }}
-          onScrollToBottom={() => { if (instHasMore && !instLoading.current) loadInstances(instPage + 1); }}
-          hasMore={instHasMore} loading={instLoadingState} />
+          onResume={async (id) => {
+            await resumeInstance(id);
+            const inst = allInstances.find(i => i.id === id);
+            if (inst) refreshDef(inst.definitionId);
+            loadInstance(id);
+          }}
+          onDelete={async (id) => {
+            await deleteInstance(id);
+            const inst = allInstances.find(i => i.id === id);
+            if (inst) refreshDef(inst.definitionId);
+            setSelectedId(null);
+          }}
+          onRestart={async (id) => {
+            const inst = allInstances.find(i => i.id === id);
+            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); refreshDef(inst.definitionId); }
+          }}
+          onLoadInstances={(defId) => {
+            const g = defGroups.find(d => d.defId === defId);
+            if (g && g.instHasMore && !g.instLoading) loadInstancesForDef(defId, g.instPage + 1);
+          }}
+          defHasMore={defHasMore}
+          defLoading={defLoadingState}
+          onLoadMoreDefs={() => { if (defHasMore && !defLoading.current) loadDefinitions(defPage + 1); }}
+        />
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {selectedInst && (
@@ -247,14 +327,10 @@ export default function MonitorPage() {
                 {statusLabel(selectedInst.status)}
               </span>
             </div>
-
-            {/* Active nodes */}
             <div className="text-gray-400 font-semibold mt-3 mb-1">Active Nodes</div>
             {selectedInst.activeNodeIds?.length > 0 ? selectedInst.activeNodeIds.map((nid: string) => (
               <div key={nid} className="text-blue-400 mb-0.5">● {nodeNames[nid] || nid}</div>
             )) : <div className="text-gray-600">none</div>}
-
-            {/* Variables */}
             <div className="text-gray-400 font-semibold mt-3 mb-1">{t.designer.variables}</div>
             {Object.keys(selectedInst.variables || {}).length > 0
               ? Object.entries(selectedInst.variables||{}).map(([k,v]) => (
@@ -263,8 +339,6 @@ export default function MonitorPage() {
                 </div>
               ))
               : <div className="text-gray-600">none</div>}
-
-            {/* History */}
             <div className="text-gray-400 font-semibold mt-3 mb-1">{t.monitor.history} ({history.length})</div>
             {history.slice(-10).reverse().map((h:any,i:number) => (
               <div key={i} className="mb-1 pl-2 border-l border-gray-700">

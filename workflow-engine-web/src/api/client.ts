@@ -39,7 +39,11 @@ async function apiDelete(path: string) {
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
 }
 
-export async function listInstances(page = 1, size = 10) { return apiGet(`/instances?page=${page}&size=${size}`); }
+export async function listInstances(page = 1, size = 10, definitionId?: string) {
+  let url = `/instances?page=${page}&size=${size}`;
+  if (definitionId) url += `&definitionId=${encodeURIComponent(definitionId)}`;
+  return apiGet(url);
+}
 export async function startInstance(defId: string, vars: Record<string, unknown>) {
   return apiPost('/instances', { definitionId: defId, variables: vars });
 }
@@ -57,6 +61,8 @@ export async function queryTasks(params: { instanceId: string }) {
 export async function completeTask(taskId: string, vars?: Record<string,unknown>, comment?: string) {
   return apiPost(`/tasks/${taskId}/complete`, { variables: vars || {}, comment: comment || '' });
 }
+
+export async function listDefinitions(page = 1, size = 10) { return apiGet(`/definitions?page=${page}&size=${size}`); }
 
 export async function deployDefinition(yaml: string, positions?: Record<string, {x:number;y:number}>) {
   return apiPost('/definitions', { yaml, positions });

@@ -33,10 +33,16 @@ public class InstanceController {
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
         java.util.List<com.github.wf.model.ProcessInstance> all;
+        long total;
         if (definitionId != null && !definitionId.isEmpty()) {
             all = engine.instanceRepository.findByDefinitionId(definitionId);
+            total = all.size();
+            // Apply pagination in-memory for definition-filtered queries
+            int from = (page - 1) * size;
+            all = all.stream().skip(from).limit(size).toList();
         } else {
             all = engine.instanceRepository.findAllPaginated(page, size);
+            total = engine.instanceRepository.count();
         }
         var filtered = all.stream()
                 .filter(i -> userId.equals(i.getVariable("_userId")))
@@ -47,7 +53,7 @@ public class InstanceController {
         result.put("items", filtered);
         result.put("page", page);
         result.put("size", size);
-        result.put("total", engine.instanceRepository.count());
+        result.put("total", total);
         return result;
     }
 

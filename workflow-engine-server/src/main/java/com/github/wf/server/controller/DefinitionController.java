@@ -33,8 +33,15 @@ public class DefinitionController {
     }
 
     @GetMapping
-    public List<ProcessDefinition> list(@RequestHeader("X-User-Id") String userId) {
-        return repo.listLatestByUser(userId);
+    public Map<String, Object> list(@RequestHeader("X-User-Id") String userId,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", repo.listLatestByUserPaginated(userId, page, size));
+        result.put("page", page);
+        result.put("size", size);
+        result.put("total", repo.countByUser(userId));
+        return result;
     }
 
     @GetMapping("/{id}")
