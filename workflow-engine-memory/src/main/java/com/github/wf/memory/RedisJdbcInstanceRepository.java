@@ -1,7 +1,7 @@
 package com.github.wf.memory;
 
 import com.github.wf.engine.Execution;
-import com.github.wf.engine.ExecutionStatus;
+
 import com.github.wf.model.*;
 import com.github.wf.spi.InstanceRepository;
 import com.google.gson.Gson;
@@ -206,35 +206,40 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
-    public InstanceStats getStats() {
-        var s = new InstanceStats();
+    public com.github.wf.model.InstanceStats getStats() {
+        var s = new com.github.wf.model.InstanceStats();
+        // Status counts
         jdbc.query("SELECT status, COUNT(*) c FROM process_instance GROUP BY status", (rs) -> {
             String st = rs.getString("status"); long c = rs.getLong("c");
             s.setTotal(s.getTotal() + c);
-            switch (InstanceStatus.valueOf(st)) {
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
                 case RUNNING -> s.setRunning(c);
                 case COMPLETED -> s.setCompleted(c);
                 case SUSPENDED -> s.setSuspended(c);
                 case TERMINATED -> s.setTerminated(c);
             }
         });
+        // Avg duration
         Double avg = jdbc.queryForObject(
             "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL", Double.class);
         if (avg != null) s.setAvgDurationMs(avg);
+        // By definition
         jdbc.query("SELECT definition_id, status, COUNT(*) c FROM process_instance GROUP BY definition_id, status",
-            (rs) -> s.getByDefinition()
-                .computeIfAbsent(rs.getString("definition_id"), k -> new LinkedHashMap<>())
-                .put(rs.getString("status"), rs.getLong("c")));
+            (rs) -> {
+                s.getByDefinition()
+                    .computeIfAbsent(rs.getString("definition_id"), k -> new java.util.LinkedHashMap<>())
+                    .put(rs.getString("status"), rs.getLong("c"));
+            });
         return s;
     }
 
     @Override
-    public InstanceStats getStatsByDefinition(String definitionId) {
-        var s = new InstanceStats();
+    public com.github.wf.model.InstanceStats getStatsByDefinition(String definitionId) {
+        var s = new com.github.wf.model.InstanceStats();
         jdbc.query("SELECT status, COUNT(*) c FROM process_instance WHERE definition_id = ? GROUP BY status", (rs) -> {
             String st = rs.getString("status"); long c = rs.getLong("c");
             s.setTotal(s.getTotal() + c);
-            switch (InstanceStatus.valueOf(st)) {
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
                 case RUNNING -> s.setRunning(c);
                 case COMPLETED -> s.setCompleted(c);
                 case SUSPENDED -> s.setSuspended(c);
@@ -425,8 +430,9 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
 
     private Execution mapExecution(java.sql.ResultSet rs) throws java.sql.SQLException {
         String parentId = rs.getString("parent_execution_id");
+        boolean parentNull = rs.wasNull();
         Execution exec = new Execution(rs.getString("id"), rs.getString("instance_id"),
-            rs.getString("current_node_id"), rs.wasNull() ? null : parentId);
+            rs.getString("current_node_id"), parentNull ? null : parentId);
         exec.setStatus(ExecutionStatus.valueOf(rs.getString("status")));
         exec.setRetryAttempt(rs.getInt("retry_attempt"));
         exec.setNextRetryAt(rs.getLong("next_retry_at"));

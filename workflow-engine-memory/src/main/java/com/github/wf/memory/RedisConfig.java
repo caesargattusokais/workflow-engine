@@ -1,7 +1,8 @@
 package com.github.wf.memory;
 
 import com.github.wf.engine.Execution;
-import com.github.wf.engine.ExecutionStatus;
+
+import com.github.wf.model.ExecutionStatus;
 import com.github.wf.model.InstanceStatus;
 import com.github.wf.model.ProcessInstance;
 import com.google.gson.*;
