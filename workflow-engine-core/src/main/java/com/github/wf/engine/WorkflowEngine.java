@@ -80,19 +80,25 @@ public class WorkflowEngine {
      * executions and re-triggers them so the daemon can pick them up.
      */
     public void recover() {
-        log.warn("Starting recovery scan...");
-        int count = 0;
-        List<Execution> pending = instanceRepository.findPendingTimerRetry();
-        for (Execution exec : pending) {
-            log.warn("Recovering pending execution: instance=" + exec.getInstanceId()
-                    + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
-            exec.setStatus(ExecutionStatus.ACTIVE);
-            exec.setRetryState(null);
-            instanceRepository.updateExecution(exec);
-            trigger(exec.getInstanceId());
-            count++;
+        // Global recovery lock — prevents multiple nodes from scanning concurrently
+        lockManager.writeLock("__recover__");
+        try {
+            log.warn("Starting recovery scan...");
+            int count = 0;
+            List<Execution> pending = instanceRepository.findPendingTimerRetry();
+            for (Execution exec : pending) {
+                log.warn("Recovering pending execution: instance=" + exec.getInstanceId()
+                        + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
+                exec.setStatus(ExecutionStatus.ACTIVE);
+                exec.setRetryState(null);
+                instanceRepository.updateExecution(exec);
+                trigger(exec.getInstanceId());
+                count++;
+            }
+            log.warn("Recovery complete: " + count + " executions re-triggered");
+        } finally {
+            lockManager.writeUnlock("__recover__");
         }
-        log.warn("Recovery complete: " + count + " executions re-triggered");
     }
 
     public void setProcessParser(ProcessParser processParser) { this.processParser = processParser; }
