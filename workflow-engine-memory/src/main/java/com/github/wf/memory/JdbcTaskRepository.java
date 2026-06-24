@@ -1,6 +1,7 @@
 package com.github.wf.memory;
 
 import com.github.wf.engine.InstanceLockManager;
+import com.github.wf.engine.LocalInstanceLockManager;
 import com.github.wf.spi.TaskRepository;
 import com.github.wf.task.Task;
 import com.github.wf.task.TaskQuery;
@@ -10,40 +11,32 @@ import com.google.gson.reflect.TypeToken;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * JDBC-backed TaskRepository with per-taskId ReadWriteLock (local)
- * and optional distributed lock (redis profile).
+ * JDBC-backed TaskRepository. Locking delegated to InstanceLockManager
+ * (local ReentrantReadWriteLock by default, Redis distributed in redis profile).
  */
 public class JdbcTaskRepository implements TaskRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();
-    private static final String DIST_LOCK_PREFIX = "wf:lock:task:";
-    private final Map<String, ReadWriteLock> locks = new ConcurrentHashMap<>();
-    private final InstanceLockManager distLockManager;
+    private final InstanceLockManager lockMgr;
 
-    private ReadWriteLock localLock(String taskId) {
-        return locks.computeIfAbsent(taskId, k -> new ReentrantReadWriteLock());
-    }
+    private String taskKey(String taskId) { return "task:" + taskId; }
 
     public JdbcTaskRepository(JdbcTemplate jdbc) {
-        this(jdbc, null);
+        this(jdbc, new LocalInstanceLockManager());
     }
 
-    public JdbcTaskRepository(JdbcTemplate jdbc, InstanceLockManager distLockManager) {
+    public JdbcTaskRepository(JdbcTemplate jdbc, InstanceLockManager lockMgr) {
         this.jdbc = jdbc;
-        this.distLockManager = distLockManager;
+        this.lockMgr = lockMgr;
     }
 
     @Override
     public void save(Task task) {
-        if (distLockManager != null) distLockManager.lock(DIST_LOCK_PREFIX + task.getId());
-        var rw = localLock(task.getId());
-        rw.writeLock().lock();
+        String key = taskKey(task.getId());
+        lockMgr.writeLock(key);
         try {
             jdbc.update(
                 "INSERT INTO task (id, instance_id, node_id, assignee, candidate_groups_json, status, variables_json, created_at, completed_at) " +
@@ -53,31 +46,27 @@ public class JdbcTaskRepository implements TaskRepository {
                 gson.toJson(task.getVariables()), task.getCreatedAt().toEpochMilli(),
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null);
         } finally {
-            rw.writeLock().unlock();
-            if (distLockManager != null) distLockManager.unlock(DIST_LOCK_PREFIX + task.getId());
+            lockMgr.writeUnlock(key);
         }
     }
 
     @Override
     public Task findById(String id) {
-        if (distLockManager != null) distLockManager.lock(DIST_LOCK_PREFIX + id);
-        var rw = localLock(id);
-        rw.readLock().lock();
+        String key = taskKey(id);
+        lockMgr.readLock(key);
         try {
             List<Task> list = jdbc.query("SELECT * FROM task WHERE id = ?",
                 (rs, rowNum) -> mapTask(rs), id);
             return list.isEmpty() ? null : list.get(0);
         } finally {
-            rw.readLock().unlock();
-            if (distLockManager != null) distLockManager.unlock(DIST_LOCK_PREFIX + id);
+            lockMgr.readUnlock(key);
         }
     }
 
     @Override
     public void update(Task task) {
-        if (distLockManager != null) distLockManager.lock(DIST_LOCK_PREFIX + task.getId());
-        var rw = localLock(task.getId());
-        rw.writeLock().lock();
+        String key = taskKey(task.getId());
+        lockMgr.writeLock(key);
         try {
             jdbc.update(
                 "UPDATE task SET assignee=?, candidate_groups_json=?, status=?, variables_json=?, completed_at=? WHERE id=?",
@@ -86,14 +75,12 @@ public class JdbcTaskRepository implements TaskRepository {
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null,
                 task.getId());
         } finally {
-            rw.writeLock().unlock();
-            if (distLockManager != null) distLockManager.unlock(DIST_LOCK_PREFIX + task.getId());
+            lockMgr.writeUnlock(key);
         }
     }
 
     @Override
     public List<Task> query(TaskQuery query) {
-        // Read-only scan — no lock needed
         StringBuilder sql = new StringBuilder("SELECT * FROM task WHERE 1=1");
         List<Object> params = new ArrayList<>();
 

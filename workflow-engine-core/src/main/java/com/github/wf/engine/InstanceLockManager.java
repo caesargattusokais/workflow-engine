@@ -1,7 +1,16 @@
 package com.github.wf.engine;
 
-/** Distributed lock for per-instance mutual exclusion during trigger loops. */
+/** Distributed read/write lock — used for per-instance and per-task mutual exclusion. */
 public interface InstanceLockManager {
-    void lock(String instanceId);
-    void unlock(String instanceId);
+    /** Exclusive lock (write). */
+    void writeLock(String key);
+    void writeUnlock(String key);
+
+    /** Shared lock (read). */
+    void readLock(String key);
+    void readUnlock(String key);
+
+    /** Convenience — delegates to writeLock. */
+    default void lock(String key) { writeLock(key); }
+    default void unlock(String key) { writeUnlock(key); }
 }

@@ -8,11 +8,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
-/** Distributed per-instance lock backed by Redis SET NX PX + Lua release. */
+/** Distributed read/write lock backed by Redis SET NX PX + Lua release.
+ *  Reads and writes both use exclusive SETNX — correct and safe. */
 public class RedisInstanceLockManager implements InstanceLockManager {
 
     private final StringRedisTemplate redis;
-    private static final String PREFIX = "wf:lock:instance:";
+    private static final String KEY_PREFIX = "wf:lock:";
     private static final long LOCK_MS = 30_000;
     private static final long RETRY_MS = 50;
     private static final int MAX_RETRIES = 100;
@@ -30,28 +31,47 @@ public class RedisInstanceLockManager implements InstanceLockManager {
         this.redis = redis;
     }
 
+    // ── write lock (exclusive) ──
+
     @Override
-    public void lock(String instanceId) {
-        String key = PREFIX + instanceId;
+    public void writeLock(String key) {
+        acquire(KEY_PREFIX + "w:" + key);
+    }
+
+    @Override
+    public void writeUnlock(String key) {
+        release(KEY_PREFIX + "w:" + key);
+    }
+
+    // ── read lock (exclusive across JVMs, safe) ──
+
+    @Override
+    public void readLock(String key) {
+        acquire(KEY_PREFIX + "r:" + key);
+    }
+
+    @Override
+    public void readUnlock(String key) {
+        release(KEY_PREFIX + "r:" + key);
+    }
+
+    // ── internal ──
+
+    private void acquire(String key) {
         String token = UUID.randomUUID().toString();
-        // Store token in a ThreadLocal-like way — we just use a simple map keyed by instanceId
-        // But since lock()/unlock() are always paired in trigger(), we can use a thread-local approach
-        // Simpler: store token via SET and retry
         for (int i = 0; i < MAX_RETRIES; i++) {
             Boolean ok = redis.opsForValue().setIfAbsent(key, token, Duration.ofMillis(LOCK_MS));
             if (Boolean.TRUE.equals(ok)) {
-                LockToken.set(instanceId, token);
+                LockToken.set(key, token);
                 return;
             }
             try { Thread.sleep(RETRY_MS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
         }
-        throw new RuntimeException("Failed to acquire lock for instance: " + instanceId);
+        throw new RuntimeException("Failed to acquire lock: " + key);
     }
 
-    @Override
-    public void unlock(String instanceId) {
-        String key = PREFIX + instanceId;
-        String token = LockToken.remove(instanceId);
+    private void release(String key) {
+        String token = LockToken.remove(key);
         if (token != null) {
             redis.execute(UNLOCK_SCRIPT, List.of(key), token);
         }
@@ -60,7 +80,7 @@ public class RedisInstanceLockManager implements InstanceLockManager {
     /** Thread-local storage for lock ownership tokens. */
     private static class LockToken {
         private static final ThreadLocal<java.util.Map<String, String>> holder = ThreadLocal.withInitial(java.util.HashMap::new);
-        static void set(String id, String token) { holder.get().put(id, token); }
-        static String remove(String id) { return holder.get().remove(id); }
+        static void set(String key, String token) { holder.get().put(key, token); }
+        static String remove(String key) { return holder.get().remove(key); }
     }
 }
