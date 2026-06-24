@@ -1,5 +1,7 @@
 package com.github.wf.memory;
 
+import com.github.wf.engine.InstanceLockManager;
+import com.github.wf.engine.LocalInstanceLockManager;
 import com.github.wf.spi.TaskRepository;
 import com.github.wf.task.Task;
 import com.github.wf.task.TaskQuery;
@@ -9,31 +11,36 @@ import com.google.gson.reflect.TypeToken;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * JDBC-backed TaskRepository with per-taskId ReadWriteLock.
+ * JDBC-backed TaskRepository with optional distributed locking.
  */
 public class JdbcTaskRepository implements TaskRepository {
 
     private final JdbcTemplate jdbc;
     private static final Gson gson = new Gson();
-    private final Map<String, ReadWriteLock> locks = new ConcurrentHashMap<>();
+    private static final String LOCK_PREFIX = "wf:lock:task:";
+    private final InstanceLockManager lockManager;
 
-    private ReadWriteLock taskLock(String taskId) {
-        return locks.computeIfAbsent(taskId, k -> new ReentrantReadWriteLock());
+    private void lockTask(String taskId) {
+        if (lockManager != null) lockManager.lock(LOCK_PREFIX + taskId);
+    }
+    private void unlockTask(String taskId) {
+        if (lockManager != null) lockManager.unlock(LOCK_PREFIX + taskId);
     }
 
     public JdbcTaskRepository(JdbcTemplate jdbc) {
+        this(jdbc, new LocalInstanceLockManager());
+    }
+
+    public JdbcTaskRepository(JdbcTemplate jdbc, InstanceLockManager lockManager) {
         this.jdbc = jdbc;
+        this.lockManager = lockManager;
     }
 
     @Override
     public void save(Task task) {
-        var rw = taskLock(task.getId());
-        rw.writeLock().lock();
+        lockTask(task.getId());
         try {
             jdbc.update(
                 "INSERT INTO task (id, instance_id, node_id, assignee, candidate_groups_json, status, variables_json, created_at, completed_at) " +
@@ -43,27 +50,25 @@ public class JdbcTaskRepository implements TaskRepository {
                 gson.toJson(task.getVariables()), task.getCreatedAt().toEpochMilli(),
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null);
         } finally {
-            rw.writeLock().unlock();
+            unlockTask(task.getId());
         }
     }
 
     @Override
     public Task findById(String id) {
-        var rw = taskLock(id);
-        rw.readLock().lock();
+        lockTask(id);
         try {
             List<Task> list = jdbc.query("SELECT * FROM task WHERE id = ?",
                 (rs, rowNum) -> mapTask(rs), id);
             return list.isEmpty() ? null : list.get(0);
         } finally {
-            rw.readLock().unlock();
+            unlockTask(id);
         }
     }
 
     @Override
     public void update(Task task) {
-        var rw = taskLock(task.getId());
-        rw.writeLock().lock();
+        lockTask(task.getId());
         try {
             jdbc.update(
                 "UPDATE task SET assignee=?, candidate_groups_json=?, status=?, variables_json=?, completed_at=? WHERE id=?",
@@ -72,7 +77,7 @@ public class JdbcTaskRepository implements TaskRepository {
                 task.getCompletedAt() != null ? task.getCompletedAt().toEpochMilli() : null,
                 task.getId());
         } finally {
-            rw.writeLock().unlock();
+            unlockTask(task.getId());
         }
     }
 

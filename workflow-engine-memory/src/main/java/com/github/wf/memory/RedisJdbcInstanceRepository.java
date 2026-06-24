@@ -37,7 +37,7 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
 
     private void loadFromRedis() {
         Set<String> keys = redis.keys(INST_PREFIX + "*");
-        if (keys == null || keys.isEmpty()) {
+        if (keys.isEmpty()) {
             // Cold start — load from DB
             loadRunning();
             return;
