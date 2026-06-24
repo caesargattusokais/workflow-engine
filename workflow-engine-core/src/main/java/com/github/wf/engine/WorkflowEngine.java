@@ -18,7 +18,6 @@ import org.apache.commons.logging.LogFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class WorkflowEngine {
 
@@ -28,7 +27,7 @@ public class WorkflowEngine {
     public final TaskRepository taskRepository;
     final ExpressionEvaluator expressionEvaluator;
     final DelayQueue<DelayedTrigger> delayQueue = new DelayQueue<>();
-    final ConcurrentHashMap<String, ReentrantLock> instanceLocks = new ConcurrentHashMap<>();
+    final InstanceLockManager lockManager;
 
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
     private ProcessParser processParser = new YamlProcessParser();
@@ -39,12 +38,14 @@ public class WorkflowEngine {
                    TaskRepository taskRepository,
                    ExpressionEvaluator expressionEvaluator,
                    com.github.wf.ext.OrgService orgService,
-                   String baseUrl) {
+                   String baseUrl,
+                   InstanceLockManager lockManager) {
         this.processRepository = processRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
         this.baseUrl = baseUrl;
+        this.lockManager = lockManager;
         registerDefaultRunners(orgService);
         // Delay daemon: picks up delayed triggers (retry/timer), wakes instances
         Thread delayDaemon = new Thread(() -> {
@@ -176,8 +177,7 @@ public class WorkflowEngine {
     // === Trigger Loop ===
 
     public void trigger(String instanceId) {
-        ReentrantLock lock = instanceLocks.computeIfAbsent(instanceId, k -> new ReentrantLock());
-        lock.lock();
+        lockManager.lock(instanceId);
         try {
             ProcessInstance instance = instanceRepository.findById(instanceId);
             if (instance == null || !instance.isRunning()) return;
@@ -264,7 +264,7 @@ public class WorkflowEngine {
             instanceRepository.update(instance);
 
         } finally {
-            lock.unlock();
+            lockManager.unlock(instanceId);
         }
     }
 

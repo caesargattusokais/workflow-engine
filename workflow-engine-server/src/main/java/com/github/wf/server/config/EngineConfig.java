@@ -15,15 +15,20 @@ import com.github.wf.memory.JdbcDraftRepository;
 import com.github.wf.memory.JdbcInstanceRepository;
 import com.github.wf.memory.JdbcProcessRepository;
 import com.github.wf.memory.JdbcTaskRepository;
+import com.github.wf.memory.RedisInstanceLockManager;
+import com.github.wf.memory.RedisJdbcInstanceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
+
+import com.google.gson.Gson;
 import java.util.Properties;
 
 @Configuration
@@ -78,7 +83,7 @@ public class EngineConfig {
     // ── Engine ────────────────────────────
 
     @Bean
-    @Profile("!memory")
+    @Profile("!memory & !redis")
     public WorkflowEngine workflowEngine(DataSource dataSource,
             @org.springframework.beans.factory.annotation.Autowired(required = false) OrgService orgService) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
@@ -86,6 +91,26 @@ public class EngineConfig {
                 .processRepository(new JdbcProcessRepository(jdbc))
                 .instanceRepository(new JdbcInstanceRepository(jdbc))
                 .taskRepository(new JdbcTaskRepository(jdbc))
+                .baseUrl(baseUrl);
+        if (orgService != null) builder.orgService(orgService);
+        WorkflowEngine engine = builder.build();
+        engine.recover();
+        return engine;
+    }
+
+    @Bean
+    @Profile("redis")
+    public WorkflowEngine workflowEngineRedis(DataSource dataSource,
+            StringRedisTemplate redisTemplate,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) Gson redisGson,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) OrgService orgService) {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        Gson gson = redisGson != null ? redisGson : new Gson();
+        var builder = WorkflowEngine.builder()
+                .processRepository(new JdbcProcessRepository(jdbc))
+                .instanceRepository(new RedisJdbcInstanceRepository(jdbc, redisTemplate, gson))
+                .taskRepository(new JdbcTaskRepository(jdbc))
+                .lockManager(new RedisInstanceLockManager(redisTemplate))
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         WorkflowEngine engine = builder.build();

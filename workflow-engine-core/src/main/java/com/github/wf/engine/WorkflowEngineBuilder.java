@@ -17,6 +17,7 @@ public class WorkflowEngineBuilder {
     private ExpressionEvaluator expressionEvaluator;
     private OrgService orgService;
     private String baseUrl;
+    private InstanceLockManager lockManager;
 
     WorkflowEngineBuilder() {}
 
@@ -50,6 +51,11 @@ public class WorkflowEngineBuilder {
         return this;
     }
 
+    public WorkflowEngineBuilder lockManager(InstanceLockManager lockManager) {
+        this.lockManager = lockManager;
+        return this;
+    }
+
     public WorkflowEngine build() {
         Objects.requireNonNull(processRepository, "processRepository is required");
         Objects.requireNonNull(instanceRepository, "instanceRepository is required");
@@ -57,6 +63,9 @@ public class WorkflowEngineBuilder {
         if (expressionEvaluator == null) {
             expressionEvaluator = new SpelExpressionEvaluator();
         }
-        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, orgService, baseUrl);
+        if (lockManager == null) {
+            lockManager = new LocalInstanceLockManager();
+        }
+        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, orgService, baseUrl, lockManager);
     }
 }
