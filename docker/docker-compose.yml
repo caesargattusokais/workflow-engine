@@ -46,3 +46,14 @@ services:
     depends_on:
       - rocketmq-namesrv
     restart: always
+
+  rocketmq-dashboard:
+    image: styletang/rocketmq-console-ng:latest
+    container_name: rocketmq-dashboard
+    ports:
+      - "8082:8080"
+    environment:
+      - JAVA_OPTS=-Drocketmq.namesrv.addr=rocketmq-namesrv:9876 -Drocketmq.config.isVIPChannel=false
+    depends_on:
+      - rocketmq-namesrv
+    restart: always
