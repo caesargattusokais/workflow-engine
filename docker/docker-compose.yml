@@ -25,3 +25,24 @@ services:
     depends_on:
       - ldap
     restart: always
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: rocketmq-namesrv
+    command: nameserver
+    ports:
+      - "9876:9876"
+    restart: always
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    container_name: rocketmq-broker
+    command: broker -n rocketmq-namesrv:9876
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    environment:
+      - NAMESRV_ADDR=rocketmq-namesrv:9876
+    depends_on:
+      - rocketmq-namesrv
+    restart: always

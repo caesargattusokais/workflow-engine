@@ -18,6 +18,7 @@ public class WorkflowEngineBuilder {
     private OrgService orgService;
     private String baseUrl;
     private InstanceLockManager lockManager;
+    private DelayScheduler delayScheduler;
 
     WorkflowEngineBuilder() {}
 
@@ -56,6 +57,11 @@ public class WorkflowEngineBuilder {
         return this;
     }
 
+    public WorkflowEngineBuilder delayScheduler(DelayScheduler delayScheduler) {
+        this.delayScheduler = delayScheduler;
+        return this;
+    }
+
     public WorkflowEngine build() {
         Objects.requireNonNull(processRepository, "processRepository is required");
         Objects.requireNonNull(instanceRepository, "instanceRepository is required");
@@ -66,6 +72,9 @@ public class WorkflowEngineBuilder {
         if (lockManager == null) {
             lockManager = new LocalInstanceLockManager();
         }
-        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, orgService, baseUrl, lockManager);
+        if (delayScheduler == null) {
+            delayScheduler = new LocalDelayScheduler();
+        }
+        return new WorkflowEngine(processRepository, instanceRepository, taskRepository, expressionEvaluator, orgService, baseUrl, lockManager, delayScheduler);
     }
 }

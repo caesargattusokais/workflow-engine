@@ -17,7 +17,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.util.*;
-import java.util.concurrent.*;
 
 public class WorkflowEngine {
 
@@ -26,7 +25,7 @@ public class WorkflowEngine {
     public final InstanceRepository instanceRepository;
     public final TaskRepository taskRepository;
     final ExpressionEvaluator expressionEvaluator;
-    final DelayQueue<DelayedTrigger> delayQueue = new DelayQueue<>();
+    final DelayScheduler delayScheduler;
     final InstanceLockManager lockManager;
 
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
@@ -39,37 +38,28 @@ public class WorkflowEngine {
                    ExpressionEvaluator expressionEvaluator,
                    com.github.wf.ext.OrgService orgService,
                    String baseUrl,
-                   InstanceLockManager lockManager) {
+                   InstanceLockManager lockManager,
+                   DelayScheduler delayScheduler) {
         this.processRepository = processRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.expressionEvaluator = expressionEvaluator;
         this.baseUrl = baseUrl;
         this.lockManager = lockManager;
+        this.delayScheduler = delayScheduler;
+        this.delayScheduler.start(this::trigger);
         registerDefaultRunners(orgService);
-        // Delay daemon: picks up delayed triggers (retry/timer), wakes instances
-        Thread delayDaemon = new Thread(() -> {
-            while (true) {
-                try {
-                    DelayedTrigger dt = delayQueue.take();
-                    log.warn("Delayed trigger: " + dt.instanceId);
-                    trigger(dt.instanceId);
-                } catch (InterruptedException e) { break; }
-            }
-        }, "wf-delay-daemon");
-        delayDaemon.setDaemon(true);
-        delayDaemon.start();
     }
 
     private void registerDefaultRunners(com.github.wf.ext.OrgService orgService) {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
         runners.put(NodeType.END_EVENT, new EndEventRunner());
-        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, this::scheduleDelay, baseUrl, orgService));
-        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(this::scheduleDelay));
+        runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, delayScheduler::schedule, baseUrl, orgService));
+        runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(delayScheduler::schedule));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
-        runners.put(NodeType.TIMER, new TimerRunner(this::scheduleDelay));
+        runners.put(NodeType.TIMER, new TimerRunner(delayScheduler::schedule));
     }
 
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
@@ -162,22 +152,12 @@ public class WorkflowEngine {
 
     /** Generic delayed trigger — used by both retry and timer nodes */
     public void scheduleDelay(String instanceId, long delayMs) {
-        delayQueue.put(new DelayedTrigger(instanceId, delayMs));
+        delayScheduler.schedule(instanceId, delayMs);
     }
 
-    static class DelayedTrigger implements Delayed {
-        final String instanceId;
-        final long deadline; // System.nanoTime() — monotonic
-        DelayedTrigger(String iid, long delayMs) {
-            this.instanceId = iid;
-            this.deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(delayMs);
-        }
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(deadline - System.nanoTime(), TimeUnit.NANOSECONDS);
-        }
-        public int compareTo(Delayed o) {
-            return Long.compare(deadline, ((DelayedTrigger)o).deadline);
-        }
+    /** Shut down the delay scheduler (e.g. stop daemon thread). */
+    public void shutdown() {
+        delayScheduler.stop();
     }
 
     // === Trigger Loop ===
