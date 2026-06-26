@@ -58,22 +58,17 @@ spring:
         min-idle: 2
 
 
+# RocketMQ — uncomment to enable delayed message scheduling
+#rocketmq:
+#  name-server: localhost:9876
+#  producer:
+#    group: wf-delay-producer
+
 ---
 spring:
   config:
     activate:
       on-profile: memory
-
----
-spring:
-  config:
-    activate:
-      on-profile: mq
-
-rocketmq:
-  name-server: localhost:9876
-  producer:
-    group: wf-delay-producer
 
 ---
 spring:

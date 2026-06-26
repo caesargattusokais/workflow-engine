@@ -143,7 +143,7 @@ public class EngineConfig {
     // ── MQ Delay Scheduler ─────────────
 
     @Bean
-    @Profile("mq")
+    @ConditionalOnProperty("rocketmq.name-server")
     public DelayScheduler rocketMQDelayScheduler(RocketMQTemplate rocketMQTemplate) {
         return new com.github.wf.memory.RocketMQDelayScheduler(rocketMQTemplate);
     }
