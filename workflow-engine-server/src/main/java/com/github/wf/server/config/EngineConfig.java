@@ -16,6 +16,7 @@ import com.github.wf.memory.JdbcDraftRepository;
 import com.github.wf.memory.JdbcInstanceRepository;
 import com.github.wf.memory.JdbcProcessRepository;
 import com.github.wf.memory.JdbcTaskRepository;
+import com.github.wf.memory.RedisConfig;
 import com.github.wf.memory.RedisInstanceLockManager;
 import com.github.wf.memory.RedisJdbcInstanceRepository;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,6 +36,7 @@ import com.google.gson.Gson;
 import java.util.Properties;
 
 @Configuration
+@Import(RedisConfig.class)
 public class EngineConfig {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EngineConfig.class);
@@ -80,6 +83,29 @@ public class EngineConfig {
             if (val != null) p.setProperty("ldap." + key, val);
         }
         return new LdapOrgService(p);
+    }
+
+    // ── Redis — force RESP2 to avoid HELLO+AUTH deadlock on Redis 7 ──
+
+    @Bean
+    @Profile("redis")
+    public org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory lettuceConnectionFactory(
+            @Value("${spring.redis.host:127.0.0.1}") String host,
+            @Value("${spring.redis.port:6379}") int port,
+            @Value("${spring.redis.password:}") String password) {
+        var redisConfig = new org.springframework.data.redis.connection.RedisStandaloneConfiguration();
+        redisConfig.setHostName(host);
+        redisConfig.setPort(port);
+        if (password != null && !password.isBlank()) {
+            redisConfig.setPassword(org.springframework.data.redis.connection.RedisPassword.of(password));
+        }
+        var clientOptions = io.lettuce.core.ClientOptions.builder()
+                .protocolVersion(io.lettuce.core.protocol.ProtocolVersion.RESP2)
+                .build();
+        var clientConfig = org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration.builder()
+                .clientOptions(clientOptions)
+                .build();
+        return new org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
     // ── Engine ────────────────────────────

@@ -26,6 +26,16 @@ services:
       - ldap
     restart: always
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
   rocketmq-namesrv:
     image: apache/rocketmq:5.3.2
     container_name: rocketmq-namesrv
@@ -37,12 +47,14 @@ services:
   rocketmq-broker:
     image: apache/rocketmq:5.3.2
     container_name: rocketmq-broker
-    command: broker -n rocketmq-namesrv:9876
+    command: broker -n rocketmq-namesrv:9876 -c /home/rocketmq/conf/broker.conf
     ports:
       - "10909:10909"
       - "10911:10911"
     environment:
       - NAMESRV_ADDR=rocketmq-namesrv:9876
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/conf/broker.conf
     depends_on:
       - rocketmq-namesrv
     restart: always
@@ -57,3 +69,6 @@ services:
     depends_on:
       - rocketmq-namesrv
     restart: always
+
+volumes:
+  redis_data:

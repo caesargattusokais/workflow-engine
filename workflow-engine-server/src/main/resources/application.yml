@@ -34,7 +34,15 @@ feishu:
 #  uidAttr: uid
 #  userObjectClass: inetOrgPerson
 
+# RocketMQ — uncomment to enable delayed message scheduling
+rocketmq:
+  name-server: localhost:9876
+  producer:
+    group: wf-delay-producer
+
 spring:
+  profiles:
+    active: redis
   datasource:
     url: jdbc:mysql://localhost:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
     username: root
@@ -47,24 +55,6 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
-  redis:
-    host: localhost
-    port: 6379
-    password: redis123
-    timeout: 2000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 2
-
-
-# RocketMQ — uncomment to enable delayed message scheduling
-#rocketmq:
-#  name-server: localhost:9876
-#  producer:
-#    group: wf-delay-producer
-
 ---
 spring:
   config:
@@ -76,3 +66,15 @@ spring:
   config:
     activate:
       on-profile: redis
+
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: redis123
+    timeout: 2000ms
+    lettuce:
+      shutdown-timeout: 100ms
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
