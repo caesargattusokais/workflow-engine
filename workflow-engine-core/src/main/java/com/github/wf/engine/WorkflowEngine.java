@@ -187,6 +187,7 @@ public class WorkflowEngine {
                 executions = instanceRepository.findActiveExecutions(instanceId);
 
                 if (executions.isEmpty()) {
+                    instance = instanceRepository.findById(instanceId);
                     instance.setStatus(InstanceStatus.COMPLETED);
                     instanceRepository.update(instance);
                     return;
@@ -214,6 +215,7 @@ public class WorkflowEngine {
                             if ("SUSPENDED".equals(exec.getRetryState())) {
                                 if (!exec.isChild()) {
                                     // Main execution — suspend instance immediately
+                                    instance = instanceRepository.findById(instanceId);
                                     instance.setStatus(InstanceStatus.SUSPENDED);
                                     instanceRepository.update(instance);
                                     return;
@@ -227,6 +229,7 @@ public class WorkflowEngine {
                                 boolean allSuspended = !remaining.isEmpty() && remaining.stream()
                                         .allMatch(s -> "SUSPENDED".equals(s.getRetryState()));
                                 if (allSuspended) {
+                                    instance = instanceRepository.findById(instanceId);
                                     instance.setStatus(InstanceStatus.SUSPENDED);
                                     instanceRepository.update(instance);
                                     return;
@@ -240,6 +243,8 @@ public class WorkflowEngine {
                 }
             } while (advanced);
 
+            // Re-read instance to get latest variables (runner may have modified them)
+            instance = instanceRepository.findById(instanceId);
             // Update active node snapshot
             List<Execution> remaining = instanceRepository.findActiveExecutions(instanceId);
             Set<String> activeNodes = new HashSet<>();
