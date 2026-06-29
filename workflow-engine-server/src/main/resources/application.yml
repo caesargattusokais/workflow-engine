@@ -35,19 +35,25 @@ feishu:
 #  userObjectClass: inetOrgPerson
 
 # RocketMQ — uncomment to enable delayed message scheduling
-rocketmq:
-  name-server: localhost:9876
-  producer:
-    group: wf-delay-producer
+#rocketmq:
+#  name-server: localhost:9876
+#  producer:
+#    group: wf-delay-producer
 
 spring:
-  profiles:
-    active: redis
+#  profiles:
+#    active: redis
   datasource:
-    url: jdbc:mysql://localhost:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root123
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    # MySQL
+    #url: jdbc:mysql://localhost:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    #username: root
+    #password: root123
+    #driver-class-name: com.mysql.cj.jdbc.Driver
+    # Oracle
+    url: jdbc:oracle:thin:@localhost:1521/orclpdb1
+    username: system
+    password: oracle123
+    driver-class-name: oracle.jdbc.OracleDriver
   sql:
     init:
       mode: always
@@ -67,6 +73,7 @@ spring:
     activate:
       on-profile: redis
 
+---
   redis:
     host: 127.0.0.1
     port: 6379

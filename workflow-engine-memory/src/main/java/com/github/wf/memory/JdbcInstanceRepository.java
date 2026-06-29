@@ -27,6 +27,10 @@ public class JdbcInstanceRepository implements InstanceRepository {
     private final Map<String, Execution> executions = new ConcurrentHashMap<>();
     public JdbcInstanceRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    /** Load running instances from DB — must be called after schema.sql has been executed */
+    public void init() {
         loadRunning();
     }
 

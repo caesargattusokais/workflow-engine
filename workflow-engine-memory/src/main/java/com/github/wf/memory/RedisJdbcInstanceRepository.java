@@ -30,6 +30,10 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
         this.jdbc = jdbc;
         this.redis = redis;
         this.gson = gson;
+    }
+
+    /** Load running instances from Redis/DB — must be called after schema.sql has been executed */
+    public void init() {
         loadFromRedis();
     }
 

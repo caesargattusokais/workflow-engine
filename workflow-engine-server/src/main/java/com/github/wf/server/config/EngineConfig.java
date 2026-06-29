@@ -110,6 +110,21 @@ public class EngineConfig {
 
     // ── Engine ────────────────────────────
 
+    /** Deferred init: load running instances + recover pending timers — after schema.sql has been executed */
+    @Bean
+    @Profile("!memory")
+    org.springframework.boot.ApplicationRunner engineRecovery(WorkflowEngine engine) {
+        return args -> {
+            // Load running instances from DB/Redis into cache (depends on schema.sql)
+            if (engine.instanceRepository instanceof com.github.wf.memory.JdbcInstanceRepository jdbcRepo) {
+                jdbcRepo.init();
+            } else if (engine.instanceRepository instanceof com.github.wf.memory.RedisJdbcInstanceRepository redisRepo) {
+                redisRepo.init();
+            }
+            engine.recover();
+        };
+    }
+
     @Bean(destroyMethod = "shutdown")
     @Profile("!memory & !redis")
     public WorkflowEngine workflowEngine(DataSource dataSource,
@@ -123,9 +138,7 @@ public class EngineConfig {
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
-        WorkflowEngine engine = builder.build();
-        engine.recover();
-        return engine;
+        return builder.build();
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -146,9 +159,7 @@ public class EngineConfig {
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
-        WorkflowEngine engine = builder.build();
-        engine.recover();
-        return engine;
+        return builder.build();
     }
 
     @Bean(destroyMethod = "shutdown")
