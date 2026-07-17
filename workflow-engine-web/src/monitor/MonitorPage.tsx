@@ -116,13 +116,13 @@ export default function MonitorPage() {
   }, [defGroups, statusFilter, loadDefinitions]);
 
   // ── Auto-refresh selected instance detail every 3s ──
+  const pollingTimer = useRef<ReturnType<typeof setInterval>>();
   useEffect(() => {
     if (!selectedId) return;
     const refresh = async () => {
       try {
         const inst = await getInstance(selectedId);
         if (!inst) return;
-        // Update the instance in all groups
         setDefGroups(prev => prev.map(g => ({
           ...g, instances: g.instances.map(i => i.id === inst.id ? inst : i)
         })));
@@ -142,11 +142,15 @@ export default function MonitorPage() {
           const h = await apiGet(`/instances/${selectedId}/history`);
           setHistory(h || []);
         } catch {}
+        // Stop polling when instance reaches a terminal state
+        if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
+          clearInterval(pollingTimer.current);
+        }
       } catch {}
     };
     refresh();
-    const interval = setInterval(refresh, 3000);
-    return () => clearInterval(interval);
+    pollingTimer.current = setInterval(refresh, 3000);
+    return () => clearInterval(pollingTimer.current);
   }, [selectedId]);
 
   // Flatten all instances for lookup
