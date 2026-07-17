@@ -173,11 +173,11 @@ export default function MonitorPage() {
 
   const loadInstance = useCallback(async (id: string) => {
     setSelectedId(id);
-    const inst = allInstances.find(i => i.id === id);
-    if (!inst) return;
-
     setError(null);
     try {
+      // Fetch fresh instance from server, NOT stale allInstances from closure
+      const inst = await getInstance(id);
+      if (!inst) return;
       const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
       const activeIds: string[] = inst.activeNodeIds || [];
       setNodes((graph.nodes || []).map((n: any) => ({
@@ -185,8 +185,11 @@ export default function MonitorPage() {
         data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
       })));
       setEdges(graph.edges || []);
+      // Build node name map for sidebar
+      const names: Record<string,string> = {};
+      (graph.nodes||[]).forEach((n:any) => { names[n.id] = n.data?.name || n.id; });
+      setNodeNames(names);
     } catch (e: any) { setError(e.message); setNodes([]); setEdges([]); }
-
     try {
       const ts = await queryTasks({ instanceId: id });
       setTasks(ts.filter((t: any) => t.status === 'PENDING'));
@@ -195,13 +198,7 @@ export default function MonitorPage() {
       const h = await apiGet(`/instances/${id}/history`);
       setHistory(h || []);
     } catch { setHistory([]); }
-    try {
-      const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
-      const names: Record<string,string> = {};
-      (graph.nodes||[]).forEach((n:any) => { names[n.id] = n.data?.name || n.id; });
-      setNodeNames(names);
-    } catch {}
-  }, [allInstances]);
+  }, []);
 
   const handleComplete = async (taskId: string) => {
     await completeTask(taskId);
