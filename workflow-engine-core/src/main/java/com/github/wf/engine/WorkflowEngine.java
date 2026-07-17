@@ -202,6 +202,7 @@ public class WorkflowEngine {
                 if (executions.isEmpty()) {
                     instance = instanceRepository.findById(instanceId);
                     instance.setStatus(InstanceStatus.COMPLETED);
+                    instance.setActiveNodeIds(Set.of());
                     instanceRepository.update(instance);
                     notifyStateListeners(instanceId);
                     return;
