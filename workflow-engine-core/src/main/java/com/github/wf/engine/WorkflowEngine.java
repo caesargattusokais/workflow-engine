@@ -374,6 +374,8 @@ public class WorkflowEngine {
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskRejected(instance.getId(), node.getId(),
                         node.getName(), node.getType(), task.getAssignee(), comment));
+
+        notifyStateListeners(task.getInstanceId());
     }
 
     public void delegateTask(String taskId, String newAssignee) {
@@ -395,6 +397,8 @@ public class WorkflowEngine {
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskDelegated(instance.getId(), node.getId(),
                         node.getName(), node.getType(), oldAssignee, newAssignee));
+
+        notifyStateListeners(task.getInstanceId());
     }
 
     public void terminate(String instanceId, String reason) {
@@ -421,6 +425,8 @@ public class WorkflowEngine {
             instanceRepository.saveHistoricActivity(new HistoricActivity(null, instanceId,
                     "system", "terminate", null, "system", "terminate", null, reason));
         }
+
+        notifyStateListeners(instanceId);
     }
 
     /**

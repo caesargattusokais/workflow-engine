@@ -40,7 +40,8 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
 
     /** Broadcast a JSON message to all connected monitor clients. */
     public void broadcast(String jsonMessage) {
-        if (sessions.isEmpty()) return;
+        if (sessions.isEmpty()) { log.debug("Monitor broadcast skipped — no sessions"); return; }
+        log.info("Monitor broadcast: sessions={} msg={}", sessions.size(), jsonMessage);
         TextMessage tm = new TextMessage(jsonMessage);
         for (WebSocketSession s : sessions) {
             try { s.sendMessage(tm); } catch (IOException e) {

@@ -111,6 +111,7 @@ public class InstanceStateDataService {
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("type", "changed");
         msg.put("instanceId", instanceId);
+        msg.put("definitionId", inst.getDefinitionId());
         msg.put("status", inst.getStatus().name());
         msg.put("activeNodeIds", new ArrayList<>(inst.getActiveNodeIds()));
         return gson.toJson(msg);

@@ -26,6 +26,7 @@ public class RedisInstanceNotifier implements InstanceStateListener {
 
     @Override
     public void onStateChanged(String instanceId) {
+        log.info("Redis publish: instance={}", instanceId);
         try {
             redisTemplate.convertAndSend(CHANNEL_PREFIX + instanceId, instanceId);
         } catch (Exception e) {

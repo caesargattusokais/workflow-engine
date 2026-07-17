@@ -171,17 +171,44 @@ export default function MonitorPage() {
   // ── Monitor global WebSocket — updates instance list in real time ──
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${location.host}/ws/monitor`);
+    const wsUrl = `${protocol}//${location.host}/ws/monitor`;
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => console.log('[WS monitor] connected');
+    ws.onclose = (e) => console.log('[WS monitor] closed', e.code, e.reason);
+    ws.onerror = (e) => console.error('[WS monitor] error', e);
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'changed') {
-          setDefGroups(prev => prev.map(g => ({
-            ...g,
-            instances: g.instances.map(i => i.id === msg.instanceId
-              ? { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] }
-              : i)
-          })));
+          console.log('[WS monitor]', msg.instanceId, msg.status, msg.definitionId);
+          setDefGroups(prev => {
+            let found = false;
+            const next = prev.map(g => ({
+              ...g,
+              instances: g.instances.map(i => i.id === msg.instanceId
+                ? (found = true, { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] })
+                : i)
+            }));
+            if (!found && msg.definitionId) {
+              getInstance(msg.instanceId).then(inst => {
+                if (inst) {
+                  setDefGroups(prev2 => {
+                    const g = prev2.find(x => x.defId === msg.definitionId);
+                    if (g) {
+                      if (g.instances.some(i => i.id === inst.id)) return prev2; // already exists
+                      return prev2.map(x => x.defId === msg.definitionId
+                        ? { ...x, instances: [inst, ...x.instances] } : x);
+                    }
+                    return [...prev2, {
+                      defId: msg.definitionId, defName: inst.definitionId,
+                      instances: [inst], instPage: 1, instHasMore: false, instLoading: false
+                    }];
+                  });
+                }
+              }).catch(e => console.error('[WS monitor] fetch error', e));
+            }
+            return found ? next : prev;
+          });
         }
       } catch {}
     };
