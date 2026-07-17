@@ -19,17 +19,19 @@ public class DirectInstanceNotifier implements InstanceStateListener {
     private static final Logger log = LoggerFactory.getLogger(DirectInstanceNotifier.class);
 
     private final InstanceWebSocketHandler wsHandler;
+    private final MonitorWebSocketHandler monitorHandler;
     private final InstanceStateDataService dataService;
 
     public DirectInstanceNotifier(InstanceWebSocketHandler wsHandler,
+                                  MonitorWebSocketHandler monitorHandler,
                                   InstanceStateDataService dataService) {
         this.wsHandler = wsHandler;
+        this.monitorHandler = monitorHandler;
         this.dataService = dataService;
     }
 
     @PostConstruct
     void wireCallbacks() {
-        // When a client connects, build snapshot and send
         wsHandler.setOnConnect(session -> {
             String instanceId = getInstanceId(session);
             if (instanceId != null) {
@@ -43,6 +45,12 @@ public class DirectInstanceNotifier implements InstanceStateListener {
 
     @Override
     public void onStateChanged(String instanceId) {
+        // Always push to monitor (no subscriber check — monitor needs all)
+        try {
+            String monitorMsg = dataService.buildMonitorMessage(instanceId);
+            if (monitorMsg != null) monitorHandler.broadcast(monitorMsg);
+        } catch (Exception e) { log.warn("Monitor broadcast error: {}", e.getMessage()); }
+        // Push detail update only if someone is watching this instance
         if (!wsHandler.hasSubscribers(instanceId)) return;
         try {
             String json = dataService.buildUpdate(instanceId);

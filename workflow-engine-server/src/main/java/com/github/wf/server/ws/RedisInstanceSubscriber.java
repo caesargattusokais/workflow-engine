@@ -23,20 +23,22 @@ public class RedisInstanceSubscriber implements MessageListener {
 
     private final RedisMessageListenerContainer container;
     private final InstanceWebSocketHandler wsHandler;
+    private final MonitorWebSocketHandler monitorHandler;
     private final InstanceStateDataService dataService;
 
     public RedisInstanceSubscriber(RedisMessageListenerContainer container,
                                    InstanceWebSocketHandler wsHandler,
+                                   MonitorWebSocketHandler monitorHandler,
                                    InstanceStateDataService dataService) {
         this.container = container;
         this.wsHandler = wsHandler;
+        this.monitorHandler = monitorHandler;
         this.dataService = dataService;
     }
 
     @PostConstruct
     void subscribe() {
         container.addMessageListener(this, new ChannelTopic(CHANNEL_PATTERN));
-        // Wire connect callback for snapshot
         wsHandler.setOnConnect(session -> {
             String instanceId = getInstanceId(session);
             if (instanceId != null) {
@@ -52,6 +54,12 @@ public class RedisInstanceSubscriber implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         String instanceId = new String(message.getBody());
+        // Always push to monitor
+        try {
+            String monitorMsg = dataService.buildMonitorMessage(instanceId);
+            if (monitorMsg != null) monitorHandler.broadcast(monitorMsg);
+        } catch (Exception e) { log.warn("Monitor broadcast error: {}", e.getMessage()); }
+        // Push detail update only if someone is watching this instance
         if (!wsHandler.hasSubscribers(instanceId)) return;
         try {
             String json = dataService.buildUpdate(instanceId);

@@ -102,4 +102,17 @@ public class InstanceStateDataService {
         m.put("variables", inst.getVariables());
         return m;
     }
+
+    /** Lightweight monitor broadcast — just instance status, no graph/tasks. */
+    public String buildMonitorMessage(String instanceId) {
+        WorkflowEngine engine = engine();
+        ProcessInstance inst = engine.instanceRepository.findById(instanceId);
+        if (inst == null) return null;
+        Map<String, Object> msg = new LinkedHashMap<>();
+        msg.put("type", "changed");
+        msg.put("instanceId", instanceId);
+        msg.put("status", inst.getStatus().name());
+        msg.put("activeNodeIds", new ArrayList<>(inst.getActiveNodeIds()));
+        return gson.toJson(msg);
+    }
 }

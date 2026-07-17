@@ -168,6 +168,26 @@ export default function MonitorPage() {
     return () => { closed = true; ws?.close(); };
   }, [selectedId]);
 
+  // ── Monitor global WebSocket — updates instance list in real time ──
+  useEffect(() => {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${location.host}/ws/monitor`);
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'changed') {
+          setDefGroups(prev => prev.map(g => ({
+            ...g,
+            instances: g.instances.map(i => i.id === msg.instanceId
+              ? { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] }
+              : i)
+          })));
+        }
+      } catch {}
+    };
+    return () => ws.close();
+  }, []);
+
   // Flatten all instances for lookup
   const allInstances = defGroups.flatMap(g => g.instances);
 

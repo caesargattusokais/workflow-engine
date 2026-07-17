@@ -125,6 +125,11 @@ public class EngineConfig {
     }
 
     @Bean
+    public com.github.wf.server.ws.MonitorWebSocketHandler monitorWebSocketHandler() {
+        return new com.github.wf.server.ws.MonitorWebSocketHandler();
+    }
+
+    @Bean
     public com.github.wf.server.ws.InstanceStateDataService instanceStateDataService(
             org.springframework.beans.factory.ObjectProvider<WorkflowEngine> engineProvider) {
         return new com.github.wf.server.ws.InstanceStateDataService(engineProvider);
