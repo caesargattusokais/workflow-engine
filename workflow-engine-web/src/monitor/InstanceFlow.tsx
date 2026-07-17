@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, memo } from 'react';
 import { ReactFlow, Background, MarkerType, type Node, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from '../designer/nodes';
@@ -15,21 +15,33 @@ function edgeStyle(edgeType?: string) {
   }
 }
 
-export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], edges: Edge[], error?: string }) {
+/** Memoized — avoids re-render when parent state (defGroups) changes but nodes/edges/error stay the same. */
+export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node[], edges: Edge[], error?: string }) {
   const { t } = useT();
   const rfRef = useRef<any>(null);
+  const nodesKeyRef = useRef<string>('');
 
-  // Fit view after nodes change
+  // Build a stable key from node IDs to detect instance switches
+  const nodesKey = useMemo(() => nodes.map(n => n.id).sort().join(','), [nodes]);
+
+  // Fit view after nodes change — use rAF to wait for ReactFlow measurements
   useEffect(() => {
     if (nodes.length === 0 || !rfRef.current) return;
-    const timer = setTimeout(() => {
-      // Guard: ReactFlow instance may have been replaced if nodes changed rapidly
-      if (rfRef.current) {
-        try { rfRef.current.fitView({ duration: 300, padding: 0.2 }); } catch {}
-      }
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [nodes]);
+    const key = nodesKey;
+    // Use requestAnimationFrame + small delay to ensure ReactFlow has measured new nodes
+    const raf = requestAnimationFrame(() => {
+      const timer = setTimeout(() => {
+        // Guard: only fit if nodes haven't changed since scheduling
+        if (rfRef.current && nodesKeyRef.current === key) {
+          try { rfRef.current.fitView({ duration: 300, padding: 0.2 }); } catch {}
+        }
+      }, 100);
+      // Store cleanup
+      nodesKeyRef.current = key;
+      return () => clearTimeout(timer);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [nodesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const safeEdges = useMemo(() => edges.map(e => ({
     ...e,
@@ -40,6 +52,17 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
       ? { type: MarkerType.ArrowClosed, color: '#666' }
       : undefined,
   })), [edges]);
+
+  // Memoize safeNodes — only rebuild when nodes reference changes
+  const safeNodes = useMemo(() => nodes.map(n => ({
+    id: n.id,
+    type: n.type,
+    position: { x: n.position?.x ?? 200, y: n.position?.y ?? 50 },
+    data: n.data || {},
+    style: n.data?.active
+      ? { border: '2px solid #3b82f6', boxShadow: '0 0 12px rgba(59,130,246,0.5)' }
+      : n.data?.status === 'done' ? { opacity: 0.4 } : {}
+  })), [nodes]);
 
   if (error) {
     return (
@@ -60,16 +83,6 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
     );
   }
 
-  const safeNodes = nodes.map(n => ({
-    id: n.id,
-    type: n.type,
-    position: { x: (n as any).x ?? n.position?.x ?? 200, y: (n as any).y ?? n.position?.y ?? 50 },
-    data: n.data || {},
-    style: n.data?.active
-      ? { border: '2px solid #3b82f6', boxShadow: '0 0 12px rgba(59,130,246,0.5)' }
-      : n.data?.status === 'done' ? { opacity: 0.4 } : {}
-  }));
-
   return (
     <div className="flex-1 h-full" style={{ minHeight: 300, background: '#1a1a2e' }}>
       <ReactFlow nodes={safeNodes} edges={safeEdges} nodeTypes={nodeTypes}
@@ -79,4 +92,4 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
       </ReactFlow>
     </div>
   );
-}
+});

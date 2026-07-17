@@ -128,8 +128,9 @@ export default function MonitorPage() {
   // ── WebSocket real-time updates ──
   useEffect(() => {
     if (!selectedId) return;
+    const instanceId = selectedId; // capture for the lifetime of this effect
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/ws/instance/${selectedId}`;
+    const wsUrl = `${protocol}//${location.host}/ws/instance/${instanceId}`;
     let ws: WebSocket | null = null;
     let closed = false;
 
@@ -141,26 +142,31 @@ export default function MonitorPage() {
           const msg = JSON.parse(event.data);
           if (msg.type === 'snapshot' || msg.type === 'update') {
             const inst = msg.instance;
-            if (inst) {
-              setDefGroups(prev => prev.map(g => ({
-                ...g, instances: g.instances.map(i => i.id === inst.id ? { ...i, ...inst, status: inst.status, activeNodeIds: inst.activeNodeIds, variables: inst.variables } : i)
-              })));
-              if (msg.graph) {
-                const activeIds: string[] = inst.activeNodeIds || [];
-                setNodes(normalizeNodes(msg.graph.nodes, activeIds));
-                setEdges(msg.graph.edges || []);
-              } else {
-                const activeIds: string[] = inst.activeNodeIds || [];
-                setNodes(prev => prev.map(n => ({
-                  ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
-                })));
-              }
-              setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
-              if (msg.history) setHistory(msg.history);
-              // Close WS when instance reaches terminal state — no more updates expected
-              if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
-                closed = true; ws?.close();
-              }
+            // Guard: only process messages for the instance this effect was created for
+            if (!inst || inst.id !== instanceId) return;
+            setDefGroups(prev => prev.map(g => ({
+              ...g, instances: g.instances.map(i => i.id === inst.id ? { ...i, ...inst, status: inst.status, activeNodeIds: inst.activeNodeIds, variables: inst.variables } : i)
+            })));
+            if (msg.graph) {
+              const activeIds: string[] = inst.activeNodeIds || [];
+              setNodes(normalizeNodes(msg.graph.nodes, activeIds));
+              setEdges(msg.graph.edges || []);
+            } else {
+              const activeIds: string[] = inst.activeNodeIds || [];
+              setNodes(prev => {
+                // Only update styling if nodes belong to this instance (idempotent guard)
+                if (prev.length === 0) return prev;
+                return prev.map(n => ({
+                  ...n,
+                  data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
+                }));
+              });
+            }
+            setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
+            if (msg.history) setHistory(msg.history);
+            // Close WS when instance reaches terminal state — no more updates expected
+            if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
+              closed = true; ws?.close();
             }
           }
         } catch {}
@@ -226,14 +232,21 @@ export default function MonitorPage() {
   // Flatten all instances for lookup
   const allInstances = defGroups.flatMap(g => g.instances);
 
+  // Track latest load request to suppress stale responses
+  const loadIdRef = useRef(0);
+
   const loadInstance = useCallback(async (id: string) => {
+    const loadId = ++loadIdRef.current;
     setSelectedId(id);
     setError(null);
     try {
       // Fetch fresh instance from server, NOT stale allInstances from closure
       const inst = await getInstance(id);
       if (!inst) return;
+      // Guard: stale request — another loadInstance call has started since
+      if (loadId !== loadIdRef.current) return;
       const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
+      if (loadId !== loadIdRef.current) return;
       const activeIds: string[] = inst.activeNodeIds || [];
       setNodes(normalizeNodes(graph.nodes, activeIds));
       setEdges(graph.edges || []);
@@ -241,15 +254,26 @@ export default function MonitorPage() {
       const names: Record<string,string> = {};
       (graph.nodes||[]).forEach((n:any) => { names[n.id] = n.data?.name || n.id; });
       setNodeNames(names);
-    } catch (e: any) { setError(e.message); setNodes([]); setEdges([]); }
+    } catch (e: any) {
+      // Only update error/nodes if this is still the latest request
+      if (loadId === loadIdRef.current) {
+        setError(e.message);
+        // Don't clear nodes — WS snapshot may have already set correct ones
+      }
+    }
     try {
       const ts = await queryTasks({ instanceId: id });
+      if (loadId !== loadIdRef.current) return;
       setTasks(ts.filter((t: any) => t.status === 'PENDING'));
-    } catch { setTasks([]); }
+    } catch {
+      if (loadId === loadIdRef.current) setTasks([]);
+    }
     try {
       const h = await apiGet(`/instances/${id}/history`);
-      setHistory(h || []);
-    } catch { setHistory([]); }
+      if (loadId === loadIdRef.current) setHistory(h || []);
+    } catch {
+      if (loadId === loadIdRef.current) setHistory([]);
+    }
   }, []);
 
   const handleComplete = async (taskId: string) => {
