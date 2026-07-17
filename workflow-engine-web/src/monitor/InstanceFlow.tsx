@@ -1,8 +1,19 @@
-import { useRef, useEffect } from 'react';
-import { ReactFlow, Background, type Node, type Edge } from '@xyflow/react';
+import { useRef, useEffect, useMemo } from 'react';
+import { ReactFlow, Background, MarkerType, type Node, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from '../designer/nodes';
 import { useT } from '../i18n';
+
+function edgeStyle(edgeType?: string) {
+  switch (edgeType) {
+    case 'result': return { stroke: '#22c55e', strokeWidth: 2 };
+    case 'exception': return { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' };
+    case 'timeout': return { stroke: '#f97316', strokeWidth: 2, strokeDasharray: '5,5' };
+    case 'conditional': return { stroke: '#e5a50a', strokeWidth: 2 };
+    case 'default': return { stroke: '#888', strokeWidth: 2, strokeDasharray: '3,3' };
+    default: return { stroke: '#666', strokeWidth: 2 };
+  }
+}
 
 export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], edges: Edge[], error?: string }) {
   const { t } = useT();
@@ -11,9 +22,19 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
   // Fit view after nodes change
   useEffect(() => {
     if (nodes.length > 0 && rfRef.current) {
-      setTimeout(() => rfRef.current?.fitView({ duration: 300 }), 50);
+      setTimeout(() => rfRef.current?.fitView({ duration: 300 }), 100);
     }
   }, [nodes]);
+
+  const safeEdges = useMemo(() => edges.map(e => ({
+    ...e,
+    style: edgeStyle((e.data as any)?.edgeType),
+    markerEnd: e.markerEnd === 'arrowclosed'
+      ? { type: MarkerType.ArrowClosed, color: edgeStyle((e.data as any)?.edgeType).stroke as string }
+      : e.markerEnd
+      ? { type: MarkerType.ArrowClosed, color: '#666' }
+      : undefined,
+  })), [edges]);
 
   if (error) {
     return (
@@ -46,7 +67,7 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
 
   return (
     <div className="flex-1 h-full" style={{ minHeight: 300, background: '#1a1a2e' }}>
-      <ReactFlow nodes={safeNodes} edges={edges} nodeTypes={nodeTypes}
+      <ReactFlow nodes={safeNodes} edges={safeEdges} nodeTypes={nodeTypes}
         onInit={(rf: any) => { rfRef.current = rf; }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}>
         <Background />

@@ -40,6 +40,7 @@ public class GraphResponse {
     public static class GraphEdge {
         private String id, source, target, type = "smoothstep";
         private String label;
+        private String markerEnd;
         private Map<String, Object> data;
 
         public GraphEdge() {}
@@ -56,6 +57,8 @@ public class GraphResponse {
         public void setType(String t) { type = t; }
         public String getLabel() { return label; }
         public void setLabel(String l) { label = l; }
+        public String getMarkerEnd() { return markerEnd; }
+        public void setMarkerEnd(String m) { markerEnd = m; }
         public Map<String, Object> getData() { return data; }
         public void setData(Map<String, Object> d) { data = d; }
     }
