@@ -6,6 +6,16 @@ import TaskPanel from './TaskPanel';
 import { listInstances, listDefinitions, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, getInstance } from '../api/client';
 import { useT } from '../i18n';
 
+/** Normalize backend graph nodes (flat x/y) to ReactFlow format (position: {x,y}). */
+function normalizeNodes(nodes: any[], activeIds: string[]): Node[] {
+  return (nodes || []).map((n: any) => ({
+    id: n.id,
+    type: n.type,
+    position: { x: n.x ?? n.position?.x ?? 200, y: n.y ?? n.position?.y ?? 50 },
+    data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' },
+  }));
+}
+
 interface DefGroup {
   defId: string;
   defName: string;
@@ -137,9 +147,7 @@ export default function MonitorPage() {
               })));
               if (msg.graph) {
                 const activeIds: string[] = inst.activeNodeIds || [];
-                setNodes((msg.graph.nodes || []).map((n: any) => ({
-                  ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
-                })));
+                setNodes(normalizeNodes(msg.graph.nodes, activeIds));
                 setEdges(msg.graph.edges || []);
               } else {
                 const activeIds: string[] = inst.activeNodeIds || [];
@@ -227,10 +235,7 @@ export default function MonitorPage() {
       if (!inst) return;
       const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
       const activeIds: string[] = inst.activeNodeIds || [];
-      setNodes((graph.nodes || []).map((n: any) => ({
-        ...n,
-        data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
-      })));
+      setNodes(normalizeNodes(graph.nodes, activeIds));
       setEdges(graph.edges || []);
       // Build node name map for sidebar
       const names: Record<string,string> = {};

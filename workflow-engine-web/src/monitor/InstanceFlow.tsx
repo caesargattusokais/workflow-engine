@@ -21,9 +21,14 @@ export default function InstanceFlow({ nodes, edges, error }: { nodes: Node[], e
 
   // Fit view after nodes change
   useEffect(() => {
-    if (nodes.length > 0 && rfRef.current) {
-      setTimeout(() => rfRef.current?.fitView({ duration: 300 }), 100);
-    }
+    if (nodes.length === 0 || !rfRef.current) return;
+    const timer = setTimeout(() => {
+      // Guard: ReactFlow instance may have been replaced if nodes changed rapidly
+      if (rfRef.current) {
+        try { rfRef.current.fitView({ duration: 300, padding: 0.2 }); } catch {}
+      }
+    }, 150);
+    return () => clearTimeout(timer);
   }, [nodes]);
 
   const safeEdges = useMemo(() => edges.map(e => ({
