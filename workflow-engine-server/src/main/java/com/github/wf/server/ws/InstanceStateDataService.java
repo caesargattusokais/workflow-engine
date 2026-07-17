@@ -6,28 +6,32 @@ import com.github.wf.server.controller.DefinitionController;
 import com.github.wf.server.dto.GraphResponse;
 import com.github.wf.task.TaskQuery;
 import com.google.gson.Gson;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.*;
 
 /**
  * Reads instance state from the engine and builds WebSocket JSON messages.
- * Depends on WorkflowEngine — NO reference to InstanceWebSocketHandler,
- * so it doesn't participate in the circular dependency chain.
+ * Uses ObjectProvider&lt;WorkflowEngine&gt; to avoid CGLIB proxy issues with
+ * the engine's final fields (instanceRepository, etc.).
  */
 public class InstanceStateDataService {
 
     private static final Gson gson = new Gson();
-    private final WorkflowEngine engine;
+    private final ObjectProvider<WorkflowEngine> engineProvider;
 
-    public InstanceStateDataService(WorkflowEngine engine) {
-        this.engine = engine;
+    public InstanceStateDataService(ObjectProvider<WorkflowEngine> engineProvider) {
+        this.engineProvider = engineProvider;
     }
+
+    private WorkflowEngine engine() { return engineProvider.getObject(); }
 
     /** Build full snapshot JSON for a newly connected client. */
     public String buildSnapshot(String instanceId) {
+        WorkflowEngine engine = engine();
         ProcessInstance inst = engine.instanceRepository.findById(instanceId);
         if (inst == null) return null;
-        GraphResponse graph = buildGraph(inst);
+        GraphResponse graph = buildGraph(engine, inst);
         var tasks = engine.taskRepository.query(new TaskQuery().instanceId(instanceId));
         var history = engine.instanceRepository.findHistory(instanceId)
             .stream().map(h -> {
@@ -53,6 +57,7 @@ public class InstanceStateDataService {
 
     /** Build incremental update JSON after engine state change. */
     public String buildUpdate(String instanceId) {
+        WorkflowEngine engine = engine();
         ProcessInstance inst = engine.instanceRepository.findById(instanceId);
         if (inst == null) return null;
         var tasks = engine.taskRepository.query(new TaskQuery().instanceId(instanceId));
@@ -77,7 +82,7 @@ public class InstanceStateDataService {
         return gson.toJson(msg);
     }
 
-    private GraphResponse buildGraph(ProcessInstance inst) {
+    private GraphResponse buildGraph(WorkflowEngine engine, ProcessInstance inst) {
         try {
             var def = engine.processRepository.findLatestById(inst.getDefinitionId());
             if (def == null) return new GraphResponse(List.of(), List.of());

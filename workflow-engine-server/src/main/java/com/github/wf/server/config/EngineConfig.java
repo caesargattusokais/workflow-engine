@@ -126,8 +126,8 @@ public class EngineConfig {
 
     @Bean
     public com.github.wf.server.ws.InstanceStateDataService instanceStateDataService(
-            @org.springframework.context.annotation.Lazy WorkflowEngine engine) {
-        return new com.github.wf.server.ws.InstanceStateDataService(engine);
+            org.springframework.beans.factory.ObjectProvider<WorkflowEngine> engineProvider) {
+        return new com.github.wf.server.ws.InstanceStateDataService(engineProvider);
     }
 
     // ── Engine ────────────────────────────
