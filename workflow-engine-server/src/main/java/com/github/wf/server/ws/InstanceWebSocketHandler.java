@@ -1,12 +1,5 @@
 package com.github.wf.server.ws;
 
-import com.github.wf.engine.WorkflowEngine;
-import com.github.wf.model.ProcessInstance;
-import com.github.wf.server.controller.DefinitionController;
-import com.github.wf.server.dto.GraphResponse;
-import com.github.wf.task.Task;
-import com.github.wf.task.TaskQuery;
-import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
@@ -15,30 +8,32 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
- * WebSocket handler for per-instance real-time state updates.
- * Clients connect to /ws/instance/{instanceId} and receive
- * a full snapshot on connect, then incremental updates on state changes.
+ * Pure WebSocket session manager — no engine dependency.
+ * Manages per-instance session registry and broadcasts.
  */
 public class InstanceWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(InstanceWebSocketHandler.class);
-    private static final Gson gson = new Gson();
-
-    private final WorkflowEngine engine;
 
     /** instanceId → set of subscribed sessions */
     private final ConcurrentHashMap<String, Set<WebSocketSession>> sessions = new ConcurrentHashMap<>();
-
     /** session → instanceId (for cleanup) */
     private final ConcurrentHashMap<String, String> sessionToInstance = new ConcurrentHashMap<>();
 
-    public InstanceWebSocketHandler(WorkflowEngine engine) {
-        this.engine = engine;
-    }
+    /** Called when a client first connects — to send a snapshot. Set by the notifier. */
+    private Consumer<WebSocketSession> onConnect;
+
+    /** Called when state changes — to build an update message. Set by the notifier. */
+    private Consumer<String> onStateChanged;
+
+    public void setOnConnect(Consumer<WebSocketSession> onConnect) { this.onConnect = onConnect; }
+    public void setOnStateChanged(Consumer<String> onStateChanged) { this.onStateChanged = onStateChanged; }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -50,7 +45,7 @@ public class InstanceWebSocketHandler extends TextWebSocketHandler {
         sessions.computeIfAbsent(instanceId, k -> ConcurrentHashMap.newKeySet()).add(session);
         sessionToInstance.put(session.getId(), instanceId);
         log.debug("WS connect: instance={} session={}", instanceId, session.getId());
-        sendSnapshot(session, instanceId);
+        if (onConnect != null) onConnect.accept(session);
     }
 
     @Override
@@ -68,108 +63,35 @@ public class InstanceWebSocketHandler extends TextWebSocketHandler {
         log.warn("WS error: session={} msg={}", session.getId(), ex.getMessage());
     }
 
-    /** Called by notifier when engine state changes. Pushes an update to all subscribers. */
-    public void pushUpdate(String instanceId) {
+    /** Broadcast a JSON message to all sessions subscribed to this instance. */
+    public void broadcast(String instanceId, String jsonMessage) {
         Set<WebSocketSession> set = sessions.get(instanceId);
         if (set == null || set.isEmpty()) return;
-        try {
-            Map<String, Object> msg = buildUpdate(instanceId);
-            if (msg == null) return;
-            String json = gson.toJson(msg);
-            TextMessage tm = new TextMessage(json);
-            for (WebSocketSession s : set) {
-                try { s.sendMessage(tm); } catch (IOException e) { log.warn("WS send failed: {}", e.getMessage()); }
-            }
-        } catch (Exception e) {
-            log.warn("pushUpdate error: instance={} msg={}", instanceId, e.getMessage());
+        TextMessage tm = new TextMessage(jsonMessage);
+        for (WebSocketSession s : set) {
+            try { s.sendMessage(tm); } catch (IOException e) { log.warn("WS send failed: {}", e.getMessage()); }
         }
     }
 
-    /** Send full snapshot on connect. */
-    private void sendSnapshot(WebSocketSession session, String instanceId) {
-        try {
-            ProcessInstance inst = engine.instanceRepository.findById(instanceId);
-            if (inst == null) return;
-            GraphResponse graph = buildGraph(inst);
-            List<Task> tasks = engine.taskRepository.query(new TaskQuery().instanceId(instanceId));
-            List<Map<String, Object>> history = engine.instanceRepository.findHistory(instanceId)
-                .stream().map(h -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("nodeId", h.getNodeId()); m.put("nodeName", h.getNodeName());
-                    m.put("action", h.getAction()); m.put("executor", h.getExecutor());
-                    return m;
-                }).toList();
-
-            Map<String, Object> msg = new LinkedHashMap<>();
-            msg.put("type", "snapshot");
-            msg.put("instance", instanceToMap(inst));
-            msg.put("graph", graph);
-            msg.put("tasks", tasks.stream().map(t -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", t.getId()); m.put("nodeId", t.getNodeId());
-                m.put("assignee", t.getAssignee()); m.put("status", t.getStatus().name());
-                return m;
-            }).toList());
-            msg.put("history", history);
-            session.sendMessage(new TextMessage(gson.toJson(msg)));
-        } catch (Exception e) {
-            log.warn("sendSnapshot error: {}", e.getMessage());
+    /** Send a JSON message to a single session (used for connect snapshot). */
+    public void sendToSession(WebSocketSession session, String jsonMessage) {
+        try { session.sendMessage(new TextMessage(jsonMessage)); } catch (IOException e) {
+            log.warn("WS send snapshot failed: {}", e.getMessage());
         }
     }
 
-    /** Build incremental update message. */
-    private Map<String, Object> buildUpdate(String instanceId) {
-        ProcessInstance inst = engine.instanceRepository.findById(instanceId);
-        if (inst == null) return null;
-        List<Task> tasks = engine.taskRepository.query(new TaskQuery().instanceId(instanceId));
-        List<Map<String, Object>> history = engine.instanceRepository.findHistory(instanceId)
-            .stream().map(h -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("nodeId", h.getNodeId()); m.put("nodeName", h.getNodeName());
-                m.put("action", h.getAction()); m.put("executor", h.getExecutor());
-                return m;
-            }).toList();
-
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("type", "update");
-        msg.put("instance", instanceToMap(inst));
-        msg.put("tasks", tasks.stream().map(t -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", t.getId()); m.put("nodeId", t.getNodeId());
-            m.put("assignee", t.getAssignee()); m.put("status", t.getStatus().name());
-            return m;
-        }).toList());
-        msg.put("history", history);
-        return msg;
+    /** Does any client subscribe to this instance? */
+    public boolean hasSubscribers(String instanceId) {
+        Set<WebSocketSession> set = sessions.get(instanceId);
+        return set != null && !set.isEmpty();
     }
 
-    private GraphResponse buildGraph(ProcessInstance inst) {
-        try {
-            var def = engine.processRepository.findLatestById(inst.getDefinitionId());
-            if (def == null) return new GraphResponse(List.of(), List.of());
-            return DefinitionController.graphFromDef(def, null);
-        } catch (Exception e) {
-            return new GraphResponse(List.of(), List.of());
-        }
-    }
-
-    static Map<String, Object> instanceToMap(ProcessInstance inst) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", inst.getId());
-        m.put("definitionId", inst.getDefinitionId());
-        m.put("definitionVersion", inst.getDefinitionVersion());
-        m.put("status", inst.getStatus().name());
-        m.put("activeNodeIds", new ArrayList<>(inst.getActiveNodeIds()));
-        m.put("variables", inst.getVariables());
-        return m;
-    }
+    // ── Helpers ──
 
     private static String extractInstanceId(WebSocketSession session) {
         String path = session.getUri() != null ? session.getUri().getPath() : "";
-        // path: /ws/instance/{instanceId}
         String[] parts = path.split("/");
         if (parts.length >= 4) return parts[3];
-        // Also try query param
         String query = session.getUri() != null ? session.getUri().getQuery() : "";
         if (query != null && query.startsWith("instanceId=")) return query.substring(11);
         return null;

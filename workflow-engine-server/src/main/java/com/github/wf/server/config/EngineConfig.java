@@ -120,8 +120,14 @@ public class EngineConfig {
     // ── WebSocket ────────────────────────
 
     @Bean
-    public com.github.wf.server.ws.InstanceWebSocketHandler instanceWebSocketHandler(WorkflowEngine engine) {
-        return new com.github.wf.server.ws.InstanceWebSocketHandler(engine);
+    public com.github.wf.server.ws.InstanceWebSocketHandler instanceWebSocketHandler() {
+        return new com.github.wf.server.ws.InstanceWebSocketHandler();
+    }
+
+    @Bean
+    public com.github.wf.server.ws.InstanceStateDataService instanceStateDataService(
+            @org.springframework.context.annotation.Lazy WorkflowEngine engine) {
+        return new com.github.wf.server.ws.InstanceStateDataService(engine);
     }
 
     // ── Engine ────────────────────────────
