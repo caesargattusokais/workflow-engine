@@ -142,7 +142,6 @@ export default function MonitorPage() {
                 })));
                 setEdges(msg.graph.edges || []);
               } else {
-                // Update only highlights
                 const activeIds: string[] = inst.activeNodeIds || [];
                 setNodes(prev => prev.map(n => ({
                   ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
@@ -150,12 +149,16 @@ export default function MonitorPage() {
               }
               setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
               if (msg.history) setHistory(msg.history);
+              // Close WS when instance reaches terminal state — no more updates expected
+              if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
+                closed = true; ws?.close();
+              }
             }
           }
         } catch {}
       };
       ws.onclose = () => {
-        // Auto-reconnect after 2s unless instance is terminal or changed
+        // Auto-reconnect after 2s unless explicitly closed (instance changed or terminal)
         if (!closed) setTimeout(connect, 2000);
       };
       ws.onerror = () => { ws?.close(); };
