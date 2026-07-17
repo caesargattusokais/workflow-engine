@@ -31,6 +31,7 @@ public class WorkflowEngine {
     private final Map<NodeType, NodeRunner> runners = new HashMap<>();
     private ProcessParser processParser = new YamlProcessParser();
     private String baseUrl;
+    private final List<InstanceStateListener> stateListeners = new ArrayList<>();
 
     WorkflowEngine(ProcessRepository processRepository,
                    InstanceRepository instanceRepository,
@@ -60,6 +61,18 @@ public class WorkflowEngine {
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
         runners.put(NodeType.TIMER, new TimerRunner(delayScheduler::schedule));
+    }
+
+    public void addStateListener(InstanceStateListener listener) {
+        stateListeners.add(listener);
+    }
+
+    private void notifyStateListeners(String instanceId) {
+        for (InstanceStateListener l : stateListeners) {
+            try { l.onStateChanged(instanceId); } catch (Exception e) {
+                log.warn("State listener error: " + e.getMessage());
+            }
+        }
     }
 
     public static WorkflowEngineBuilder builder() { return new WorkflowEngineBuilder(); }
@@ -190,6 +203,7 @@ public class WorkflowEngine {
                     instance = instanceRepository.findById(instanceId);
                     instance.setStatus(InstanceStatus.COMPLETED);
                     instanceRepository.update(instance);
+                    notifyStateListeners(instanceId);
                     return;
                 }
 
@@ -218,6 +232,7 @@ public class WorkflowEngine {
                                     instance = instanceRepository.findById(instanceId);
                                     instance.setStatus(InstanceStatus.SUSPENDED);
                                     instanceRepository.update(instance);
+                                    notifyStateListeners(instanceId);
                                     return;
                                 }
                                 // Child execution (parallel fork) — check remaining siblings
@@ -232,6 +247,7 @@ public class WorkflowEngine {
                                     instance = instanceRepository.findById(instanceId);
                                     instance.setStatus(InstanceStatus.SUSPENDED);
                                     instanceRepository.update(instance);
+                                    notifyStateListeners(instanceId);
                                     return;
                                 }
                                 // Some remaining siblings still running — don't suspend yet
@@ -253,6 +269,7 @@ public class WorkflowEngine {
             }
             instance.setActiveNodeIds(activeNodes);
             instanceRepository.update(instance);
+            notifyStateListeners(instanceId);
 
         } finally {
             lockManager.unlock(instanceId);

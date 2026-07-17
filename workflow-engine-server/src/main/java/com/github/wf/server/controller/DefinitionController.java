@@ -64,7 +64,7 @@ public class DefinitionController {
         }
         if (def == null) def = engine.processRepository.findLatestById(id);
         if (def == null) throw new RuntimeException("Not found: " + id + (version != null ? " v" + version : ""));
-        return convertToGraph(def, repo.findPositions(userId, id, version));
+        return graphFromDef(def, repo.findPositions(userId, id, version));
     }
 
     @DeleteMapping("/{id}")
@@ -72,7 +72,7 @@ public class DefinitionController {
         repo.delete(userId, id);
     }
 
-    private GraphResponse convertToGraph(ProcessDefinition def, Map<String, Map<String, Double>> positions) {
+    public static GraphResponse graphFromDef(ProcessDefinition def, Map<String, Map<String, Double>> positions) {
         List<GraphResponse.GraphNode> nodes = new ArrayList<>();
         List<GraphResponse.GraphEdge> edges = new ArrayList<>();
         Map<String, Node> nodeMap = def.getNodes();
@@ -188,7 +188,7 @@ public class DefinitionController {
         return new GraphResponse(nodes, edges);
     }
 
-    private String mapNodeType(NodeType type) {
+    private static String mapNodeType(NodeType type) {
         return switch (type) {
             case START_EVENT -> "startEvent"; case END_EVENT -> "endEvent";
             case USER_TASK -> "userTask"; case SERVICE_TASK -> "serviceTask";

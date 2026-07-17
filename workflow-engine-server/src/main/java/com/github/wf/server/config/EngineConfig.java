@@ -108,6 +108,22 @@ public class EngineConfig {
         return new org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
+    @Bean
+    @Profile("redis")
+    public org.springframework.data.redis.listener.RedisMessageListenerContainer redisMessageListenerContainer(
+            org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory connectionFactory) {
+        var container = new org.springframework.data.redis.listener.RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+        return container;
+    }
+
+    // ── WebSocket ────────────────────────
+
+    @Bean
+    public com.github.wf.server.ws.InstanceWebSocketHandler instanceWebSocketHandler(WorkflowEngine engine) {
+        return new com.github.wf.server.ws.InstanceWebSocketHandler(engine);
+    }
+
     // ── Engine ────────────────────────────
 
     /** Deferred init: load running instances + recover pending timers — after schema.sql has been executed */
@@ -129,7 +145,8 @@ public class EngineConfig {
     @Profile("!memory & !redis")
     public WorkflowEngine workflowEngine(DataSource dataSource,
             @org.springframework.beans.factory.annotation.Autowired(required = false) OrgService orgService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.github.wf.engine.InstanceStateListener stateListener) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         var builder = WorkflowEngine.builder()
                 .processRepository(new JdbcProcessRepository(jdbc))
@@ -138,7 +155,9 @@ public class EngineConfig {
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
-        return builder.build();
+        var engine = builder.build();
+        if (stateListener != null) engine.addStateListener(stateListener);
+        return engine;
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -147,7 +166,8 @@ public class EngineConfig {
             StringRedisTemplate redisTemplate,
             @org.springframework.beans.factory.annotation.Autowired(required = false) Gson redisGson,
             @org.springframework.beans.factory.annotation.Autowired(required = false) OrgService orgService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.github.wf.engine.InstanceStateListener stateListener) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         Gson gson = redisGson != null ? redisGson : new Gson();
         var lockMgr = new RedisInstanceLockManager(redisTemplate);
@@ -159,14 +179,17 @@ public class EngineConfig {
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
-        return builder.build();
+        var engine = builder.build();
+        if (stateListener != null) engine.addStateListener(stateListener);
+        return engine;
     }
 
     @Bean(destroyMethod = "shutdown")
     @Profile("memory")
     public WorkflowEngine workflowEngineMemory(
             @org.springframework.beans.factory.annotation.Autowired(required = false) OrgService orgService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) DelayScheduler delayScheduler,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.github.wf.engine.InstanceStateListener stateListener) {
         var builder = WorkflowEngine.builder()
                 .processRepository(new InMemoryProcessRepository())
                 .instanceRepository(new InMemoryInstanceRepository())
@@ -174,7 +197,9 @@ public class EngineConfig {
                 .baseUrl(baseUrl);
         if (orgService != null) builder.orgService(orgService);
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
-        return builder.build();
+        var engine = builder.build();
+        if (stateListener != null) engine.addStateListener(stateListener);
+        return engine;
     }
 
     // ── MQ Delay Scheduler ─────────────

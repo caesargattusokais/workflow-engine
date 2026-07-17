@@ -115,42 +115,54 @@ export default function MonitorPage() {
     }
   }, [defGroups, statusFilter, loadDefinitions]);
 
-  // ── Auto-refresh selected instance detail every 3s ──
-  const pollingTimer = useRef<ReturnType<typeof setInterval>>();
+  // ── WebSocket real-time updates ──
   useEffect(() => {
     if (!selectedId) return;
-    const refresh = async () => {
-      try {
-        const inst = await getInstance(selectedId);
-        if (!inst) return;
-        setDefGroups(prev => prev.map(g => ({
-          ...g, instances: g.instances.map(i => i.id === inst.id ? inst : i)
-        })));
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${location.host}/ws/instance/${selectedId}`;
+    let ws: WebSocket | null = null;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
         try {
-          const graph = await getDefinitionGraph(inst.definitionId, inst.definitionVersion);
-          const activeIds: string[] = inst.activeNodeIds || [];
-          setNodes((graph.nodes || []).map((n: any) => ({
-            ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
-          })));
-          setEdges(graph.edges || []);
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'snapshot' || msg.type === 'update') {
+            const inst = msg.instance;
+            if (inst) {
+              setDefGroups(prev => prev.map(g => ({
+                ...g, instances: g.instances.map(i => i.id === inst.id ? { ...i, ...inst, status: inst.status, activeNodeIds: inst.activeNodeIds, variables: inst.variables } : i)
+              })));
+              if (msg.graph) {
+                const activeIds: string[] = inst.activeNodeIds || [];
+                setNodes((msg.graph.nodes || []).map((n: any) => ({
+                  ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
+                })));
+                setEdges(msg.graph.edges || []);
+              } else {
+                // Update only highlights
+                const activeIds: string[] = inst.activeNodeIds || [];
+                setNodes(prev => prev.map(n => ({
+                  ...n, data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
+                })));
+              }
+              setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
+              if (msg.history) setHistory(msg.history);
+            }
+          }
         } catch {}
-        try {
-          const ts = await queryTasks({ instanceId: selectedId });
-          setTasks(ts.filter((t: any) => t.status === 'PENDING'));
-        } catch {}
-        try {
-          const h = await apiGet(`/instances/${selectedId}/history`);
-          setHistory(h || []);
-        } catch {}
-        // Stop polling when instance reaches a terminal state
-        if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
-          clearInterval(pollingTimer.current);
-        }
-      } catch {}
+      };
+      ws.onclose = () => {
+        // Auto-reconnect after 2s unless instance is terminal or changed
+        if (!closed) setTimeout(connect, 2000);
+      };
+      ws.onerror = () => { ws?.close(); };
     };
-    refresh();
-    pollingTimer.current = setInterval(refresh, 3000);
-    return () => clearInterval(pollingTimer.current);
+    connect();
+
+    return () => { closed = true; ws?.close(); };
   }, [selectedId]);
 
   // Flatten all instances for lookup
