@@ -21,7 +21,8 @@ async function apiPost(path: string, body?: unknown) {
     body: body ? JSON.stringify(body) : undefined
   });
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function apiPut(path: string, body: unknown) {
@@ -31,7 +32,8 @@ async function apiPut(path: string, body: unknown) {
     body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function apiDelete(path: string) {
