@@ -40,9 +40,11 @@ feishu:
 #  producer:
 #    group: wf-delay-producer
 
+
+
 spring:
-#  profiles:
-#    active: redis
+  profiles:
+    active: redis
   datasource:
     # MySQL
 #    url: jdbc:mysql://localhost:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
@@ -72,16 +74,15 @@ spring:
   config:
     activate:
       on-profile: redis
-
----
-  redis:
-    host: 127.0.0.1
-    port: 6379
-    password: redis123
-    timeout: 2000ms
-    lettuce:
-      shutdown-timeout: 100ms
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 2
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: redis123
+      timeout: 2000ms
+      lettuce:
+        shutdown-timeout: 100ms
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2

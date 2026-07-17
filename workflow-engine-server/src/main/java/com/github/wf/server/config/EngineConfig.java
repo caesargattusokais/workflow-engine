@@ -90,9 +90,9 @@ public class EngineConfig {
     @Bean
     @Profile("redis")
     public org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory lettuceConnectionFactory(
-            @Value("${spring.redis.host:127.0.0.1}") String host,
-            @Value("${spring.redis.port:6379}") int port,
-            @Value("${spring.redis.password:}") String password) {
+            @Value("${spring.data.redis.host:127.0.0.1}") String host,
+            @Value("${spring.data.redis.port:6379}") int port,
+            @Value("${spring.data.redis.password:}") String password) {
         var redisConfig = new org.springframework.data.redis.connection.RedisStandaloneConfiguration();
         redisConfig.setHostName(host);
         redisConfig.setPort(port);
