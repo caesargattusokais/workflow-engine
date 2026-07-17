@@ -51,4 +51,29 @@ class SpelExpressionEvaluatorTest {
         boolean result = evaluator.evaluateToBoolean("approver == null", vars);
         assertThat(result).isTrue();
     }
+
+    @Test
+    void coercesNumericStringToNumber() {
+        // "5" as string → should become Long 5 before SpEL compares
+        boolean result = evaluator.evaluateToBoolean("amount > 3", Map.of("amount", "5"));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void coercesDecimalString() {
+        boolean result = evaluator.evaluateToBoolean("price >= 99.99", Map.of("price", "100.50"));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void preservesNonNumericString() {
+        boolean result = evaluator.evaluateToBoolean("status == 'approved'", Map.of("status", "approved"));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void coercesNegativeIntegerString() {
+        boolean result = evaluator.evaluateToBoolean("val < 0", Map.of("val", "-10"));
+        assertThat(result).isTrue();
+    }
 }
