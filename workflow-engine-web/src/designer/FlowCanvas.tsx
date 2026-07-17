@@ -65,6 +65,17 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     } as Edge]);
   }, [edges, setEdges, locked]);
 
+  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    if (locked) return;
+    setEdges(edges.map(e => e.id === oldEdge.id ? {
+      ...e,
+      source: newConnection.source,
+      sourceHandle: newConnection.sourceHandle,
+      target: newConnection.target,
+      targetHandle: newConnection.targetHandle,
+    } : e));
+  }, [edges, setEdges, locked]);
+
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -151,6 +162,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
@@ -162,6 +174,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         fitView
         nodesDraggable={!locked}
         nodesConnectable={!locked}
+        edgesReconnectable={!locked}
         elementsSelectable={!locked}
         panOnDrag={!locked}
         zoomOnScroll={!locked}
@@ -202,8 +215,10 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
           style={{ left: menu.x, top: menu.y }}
           onClick={e => e.stopPropagation()}
         >
-          {menu.type === 'node' && (
-            <>
+          {menu.type === 'node' && (() => {
+              const connectedEdges = edges.filter(e => e.source === menu.nodeId || e.target === menu.nodeId);
+              return (
+              <>
               <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
                 Node: {nodes.find(n => n.id === menu.nodeId)?.type}
               </div>
@@ -212,13 +227,35 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 transition-colors">
                 {t.designer.duplicate}
               </button>
+              {connectedEdges.length > 0 && (
+                <>
+                  <div className="px-3 py-1 text-[10px] text-gray-600 border-t border-gray-700 mt-0.5">
+                    Edges ({connectedEdges.length})
+                  </div>
+                  {connectedEdges.map(e => {
+                    const srcName = (nodes.find(n => n.id === e.source)?.data as any)?.name || e.source;
+                    const tgtName = (nodes.find(n => n.id === e.target)?.data as any)?.name || e.target;
+                    const et = (e.data as any)?.edgeType || 'direct';
+                    return (
+                      <button key={e.id}
+                        onClick={() => { deleteEdge(e.id); setMenu(null); }}
+                        className="w-full text-left px-3 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-red-400 transition-colors flex justify-between items-center">
+                        <span className="truncate max-w-[120px]">{srcName} → {tgtName}</span>
+                        <span className="text-[10px] text-gray-600 ml-1">{et}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+              <div className="border-t border-gray-700 mt-0.5" />
               <button
                 onClick={() => deleteNode(menu.nodeId!)}
                 className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors">
                 {t.designer.delete}
               </button>
-            </>
-          )}
+              </>
+            );
+            })()}
           {menu.type === 'edge' && (() => {
               const edge = edges.find(e => e.id === menu.edgeId);
               const srcNode = nodes.find(n => n.id === edge?.source);
