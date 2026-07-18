@@ -38,6 +38,18 @@ public class EndEventRunner implements NodeRunner {
         ProcessInstance instance = repo.findById(exec.getInstanceId());
         if (instance != null && instance.getParentInstanceId() != null
             && processRepository != null && parentTrigger != null) {
+            // Only wake parent when this is the LAST active execution in the child.
+            // A child with a parallel gateway has multiple concurrent branches —
+            // each ending at an EndEvent. We must wait for all of them.
+            List<Execution> siblings = repo.findActiveExecutions(exec.getInstanceId());
+            boolean isLast = siblings.stream()
+                .allMatch(e -> e.getId().equals(exec.getId()) || e.isCompleted());
+            if (!isLast) {
+                exec.setStatus(ExecutionStatus.COMPLETED);
+                repo.updateExecution(exec);
+                return true;
+            }
+
             ProcessInstance parentInst = repo.findById(instance.getParentInstanceId());
             if (parentInst != null) {
                 Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
