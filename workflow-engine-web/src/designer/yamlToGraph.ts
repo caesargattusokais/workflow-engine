@@ -197,6 +197,8 @@ function flushNode(cur: Record<string, unknown>, nodes: Node[], counter: number)
   if (node.type === 'callActivity') {
     if (cur.calledId) (node.data as any).calledId = cur.calledId;
     if (cur.calledVersion) (node.data as any).calledVersion = cur.calledVersion;
+    if (Array.isArray(cur.inputMapping)) (node.data as any).inputMapping = cur.inputMapping;
+    if (Array.isArray(cur.outputMapping)) (node.data as any).outputMapping = cur.outputMapping;
   }
 
   // retry config (nested under retry: in YAML, becomes flat keys in our simple parser)

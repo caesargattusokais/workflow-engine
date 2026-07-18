@@ -7,10 +7,15 @@ import com.github.wf.model.node.CallActivityNode;
 import com.github.wf.spi.InstanceRepository;
 import com.github.wf.spi.ProcessRepository;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.*;
 import java.util.function.Consumer;
 
 public class CallActivityRunner implements NodeRunner {
+
+    private static final Log log = LogFactory.getLog(CallActivityRunner.class);
 
     private final ProcessRepository processRepository;
     private final InstanceRepository instanceRepository;
@@ -52,8 +57,13 @@ public class CallActivityRunner implements NodeRunner {
         }
 
         // 2. Build child variables
-        Map<String, Object> childVars = buildChildVariables(caNode,
-            instanceRepository.findById(exec.getInstanceId()));
+        ProcessInstance parentInst = instanceRepository.findById(exec.getInstanceId());
+        if (parentInst == null) {
+            throw new IllegalStateException(
+                "CallActivity '" + node.getId() + "': parent instance not found: "
+                + exec.getInstanceId());
+        }
+        Map<String, Object> childVars = buildChildVariables(caNode, parentInst);
 
         // 3. Create child instance with parent linkage
         ProcessInstance childInst = new ProcessInstance(null, def.getId(),
@@ -95,6 +105,10 @@ public class CallActivityRunner implements NodeRunner {
             Map<String, Object> parentVars = parentInst.getVariables();
             for (VariableMapping vm : node.getInputMapping()) {
                 Object value = parentVars.get(vm.getFrom());
+                if (value == null && !parentVars.containsKey(vm.getFrom())) {
+                    log.warn("CallActivity inputMapping: variable '" + vm.getFrom()
+                        + "' not found in parent instance, mapping to null");
+                }
                 child.put(vm.getTo(), value);
             }
             return child;

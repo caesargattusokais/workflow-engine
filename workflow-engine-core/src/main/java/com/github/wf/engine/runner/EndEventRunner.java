@@ -65,8 +65,13 @@ public class EndEventRunner implements NodeRunner {
                                     parentInst.setVariable(vm.getTo(), childVars.get(vm.getFrom()));
                                 }
                             } else {
-                                // Full pass-through
-                                parentInst.setVariables(instance.getVariables());
+                                // Merge child variables into parent (non-destructive).
+                                // Only overwrite keys that exist in the child, preserving
+                                // parent-only variables like _userId or orderId.
+                                Map<String, Object> childVars = instance.getVariables();
+                                for (Map.Entry<String, Object> e : childVars.entrySet()) {
+                                    parentInst.setVariable(e.getKey(), e.getValue());
+                                }
                             }
                             repo.update(parentInst);
 
