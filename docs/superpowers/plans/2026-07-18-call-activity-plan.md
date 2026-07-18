@@ -1196,13 +1196,11 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 ---
 
-### Task 14: High — missing calledId 无限重试循环
+### Task 14: High — missing calledId 无限重试循环 ✅ DONE (939a735)
 
-**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/CallActivityRunner.java:34-38`
+**Fix:** 改为 SUSPEND 模式（对齐 ServiceTaskRunner）：设置 `retryState=SUSPENDED`、`status=WAITING`、在实例变量中记录错误原因。trigger loop 检测到 SUSPENDED 后挂起实例，用户可在监控页面看到并手动修复后 resume。
 
-**Description:** 引用不存在的 calledId 时 resolveDefinition() 返回 null → 抛出 IAE → trigger loop 捕获 → 执行保持 ACTIVE（未到达 WAITING 设置）→ 每次 trigger() 重复抛异常，无退避、无错误终态。
-
-- [ ] resolveDefinition 返回 null 时将执行设为 SUSPENDED 或直接标记实例为错误状态，而非抛异常
+- [x] resolveDefinition 返回 null 时挂起实例而非抛异常
 
 ---
 
