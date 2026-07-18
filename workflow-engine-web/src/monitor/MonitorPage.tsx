@@ -299,6 +299,7 @@ export default function MonitorPage() {
     await terminateInstance(selectedId);
     const inst = allInstances.find(i => i.id === selectedId);
     if (inst) loadInstancesForDef(inst.definitionId, 1);
+    loadInstance(selectedId);
   };
 
   const refreshDef = async (defId: string) => {
