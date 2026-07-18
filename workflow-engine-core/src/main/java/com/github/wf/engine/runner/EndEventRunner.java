@@ -6,12 +6,16 @@ import com.github.wf.model.*;
 import com.github.wf.model.node.CallActivityNode;
 import com.github.wf.spi.InstanceRepository;
 import com.github.wf.spi.ProcessRepository;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
 public class EndEventRunner implements NodeRunner {
+
+    private static final Log log = LogFactory.getLog(EndEventRunner.class);
 
     private final ProcessRepository processRepository;
     private final Consumer<String> parentTrigger;
@@ -36,11 +40,10 @@ public class EndEventRunner implements NodeRunner {
             && processRepository != null && parentTrigger != null) {
             ProcessInstance parentInst = repo.findById(instance.getParentInstanceId());
             if (parentInst != null) {
-                // Load parent definition to find CallActivityNode and its outputMapping
-                ProcessDefinition parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
-                if (parentDef != null) {
-                    Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
-                    if (parentExec != null) {
+                Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
+                if (parentExec != null) {
+                    ProcessDefinition parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
+                    if (parentDef != null) {
                         Node callActivityNode = parentDef.getNode(parentExec.getCurrentNodeId());
                         if (callActivityNode instanceof CallActivityNode ca) {
                             // Write back variables
@@ -62,6 +65,17 @@ public class EndEventRunner implements NodeRunner {
                             if (!outgoings.isEmpty()) {
                                 parentExec.setCurrentNodeId(outgoings.get(0).getTo());
                             }
+                            repo.updateExecution(parentExec);
+                        } else {
+                            // Parent execution is not at a CallActivityNode — data integrity issue.
+                            // Unstick the parent by setting it back to ACTIVE.
+                            String nodeDesc = callActivityNode != null
+                                ? callActivityNode.getId() + " (" + callActivityNode.getClass().getSimpleName() + ")"
+                                : "null";
+                            log.warn("EndEvent: parent execution " + parentExec.getId()
+                                + " is at node " + nodeDesc
+                                + ", expected CallActivityNode; unsticking to ACTIVE");
+                            parentExec.setStatus(ExecutionStatus.ACTIVE);
                             repo.updateExecution(parentExec);
                         }
                     }
