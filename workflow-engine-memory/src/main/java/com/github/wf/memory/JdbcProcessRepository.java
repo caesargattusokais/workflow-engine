@@ -155,8 +155,10 @@ public class JdbcProcessRepository implements ProcessRepository {
             case "INCLUSIVE_GATEWAY": return new InclusiveGateway(id, name, listeners);
             case "TIMER": return new TimerNode(id, name, (String) d.get("duration"), (String) d.get("deadline"), listeners);
             case "CALL_ACTIVITY": {
+                String cid = (String) d.get("calledId");
+                if (cid == null) cid = ""; // old data without calledId — runner will suspend
                 Integer ver = d.get("calledVersion") != null ? ((Number) d.get("calledVersion")).intValue() : null;
-                return new CallActivityNode(id, name, (String) d.get("calledId"), ver,
+                return new CallActivityNode(id, name, cid, ver,
                     deserializeMappings((List<Map<String, Object>>) d.get("inputMapping")),
                     deserializeMappings((List<Map<String, Object>>) d.get("outputMapping")),
                     listeners, Boolean.TRUE.equals(d.get("async")));
