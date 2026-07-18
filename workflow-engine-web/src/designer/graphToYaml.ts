@@ -85,6 +85,29 @@ export function graphToYaml(nodes: Node[], edges: Edge[], defId: string, defName
       }
     }
 
+    if (node.type === 'callActivity') {
+      if (data.calledId) lines.push(`    calledId: ${y(data.calledId as string)}`);
+      if (data.calledVersion) lines.push(`    calledVersion: ${data.calledVersion}`);
+      const inMappings = data.inputMapping as any[] | undefined;
+      if (inMappings && inMappings.length > 0) {
+        lines.push('    inputMapping:');
+        for (const m of inMappings) {
+          lines.push(`      - from: ${y(m.from)}`);
+          lines.push(`        to: ${y(m.to)}`);
+          if (m.expr) lines.push(`        expr: ${y(m.expr)}`);
+        }
+      }
+      const outMappings = data.outputMapping as any[] | undefined;
+      if (outMappings && outMappings.length > 0) {
+        lines.push('    outputMapping:');
+        for (const m of outMappings) {
+          lines.push(`      - from: ${y(m.from)}`);
+          lines.push(`        to: ${y(m.to)}`);
+          if (m.expr) lines.push(`        expr: ${y(m.expr)}`);
+        }
+      }
+    }
+
     // Retry
     if (node.type === 'serviceTask' && (data.retryMaxAttempts as number) && (data.retryMaxAttempts as number) > 1) {
       lines.push('    retry:');

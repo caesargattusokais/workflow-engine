@@ -194,6 +194,11 @@ function flushNode(cur: Record<string, unknown>, nodes: Node[], counter: number)
   if (cur.until) (node.data as any).deadline = cur.until;
   if (Array.isArray(cur.candidateGroups)) (node.data as any).candidateGroups = cur.candidateGroups;
 
+  if (node.type === 'callActivity') {
+    if (cur.calledId) (node.data as any).calledId = cur.calledId;
+    if (cur.calledVersion) (node.data as any).calledVersion = cur.calledVersion;
+  }
+
   // retry config (nested under retry: in YAML, becomes flat keys in our simple parser)
   if (typeof cur.maxAttempts === 'number') (node.data as any).retryMaxAttempts = cur.maxAttempts;
   if (typeof cur.delayMs === 'number') (node.data as any).retryDelayMs = cur.delayMs;
