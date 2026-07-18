@@ -3,6 +3,7 @@ package com.github.wf.memory;
 import com.github.wf.model.Node;
 import com.github.wf.model.ProcessDefinition;
 import com.github.wf.model.Transition;
+import com.github.wf.model.VariableMapping;
 import com.github.wf.model.node.*;
 import com.github.wf.spi.ProcessRepository;
 import com.google.gson.Gson;
@@ -153,6 +154,13 @@ public class JdbcProcessRepository implements ProcessRepository {
             case "PARALLEL_GATEWAY": return new ParallelGateway(id, name, listeners);
             case "INCLUSIVE_GATEWAY": return new InclusiveGateway(id, name, listeners);
             case "TIMER": return new TimerNode(id, name, (String) d.get("duration"), (String) d.get("deadline"), listeners);
+            case "CALL_ACTIVITY": {
+                Integer ver = d.get("calledVersion") != null ? ((Number) d.get("calledVersion")).intValue() : null;
+                return new CallActivityNode(id, name, (String) d.get("calledId"), ver,
+                    deserializeMappings((List<Map<String, Object>>) d.get("inputMapping")),
+                    deserializeMappings((List<Map<String, Object>>) d.get("outputMapping")),
+                    listeners, Boolean.TRUE.equals(d.get("async")));
+            }
             default: throw new IllegalArgumentException("Unknown: " + type);
         }
     }
@@ -167,6 +175,7 @@ public class JdbcProcessRepository implements ProcessRepository {
             if (n instanceof UserTask ut) { d.put("assignee", ut.getAssignee()); d.put("candidateGroups", ut.getCandidateGroups()); d.put("dynamicRouter", ut.getDynamicRouter()); d.put("boundaryTimer", ut.getBoundaryTimer()); d.put("httpMode", ut.isHttpTask()); d.put("url", ut.getUrl()); d.put("method", ut.getMethod()); d.put("headers", ut.getHeaders()); d.put("body", ut.getBody()); }
             else if (n instanceof ServiceTask st) { d.put("handlerClass", st.getHandlerClass()); d.put("httpMode", st.isHttpTask()); d.put("url", st.getUrl()); d.put("method", st.getMethod()); d.put("headers", st.getHeaders()); d.put("body", st.getBody()); if (st.getRetryConfig() != null) { d.put("retryMaxAttempts", st.getRetryConfig().getMaxAttempts()); d.put("retryDelayMs", st.getRetryConfig().getDelayMs()); d.put("retryBackoff", st.getRetryConfig().getBackoffMultiplier()); d.put("retryOn", serializeConditions(st.getRetryConfig().getRetryOn())); } d.put("resultRouting", serializeRoutes(st.getResultRouting())); d.put("exceptionRouting", serializeRoutes(st.getExceptionRouting())); }
             else if (n instanceof TimerNode tn) { d.put("duration", tn.getDuration()); d.put("deadline", tn.getDeadline()); }
+            else if (n instanceof CallActivityNode ca) { d.put("calledId", ca.getCalledId()); d.put("calledVersion", ca.getCalledVersion()); d.put("async", ca.isAsync()); d.put("inputMapping", serializeMappings(ca.getInputMapping())); d.put("outputMapping", serializeMappings(ca.getOutputMapping())); }
             m.put(e.getKey(), d);
         }
         return m;
@@ -240,6 +249,29 @@ public class JdbcProcessRepository implements ProcessRepository {
                 if (t.getCondition().getClassName() != null) m.put("conditionClass", t.getCondition().getClassName());
             }
             list.add(m);
+        }
+        return list;
+    }
+
+    private static List<Map<String, Object>> serializeMappings(List<VariableMapping> mappings) {
+        if (mappings == null || mappings.isEmpty()) return List.of();
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (VariableMapping vm : mappings) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("from", vm.getFrom()); m.put("to", vm.getTo());
+            if (vm.getExpr() != null) m.put("expr", vm.getExpr());
+            list.add(m);
+        }
+        return list;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<VariableMapping> deserializeMappings(List<Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<VariableMapping> list = new ArrayList<>();
+        for (Map<String, Object> r : raw) {
+            list.add(new VariableMapping(
+                (String) r.get("from"), (String) r.get("to"), (String) r.get("expr")));
         }
         return list;
     }
