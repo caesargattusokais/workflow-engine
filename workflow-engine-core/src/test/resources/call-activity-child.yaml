@@ -1,0 +1,17 @@
+id: child-approval
+name: 子流程-审批
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+  - id: review
+    type: userTask
+    name: 审批
+    assignee: "${user}"
+  - id: end
+    type: endEvent
+transitions:
+  - from: start
+    to: review
+  - from: review
+    to: end

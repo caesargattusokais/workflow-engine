@@ -1,0 +1,22 @@
+id: parent-main
+name: 主流程
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+  - id: call-child
+    type: callActivity
+    calledId: child-approval
+    inputMapping:
+      - from: applicant
+        to: user
+    outputMapping:
+      - from: result
+        to: approvalResult
+  - id: end
+    type: endEvent
+transitions:
+  - from: start
+    to: call-child
+  - from: call-child
+    to: end
