@@ -49,6 +49,8 @@ public class RedisConfig {
             o.addProperty("status", src.getStatus().name());
             o.add("variables", ctx.serialize(src.getVariables()));
             o.add("activeNodeIds", ctx.serialize(new ArrayList<>(src.getActiveNodeIds())));
+            o.addProperty("parentInstanceId", src.getParentInstanceId());
+            o.addProperty("parentExecutionId", src.getParentExecutionId());
             o.add("createdAt", ctx.serialize(src.getCreatedAt()));
             o.add("completedAt", ctx.serialize(src.getCompletedAt()));
             return o;
@@ -61,11 +63,15 @@ public class RedisConfig {
             Instant created = ctx.deserialize(o.get("createdAt"), Instant.class);
             Instant completed = o.has("completedAt") && !o.get("completedAt").isJsonNull()
                 ? ctx.deserialize(o.get("completedAt"), Instant.class) : null;
+            String parentInstId = o.has("parentInstanceId") && !o.get("parentInstanceId").isJsonNull()
+                ? o.get("parentInstanceId").getAsString() : null;
+            String parentExecId = o.has("parentExecutionId") && !o.get("parentExecutionId").isJsonNull()
+                ? o.get("parentExecutionId").getAsString() : null;
             ProcessInstance inst = new ProcessInstance(
                 o.get("id").getAsString(),
                 o.get("definitionId").getAsString(),
                 o.get("definitionVersion").getAsInt(),
-                vars, created, completed);
+                vars, parentInstId, parentExecId, created, completed);
             inst.setStatus(InstanceStatus.valueOf(o.get("status").getAsString()));
             List<String> activeIds = ctx.deserialize(o.get("activeNodeIds"),
                 new TypeToken<List<String>>() {}.getType());
