@@ -230,18 +230,25 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     private void writeToDb(ProcessInstance instance) {
         int updated = jdbc.update(
-            "UPDATE process_instance SET status=?, variables_json=?, active_node_ids_json=?, completed_at=? WHERE id=?",
+            "UPDATE process_instance SET status=?, variables_json=?, active_node_ids_json=?, " +
+            "parent_instance_id=?, parent_execution_id=?, completed_at=? WHERE id=?",
             instance.getStatus().name(), gson.toJson(instance.getVariables()),
             gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
+            instance.getParentInstanceId(),
+            instance.getParentExecutionId(),
             instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null,
             instance.getId());
         if (updated == 0) {
             jdbc.update(
-                "INSERT INTO process_instance (id, definition_id, definition_version, status, variables_json, active_node_ids_json, created_at, completed_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO process_instance (id, definition_id, definition_version, status, " +
+                "variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
+                "created_at, completed_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
                 instance.getStatus().name(), gson.toJson(instance.getVariables()),
                 gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
+                instance.getParentInstanceId(),
+                instance.getParentExecutionId(),
                 instance.getCreatedAt().toEpochMilli(),
                 instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null);
         }
@@ -326,10 +333,15 @@ public class JdbcInstanceRepository implements InstanceRepository {
             Map<String, Object> parsed = gson.fromJson(varsJson, new TypeToken<Map<String, Object>>() {}.getType());
             if (parsed != null) vars = parsed;
         }
+        String parentInstId = rs.getString("parent_instance_id");
+        String parentExecId = rs.getString("parent_execution_id");
         // Preserve original timestamps
         long created = rs.getLong("created_at");
         long completed = rs.getLong("completed_at");
-        ProcessInstance inst = new ProcessInstance(id, defId, defVer, vars, Instant.ofEpochMilli(created), Instant.ofEpochMilli(completed));
+        ProcessInstance inst = new ProcessInstance(id, defId, defVer, vars,
+            parentInstId, parentExecId,
+            Instant.ofEpochMilli(created),
+            rs.wasNull() ? null : Instant.ofEpochMilli(completed));
         inst.setStatus(InstanceStatus.valueOf(rs.getString("status")));
         String activeJson = rs.getString("active_node_ids_json");
         if (activeJson != null && !activeJson.isEmpty()) {

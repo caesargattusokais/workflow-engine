@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS definition (
   PRIMARY KEY (user_id, id, version)
 );
 
+ALTER TABLE process_instance ADD COLUMN IF NOT EXISTS parent_instance_id VARCHAR(64);
+ALTER TABLE process_instance ADD COLUMN IF NOT EXISTS parent_execution_id VARCHAR(64);
+
 CREATE TABLE IF NOT EXISTS historic_activity (
   id VARCHAR(36) PRIMARY KEY,
   instance_id VARCHAR(36) NOT NULL,
