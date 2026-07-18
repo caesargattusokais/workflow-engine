@@ -1162,7 +1162,7 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 以下问题在最终代码审查中发现，待修复。
 
-### Task 11: Critical — Redis 配置文件完整支持
+### Task 11: Critical — Redis 配置文件完整支持 ✅ DONE (ad39d47)
 
 **Files:**
 - Modify: `workflow-engine-memory/src/main/java/com/github/wf/memory/RedisJdbcInstanceRepository.java`
@@ -1170,9 +1170,10 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 **Description:** CallActivity 功能遗漏了 Redis 配置文件。`RedisJdbcInstanceRepository.writeToDb()` 和 `mapInstance()` 未更新 `parent_instance_id`/`parent_execution_id` 列，`RedisConfig.ProcessInstanceAdapter` 的 Gson 序列化/反序列化未包含 parent 字段。Redis 模式下子流程完成时父流程永远不会被唤醒。
 
-- [ ] writeToDb() UPDATE/INSERT SQL 添加 parent_instance_id, parent_execution_id 列
-- [ ] mapInstance() 读取 parent 列并传入 ProcessInstance 构造器
-- [ ] ProcessInstanceAdapter 序列化/反序列化 parentInstanceId, parentExecutionId
+- [x] writeToDb() UPDATE/INSERT SQL 添加 parent_instance_id, parent_execution_id 列
+- [x] mapInstance() 读取 parent 列并传入 ProcessInstance 8-arg 构造器（同时修复 completed_at null 问题）
+- [x] ProcessInstanceAdapter 序列化添加 parentInstanceId, parentExecutionId
+- [x] ProcessInstanceAdapter 反序列化读取 parent 字段，传入 8-arg 构造器
 
 ---
 
