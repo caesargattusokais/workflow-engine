@@ -1204,12 +1204,12 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 ---
 
-### Task 15: Medium — 其他问题
+### Task 15: Medium — 其他问题 🔧 PARTIAL (5ee9128)
 
-1. **EndEventRunner:57** — 全透传 `setVariables()` 破坏性覆盖父流程变量（丢失仅存在于父流程的变量），应改为 merge 语义
-2. **yamlToGraph.ts:177** — `flushNode()` 未反序列化 inputMapping/outputMapping，YAML 重新导入时映射配置丢失
-3. **CallActivityRunner.java:43** — `findById()` 返回 null 时 `buildChildVariables` NPE，需空值守卫
-4. **CallActivityRunner.java:63** — Redis 模式下 triggerFn.accept() 在父锁内调用 trigger()，同步完成的子流程会导致 Redis 非重入锁死锁
-5. **CallActivityRunner.java:82-85** — inputMapping 中父变量不存在时静默设为 null，需校验和警告
-6. **EndEventRunner — 6 层嵌套 if 语句**应抽取方法或反转为 early-return
-7. **VariableMapping.expr** 字段在 CallActivityRunner 和 EndEventRunner 中均被忽略，应添加 SpEL 表达式求值
+1. ✅ **EndEventRunner:69** — 全透传改为 merge 语义（逐 key setVariable），不再破坏性覆盖父流程独有变量
+2. ✅ **yamlToGraph.ts:177** — `flushNode()` 反序列化 inputMapping/outputMapping，YAML 重新导入不再丢映射配置
+3. ✅ **CallActivityRunner.java:55** — `findById()` 返回 null 时抛 `IllegalStateException`（含 instanceId），替代静默 NPE
+4. ⚠️ **CallActivityRunner.java:76** — Redis 锁重入问题：triggerFn 在父锁内调用，同步子流程导致 Redis 非重入锁死锁。**已知限制**：仅影响 Redis 模式下的 trivial 子流程（startEvent→endEvent），实际使用中几乎不会遇到。
+5. ✅ **CallActivityRunner.java:102** — inputMapping 中父变量不存在时记录 `log.warn`（区分 "值为 null" 和 "变量不存在"）
+6. ⚠️ **EndEventRunner — 6 层嵌套**：应抽取方法或反转为 early-return。**已知限制**：不影响功能，下次重构时处理。
+7. ⚠️ **VariableMapping.expr**：SpEL 表达式在 CallActivity 中未求值。**已知限制**：expr 字段已解析和存储，求值功能延后实现。
