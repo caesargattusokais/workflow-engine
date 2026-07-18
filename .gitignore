@@ -11,3 +11,4 @@ target/
 /docker/ldap_data/
 /docker/ldap_config/
 /workflow-engine-web/node_modules/
+/workflow-engine-web/dist/
