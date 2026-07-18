@@ -155,6 +155,25 @@ public class DefinitionController {
             } else if (n instanceof TimerNode tn) {
                 data.put("duration", tn.getDuration());
                 data.put("deadline", tn.getDeadline());
+            } else if (n instanceof CallActivityNode ca) {
+                data.put("calledId", ca.getCalledId());
+                if (ca.getCalledVersion() != null) data.put("calledVersion", ca.getCalledVersion());
+                if (!ca.getInputMapping().isEmpty()) {
+                    data.put("inputMapping", ca.getInputMapping().stream().map(vm -> {
+                        Map<String, String> m = new HashMap<>();
+                        m.put("from", vm.getFrom()); m.put("to", vm.getTo());
+                        if (vm.getExpr() != null) m.put("expr", vm.getExpr());
+                        return m;
+                    }).toList());
+                }
+                if (!ca.getOutputMapping().isEmpty()) {
+                    data.put("outputMapping", ca.getOutputMapping().stream().map(vm -> {
+                        Map<String, String> m = new HashMap<>();
+                        m.put("from", vm.getFrom()); m.put("to", vm.getTo());
+                        if (vm.getExpr() != null) m.put("expr", vm.getExpr());
+                        return m;
+                    }).toList());
+                }
             }
             gn.setData(data);
             nodes.add(gn);
@@ -194,6 +213,7 @@ public class DefinitionController {
             case USER_TASK -> "userTask"; case SERVICE_TASK -> "serviceTask";
             case EXCLUSIVE_GATEWAY -> "exclusiveGateway"; case PARALLEL_GATEWAY -> "parallelGateway";
             case INCLUSIVE_GATEWAY -> "inclusiveGateway"; case TIMER -> "timer";
+            case CALL_ACTIVITY -> "callActivity";
         };
     }
 }
