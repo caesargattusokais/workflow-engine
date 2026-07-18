@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Node } from '@xyflow/react';
 import { useT } from '../i18n';
+import { listDefinitions } from '../api/client';
 
 interface ConditionItem {
   expr: string;
@@ -51,6 +52,12 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
     };
   }, []);
 
+  // Fetch deployed definitions for Call Activity calledId dropdown
+  const [allDefs, setAllDefs] = useState<any[]>([]);
+  useEffect(() => {
+    listDefinitions(1, 200).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
+  }, []);
+
   if (!node) {
     return (
       <div className="bg-gray-800 border-l border-gray-700 p-4 text-sm text-gray-500" style={{ width, minWidth: width }}>
@@ -99,7 +106,8 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
            node.type === 'serviceTask' ? t.nodes.serviceTask :
            node.type === 'startEvent' ? t.nodes.startEvent :
            node.type === 'endEvent' ? t.nodes.endEvent :
-           node.type === 'timer' ? t.nodes.timer : node.type}
+           node.type === 'timer' ? t.nodes.timer :
+           node.type === 'callActivity' ? t.nodes.callActivity : node.type}
         </h3>
         <div className="text-[10px] text-gray-600 mb-3">{node.type}</div>
 
@@ -424,6 +432,53 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
           </div>
         )}
 
+        {/* ── CallActivity ──────────────────── */}
+        {node.type === 'callActivity' && (
+          <div className="border-t border-blue-500/50 pt-3 mt-2">
+            {/* calledId dropdown */}
+            <label className="block mb-2">
+              <span className="text-gray-400 text-xs">{t.props.calledProcess}</span>
+              <select value={(node.data.calledId as string) || ''}
+                onChange={e => updateData('calledId', e.target.value)}
+                className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-1">
+                <option value="">-- select definition --</option>
+                {allDefs.map((d: any) => (
+                  <option key={`${d.id}-${d.version}`} value={d.id}>{d.name || d.id} (v{d.version})</option>
+                ))}
+              </select>
+            </label>
+
+            {/* calledVersion dropdown */}
+            {(node.data.calledId as string) && (
+              <label className="block mb-2">
+                <span className="text-gray-400 text-xs">{t.props.calledVersion}</span>
+                <select value={(node.data.calledVersion as number) || 'latest'}
+                  onChange={e => updateData('calledVersion', e.target.value === 'latest' ? undefined : parseInt(e.target.value))}
+                  className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-1">
+                  <option value="latest">latest</option>
+                  {allDefs.filter((d: any) => d.id === (node.data.calledId as string)).map((d: any) => (
+                    <option key={d.version} value={d.version}>v{d.version}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {/* inputMapping editor */}
+            <MappingEditor
+              label={t.props.inputMapping}
+              entries={(node.data.inputMapping as Array<{from:string;to:string;expr:string}>) || []}
+              onChange={v => updateData('inputMapping', v)}
+            />
+
+            {/* outputMapping editor */}
+            <MappingEditor
+              label={t.props.outputMapping}
+              entries={(node.data.outputMapping as Array<{from:string;to:string;expr:string}>) || []}
+              onChange={v => updateData('outputMapping', v)}
+            />
+          </div>
+        )}
+
         {/* ── Outgoing Edges ── */}
         {edges && edges.length > 0 && (
           <div className="border-t border-gray-700 pt-2 mt-2">
@@ -621,6 +676,47 @@ function RetryOnEditor({ entries, onChange, addLabel }: { entries: any[]; onChan
         </div>
       ))}
       <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">{addLabel}</button>
+    </div>
+  );
+}
+
+// ── MappingEditor (from, to, expr for callActivity input/output mapping) ──
+function MappingEditor({ label, entries, onChange }: {
+    label: string; entries: Array<{from: string; to: string; expr: string}>;
+    onChange: (v: Array<{from: string; to: string; expr: string}>) => void;
+}) {
+  const { t } = useT();
+  const add = () => onChange([...entries, { from: '', to: '', expr: '' }]);
+  const remove = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
+  const updateField = (i: number, field: 'from' | 'to' | 'expr', value: string) =>
+    onChange(entries.map((e, idx) => idx === i ? { ...e, [field]: value } : e));
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-gray-400 text-xs">{label}</span>
+        <button onClick={add} className="text-xs text-blue-400 hover:text-blue-300">+ Add</button>
+      </div>
+      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">No mappings defined</div>}
+      {entries.map((e, i) => (
+        <div key={i} className="mb-1.5 p-1.5 bg-gray-750 rounded border border-gray-700">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] text-gray-500">#{i + 1}</span>
+            <button onClick={() => remove(i)} className="text-[10px] text-red-400">&times;</button>
+          </div>
+          <div className="flex gap-1 mb-0.5">
+            <input className="flex-1 bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px] font-mono"
+              value={e.from} placeholder={t.props.mappingFrom}
+              onChange={ev => updateField(i, 'from', ev.target.value)} />
+            <input className="flex-1 bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px] font-mono"
+              value={e.to} placeholder={t.props.mappingTo}
+              onChange={ev => updateField(i, 'to', ev.target.value)} />
+          </div>
+          <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-[11px] font-mono"
+            value={e.expr || ''} placeholder={t.props.mappingExpr + ' (optional SpEL)'}
+            onChange={ev => updateField(i, 'expr', ev.target.value)} />
+        </div>
+      ))}
     </div>
   );
 }
