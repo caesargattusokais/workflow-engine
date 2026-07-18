@@ -32,10 +32,23 @@ public class CallActivityRunner implements NodeRunner {
         // 1. Resolve the called process definition
         ProcessDefinition def = resolveDefinition(caNode);
         if (def == null) {
-            throw new IllegalArgumentException(
-                "CallActivity '" + node.getId() + "': definition not found: "
-                + caNode.getCalledId()
-                + (caNode.getCalledVersion() != null ? " v" + caNode.getCalledVersion() : ""));
+            // Suspend the instance — same pattern as ServiceTaskRunner on unroutable failure.
+            // Avoids infinite retry loop: every trigger() would re-throw and keep the
+            // execution ACTIVE, never reaching a terminal state.
+            ProcessInstance inst = instanceRepository.findById(exec.getInstanceId());
+            if (inst != null) {
+                inst.setVariable("_suspendReason",
+                    "CallActivity '" + node.getId() + "': definition not found: "
+                    + caNode.getCalledId()
+                    + (caNode.getCalledVersion() != null ? " v" + caNode.getCalledVersion() : ""));
+                inst.setVariable("_suspendException", "IllegalStateException");
+                instanceRepository.update(inst);
+            }
+            exec.setRetryState("SUSPENDED");
+            exec.setStatus(ExecutionStatus.WAITING);
+            exec.setRetryAttempt(0);
+            instanceRepository.updateExecution(exec);
+            return true;
         }
 
         // 2. Build child variables
