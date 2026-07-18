@@ -1155,3 +1155,64 @@ Expected: PASS (no errors)
 ```bash
 git commit -m "chore: final verification — all tests pass, build green"
 ```
+
+---
+
+## Post-Implementation Review Findings (2026-07-18)
+
+以下问题在最终代码审查中发现，待修复。
+
+### Task 11: Critical — Redis 配置文件完整支持
+
+**Files:**
+- Modify: `workflow-engine-memory/src/main/java/com/github/wf/memory/RedisJdbcInstanceRepository.java`
+- Modify: `workflow-engine-memory/src/main/java/com/github/wf/memory/RedisConfig.java`
+
+**Description:** CallActivity 功能遗漏了 Redis 配置文件。`RedisJdbcInstanceRepository.writeToDb()` 和 `mapInstance()` 未更新 `parent_instance_id`/`parent_execution_id` 列，`RedisConfig.ProcessInstanceAdapter` 的 Gson 序列化/反序列化未包含 parent 字段。Redis 模式下子流程完成时父流程永远不会被唤醒。
+
+- [ ] writeToDb() UPDATE/INSERT SQL 添加 parent_instance_id, parent_execution_id 列
+- [ ] mapInstance() 读取 parent 列并传入 ProcessInstance 构造器
+- [ ] ProcessInstanceAdapter 序列化/反序列化 parentInstanceId, parentExecutionId
+
+---
+
+### Task 12: Critical — 并行网关子流程状态损坏
+
+**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/EndEventRunner.java`
+
+**Description:** CallActivity 子流程含并行网关时，第一个分支的 EndEvent 正确唤醒父流程。第二个分支的 EndEvent 触发时父执行已移出 CallActivityNode，`instanceof CallActivityNode` 失败，else-branch 将已 COMPLETED 的父执行设回 ACTIVE（InMemory 后端）。JDBC 后端因 `update()` 驱逐已完成实例的执行而幸免。
+
+- [ ] 进入 CallActivity wake-up 分支前检查子实例是否还有其他 active 执行
+- [ ] 仅当这是子实例的最后一个 active 执行时才唤醒父流程
+
+---
+
+### Task 13: High — 父流程 terminate 未防护
+
+**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/EndEventRunner.java:42`
+
+**Description:** 子流程运行期间 terminate 父流程，子流程 EndEvent 仍写回变量到已终止的父流程并设置父执行为 ACTIVE，造成数据完整性违规。
+
+- [ ] 在 `parentInst != null` 后添加 `&& parentInst.isRunning()` 守卫
+
+---
+
+### Task 14: High — missing calledId 无限重试循环
+
+**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/CallActivityRunner.java:34-38`
+
+**Description:** 引用不存在的 calledId 时 resolveDefinition() 返回 null → 抛出 IAE → trigger loop 捕获 → 执行保持 ACTIVE（未到达 WAITING 设置）→ 每次 trigger() 重复抛异常，无退避、无错误终态。
+
+- [ ] resolveDefinition 返回 null 时将执行设为 SUSPENDED 或直接标记实例为错误状态，而非抛异常
+
+---
+
+### Task 15: Medium — 其他问题
+
+1. **EndEventRunner:57** — 全透传 `setVariables()` 破坏性覆盖父流程变量（丢失仅存在于父流程的变量），应改为 merge 语义
+2. **yamlToGraph.ts:177** — `flushNode()` 未反序列化 inputMapping/outputMapping，YAML 重新导入时映射配置丢失
+3. **CallActivityRunner.java:43** — `findById()` 返回 null 时 `buildChildVariables` NPE，需空值守卫
+4. **CallActivityRunner.java:63** — Redis 模式下 triggerFn.accept() 在父锁内调用 trigger()，同步完成的子流程会导致 Redis 非重入锁死锁
+5. **CallActivityRunner.java:82-85** — inputMapping 中父变量不存在时静默设为 null，需校验和警告
+6. **EndEventRunner — 6 层嵌套 if 语句**应抽取方法或反转为 early-return
+7. **VariableMapping.expr** 字段在 CallActivityRunner 和 EndEventRunner 中均被忽略，应添加 SpEL 表达式求值
