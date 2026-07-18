@@ -2,19 +2,81 @@ package com.github.wf.engine.runner;
 
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
-import com.github.wf.model.ExecutionStatus;
-import com.github.wf.model.Node;
+import com.github.wf.model.*;
+import com.github.wf.model.node.CallActivityNode;
 import com.github.wf.spi.InstanceRepository;
+import com.github.wf.spi.ProcessRepository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 public class EndEventRunner implements NodeRunner {
+
+    private final ProcessRepository processRepository;
+    private final Consumer<String> parentTrigger;
+
+    public EndEventRunner() {
+        this(null, null);
+    }
+
+    public EndEventRunner(ProcessRepository processRepository, Consumer<String> parentTrigger) {
+        this.processRepository = processRepository;
+        this.parentTrigger = parentTrigger;
+    }
 
     @Override
     public boolean run(Node node, ExecutionContext context) {
         Execution exec = context.getExecution();
         InstanceRepository repo = context.getInstanceRepository();
 
+        // ── Sub-process completion: wake parent ──
+        ProcessInstance instance = repo.findById(exec.getInstanceId());
+        if (instance != null && instance.getParentInstanceId() != null
+            && processRepository != null && parentTrigger != null) {
+            ProcessInstance parentInst = repo.findById(instance.getParentInstanceId());
+            if (parentInst != null) {
+                // Load parent definition to find CallActivityNode and its outputMapping
+                ProcessDefinition parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
+                if (parentDef != null) {
+                    Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
+                    if (parentExec != null) {
+                        Node callActivityNode = parentDef.getNode(parentExec.getCurrentNodeId());
+                        if (callActivityNode instanceof CallActivityNode ca) {
+                            // Write back variables
+                            if (!ca.getOutputMapping().isEmpty()) {
+                                Map<String, Object> childVars = instance.getVariables();
+                                for (VariableMapping vm : ca.getOutputMapping()) {
+                                    parentInst.setVariable(vm.getTo(), childVars.get(vm.getFrom()));
+                                }
+                            } else {
+                                // Full pass-through
+                                parentInst.setVariables(instance.getVariables());
+                            }
+                            repo.update(parentInst);
+
+                            // Advance parent execution past the CallActivity
+                            parentExec.setStatus(ExecutionStatus.ACTIVE);
+                            List<Transition> outgoings = parentDef.getOutgoingTransitions(
+                                parentExec.getCurrentNodeId());
+                            if (!outgoings.isEmpty()) {
+                                parentExec.setCurrentNodeId(outgoings.get(0).getTo());
+                            }
+                            repo.updateExecution(parentExec);
+                        }
+                    }
+                }
+            }
+            // Trigger parent instance to continue
+            parentTrigger.accept(instance.getParentInstanceId());
+
+            // Mark child execution and instance COMPLETED
+            exec.setStatus(ExecutionStatus.COMPLETED);
+            repo.updateExecution(exec);
+            return true;
+        }
+
+        // ── Existing parallel gateway join logic ──
         if (exec.isChild()) {
             Execution parent = repo.findExecutionById(exec.getParentExecutionId());
             if (parent != null) {
@@ -23,8 +85,8 @@ public class EndEventRunner implements NodeRunner {
                         .allMatch(e -> e.getId().equals(exec.getId()) || e.isCompleted());
                 if (allDone) {
                     parent.setStatus(ExecutionStatus.ACTIVE);
-                    List<com.github.wf.model.Transition> outgoing =
-                            context.getDefinition().getOutgoingTransitions(parent.getCurrentNodeId());
+                    List<Transition> outgoing = context.getDefinition()
+                            .getOutgoingTransitions(parent.getCurrentNodeId());
                     if (!outgoing.isEmpty()) {
                         parent.setCurrentNodeId(outgoing.get(0).getTo());
                     }

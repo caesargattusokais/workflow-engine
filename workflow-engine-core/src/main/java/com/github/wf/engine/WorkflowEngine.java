@@ -54,13 +54,15 @@ public class WorkflowEngine {
 
     private void registerDefaultRunners(com.github.wf.ext.OrgService orgService) {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
-        runners.put(NodeType.END_EVENT, new EndEventRunner());
+        runners.put(NodeType.END_EVENT, new EndEventRunner(processRepository, this::trigger));
         runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, delayScheduler::schedule, baseUrl, orgService));
         runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(delayScheduler::schedule));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
         runners.put(NodeType.TIMER, new TimerRunner(delayScheduler::schedule));
+        runners.put(NodeType.CALL_ACTIVITY, new CallActivityRunner(
+            processRepository, instanceRepository, this::trigger));
     }
 
     public void addStateListener(InstanceStateListener listener) {

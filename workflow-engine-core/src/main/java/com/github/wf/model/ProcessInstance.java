@@ -16,7 +16,7 @@ public class ProcessInstance {
     private Instant completedAt;
 
     public ProcessInstance(String id, String definitionId, Map<String, Object> variables) {
-        this(id, definitionId, 0, variables, null, null);
+        this(id, definitionId, 0, variables, (String) null, (String) null);
     }
 
     public ProcessInstance(String id, String definitionId, int definitionVersion, Map<String, Object> variables) {
