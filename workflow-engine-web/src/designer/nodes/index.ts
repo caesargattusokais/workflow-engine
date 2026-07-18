@@ -6,6 +6,7 @@ import ExclusiveGatewayNode from './ExclusiveGatewayNode';
 import ParallelGatewayNode from './ParallelGatewayNode';
 import InclusiveGatewayNode from './InclusiveGatewayNode';
 import TimerNode from './TimerNode';
+import CallActivityNode from './CallActivityNode';
 
 export const nodeTypes = {
   startEvent: StartEventNode,
@@ -16,4 +17,5 @@ export const nodeTypes = {
   parallelGateway: ParallelGatewayNode,
   inclusiveGateway: InclusiveGatewayNode,
   timer: TimerNode,
+  callActivity: CallActivityNode,
 };
