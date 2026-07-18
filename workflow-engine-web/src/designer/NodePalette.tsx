@@ -11,6 +11,7 @@ export default function NodePalette() {
     { type: 'parallelGateway', label: t.nodes.and, color: 'bg-blue-600', shape: 'rotate-45' },
     { type: 'inclusiveGateway', label: t.nodes.or, color: 'bg-purple-600', shape: 'rotate-45' },
     { type: 'timer', label: t.nodes.timer, color: 'bg-amber-600', shape: 'rounded-lg' },
+    { type: 'callActivity', label: t.nodes.callActivity, color: 'bg-violet-700', shape: 'rounded-lg' },
   ];
 
   const onDragStart = (e: React.DragEvent, nodeType: string) => {

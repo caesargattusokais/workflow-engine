@@ -269,6 +269,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
                 startEvent: ['direct'],
                 endEvent: [],
                 timer: ['direct'],
+                callActivity: ['direct'],
               };
               const types = allowed[srcType] || ['direct'];
               const curType = edge?.data?.edgeType as string || 'direct';
