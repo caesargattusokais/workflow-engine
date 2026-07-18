@@ -1177,14 +1177,14 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 ---
 
-### Task 12: Critical — 并行网关子流程状态损坏
-
-**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/EndEventRunner.java`
+### Task 12: Critical — 并行网关子流程状态损坏 ✅ DONE (7e2b98a)
 
 **Description:** CallActivity 子流程含并行网关时，第一个分支的 EndEvent 正确唤醒父流程。第二个分支的 EndEvent 触发时父执行已移出 CallActivityNode，`instanceof CallActivityNode` 失败，else-branch 将已 COMPLETED 的父执行设回 ACTIVE（InMemory 后端）。JDBC 后端因 `update()` 驱逐已完成实例的执行而幸免。
 
-- [ ] 进入 CallActivity wake-up 分支前检查子实例是否还有其他 active 执行
-- [ ] 仅当这是子实例的最后一个 active 执行时才唤醒父流程
+**Fix:** 在进入 CallActivity wake-up 分支前，通过 `findActiveExecutions` 检查是否为子实例的最后一条活跃执行。非最后一条 → 仅标记当前执行 COMPLETED 并返回；是最后一条 → 执行完整父流程唤醒。
+
+- [x] 进入 CallActivity wake-up 分支前检查子实例是否还有其他 active 执行
+- [x] 仅当这是子实例的最后一个 active 执行时才唤醒父流程
 
 ---
 
