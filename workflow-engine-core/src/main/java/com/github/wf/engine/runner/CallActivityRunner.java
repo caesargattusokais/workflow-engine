@@ -63,7 +63,8 @@ public class CallActivityRunner implements NodeRunner {
                 "CallActivity '" + node.getId() + "': parent instance not found: "
                 + exec.getInstanceId());
         }
-        Map<String, Object> childVars = buildChildVariables(caNode, parentInst);
+        Map<String, Object> childVars = buildChildVariables(caNode, parentInst,
+            context.getExpressionEvaluator());
 
         // 3. Create child instance with parent linkage
         ProcessInstance childInst = new ProcessInstance(null, def.getId(),
@@ -99,15 +100,28 @@ public class CallActivityRunner implements NodeRunner {
     }
 
     private Map<String, Object> buildChildVariables(CallActivityNode node,
-                                                     ProcessInstance parentInst) {
+                                                     ProcessInstance parentInst,
+                                                     com.github.wf.expression.ExpressionEvaluator evaluator) {
         if (!node.getInputMapping().isEmpty()) {
             Map<String, Object> child = new HashMap<>();
             Map<String, Object> parentVars = parentInst.getVariables();
             for (VariableMapping vm : node.getInputMapping()) {
-                Object value = parentVars.get(vm.getFrom());
-                if (value == null && !parentVars.containsKey(vm.getFrom())) {
-                    log.warn("CallActivity inputMapping: variable '" + vm.getFrom()
-                        + "' not found in parent instance, mapping to null");
+                Object value;
+                if (vm.getExpr() != null) {
+                    // SpEL expression — evaluate against parent variables
+                    try {
+                        value = evaluator.evaluate(vm.getExpr(), parentVars);
+                    } catch (Exception e) {
+                        log.error("CallActivity inputMapping: expr evaluation failed for '"
+                            + vm.getFrom() + "' → '" + vm.getTo() + "': " + e.getMessage());
+                        value = parentVars.get(vm.getFrom()); // fall back to raw value
+                    }
+                } else {
+                    value = parentVars.get(vm.getFrom());
+                    if (value == null && !parentVars.containsKey(vm.getFrom())) {
+                        log.warn("CallActivity inputMapping: variable '" + vm.getFrom()
+                            + "' not found in parent instance, mapping to null");
+                    }
                 }
                 child.put(vm.getTo(), value);
             }

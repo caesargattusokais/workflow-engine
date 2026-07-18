@@ -62,7 +62,21 @@ public class EndEventRunner implements NodeRunner {
                             if (!ca.getOutputMapping().isEmpty()) {
                                 Map<String, Object> childVars = instance.getVariables();
                                 for (VariableMapping vm : ca.getOutputMapping()) {
-                                    parentInst.setVariable(vm.getTo(), childVars.get(vm.getFrom()));
+                                    Object value;
+                                    if (vm.getExpr() != null) {
+                                        try {
+                                            value = context.getExpressionEvaluator()
+                                                .evaluate(vm.getExpr(), childVars);
+                                        } catch (Exception e) {
+                                            log.error("EndEvent outputMapping: expr evaluation failed for '"
+                                                + vm.getFrom() + "' → '" + vm.getTo() + "': "
+                                                + e.getMessage());
+                                            value = childVars.get(vm.getFrom());
+                                        }
+                                    } else {
+                                        value = childVars.get(vm.getFrom());
+                                    }
+                                    parentInst.setVariable(vm.getTo(), value);
                                 }
                             } else {
                                 // Merge child variables into parent (non-destructive).
