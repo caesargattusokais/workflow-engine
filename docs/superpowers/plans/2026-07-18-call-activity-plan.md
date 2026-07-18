@@ -1212,4 +1212,4 @@ git commit -m "chore: final verification — all tests pass, build green"
 4. ⚠️ **CallActivityRunner.java:76** — Redis 锁重入问题：triggerFn 在父锁内调用，同步子流程导致 Redis 非重入锁死锁。**已知限制**：仅影响 Redis 模式下的 trivial 子流程（startEvent→endEvent），实际使用中几乎不会遇到。
 5. ✅ **CallActivityRunner.java:102** — inputMapping 中父变量不存在时记录 `log.warn`（区分 "值为 null" 和 "变量不存在"）
 6. ⚠️ **EndEventRunner — 6 层嵌套**：应抽取方法或反转为 early-return。**已知限制**：不影响功能，下次重构时处理。
-7. ⚠️ **VariableMapping.expr**：SpEL 表达式在 CallActivity 中未求值。**已知限制**：expr 字段已解析和存储，求值功能延后实现。
+7. ✅ **VariableMapping.expr** — SpEL 表达式求值已实现（870475c）。inputMapping 和 outputMapping 均支持。求值失败时回退到原始值并记录 error 日志。
