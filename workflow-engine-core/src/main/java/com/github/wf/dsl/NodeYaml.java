@@ -24,6 +24,16 @@ public class NodeYaml {
     public String duration;  // ISO 8601 duration
     public String until;     // ISO 8601 datetime (deadline)
     public String boundaryTimer; // ISO 8601 duration for UserTask boundary timer
+    public String calledId;
+    public Integer calledVersion;
+    public List<VariableMappingYaml> inputMapping;
+    public List<VariableMappingYaml> outputMapping;
+
+    public static class VariableMappingYaml {
+        public String from;
+        public String to;
+        public String expr;
+    }
 
     public static class RetryYaml {
         public int maxAttempts = 1;

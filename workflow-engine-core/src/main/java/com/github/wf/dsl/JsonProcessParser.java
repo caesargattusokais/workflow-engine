@@ -69,6 +69,35 @@ public class JsonProcessParser implements ProcessParser {
         ny.duration = jo.has("duration") ? jo.get("duration").getAsString() : null;
         ny.until = jo.has("until") ? jo.get("until").getAsString() : null;
         ny.boundaryTimer = jo.has("boundaryTimer") ? jo.get("boundaryTimer").getAsString() : null;
+
+        ny.calledId = jo.has("calledId") ? jo.get("calledId").getAsString() : null;
+        ny.calledVersion = jo.has("calledVersion") ? jo.get("calledVersion").getAsInt() : null;
+
+        if (jo.has("inputMapping")) {
+            JsonArray imArr = jo.getAsJsonArray("inputMapping");
+            ny.inputMapping = new ArrayList<>();
+            for (JsonElement e : imArr) {
+                JsonObject vm = e.getAsJsonObject();
+                NodeYaml.VariableMappingYaml vmy = new NodeYaml.VariableMappingYaml();
+                vmy.from = vm.has("from") ? vm.get("from").getAsString() : null;
+                vmy.to = vm.has("to") ? vm.get("to").getAsString() : null;
+                vmy.expr = vm.has("expr") ? vm.get("expr").getAsString() : null;
+                ny.inputMapping.add(vmy);
+            }
+        }
+
+        if (jo.has("outputMapping")) {
+            JsonArray omArr = jo.getAsJsonArray("outputMapping");
+            ny.outputMapping = new ArrayList<>();
+            for (JsonElement e : omArr) {
+                JsonObject vm = e.getAsJsonObject();
+                NodeYaml.VariableMappingYaml vmy = new NodeYaml.VariableMappingYaml();
+                vmy.from = vm.has("from") ? vm.get("from").getAsString() : null;
+                vmy.to = vm.has("to") ? vm.get("to").getAsString() : null;
+                vmy.expr = vm.has("expr") ? vm.get("expr").getAsString() : null;
+                ny.outputMapping.add(vmy);
+            }
+        }
         ny.httpMode = jo.has("httpMode") && jo.get("httpMode").getAsBoolean();
         ny.url = jo.has("url") ? jo.get("url").getAsString() : null;
         ny.method = jo.has("method") ? jo.get("method").getAsString() : null;
@@ -192,6 +221,21 @@ public class JsonProcessParser implements ProcessParser {
                 return new InclusiveGateway(ny.id, ny.name, listeners);
             case "timer":
                 return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
+            case "callActivity":
+                List<VariableMapping> inMappings = new ArrayList<>();
+                if (ny.inputMapping != null) {
+                    for (NodeYaml.VariableMappingYaml vm : ny.inputMapping) {
+                        inMappings.add(new VariableMapping(vm.from, vm.to, vm.expr));
+                    }
+                }
+                List<VariableMapping> outMappings = new ArrayList<>();
+                if (ny.outputMapping != null) {
+                    for (NodeYaml.VariableMappingYaml vm : ny.outputMapping) {
+                        outMappings.add(new VariableMapping(vm.from, vm.to, vm.expr));
+                    }
+                }
+                return new CallActivityNode(ny.id, ny.name, ny.calledId,
+                    ny.calledVersion, inMappings, outMappings, listeners);
             default:
                 throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }

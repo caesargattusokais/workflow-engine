@@ -139,6 +139,21 @@ public class YamlProcessParser implements ProcessParser {
             case "parallelGateway": return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway": return new InclusiveGateway(ny.id, ny.name, listeners);
             case "timer": return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
+            case "callActivity":
+                List<VariableMapping> inMappings = new ArrayList<>();
+                if (ny.inputMapping != null) {
+                    for (NodeYaml.VariableMappingYaml vm : ny.inputMapping) {
+                        inMappings.add(new VariableMapping(vm.from, vm.to, vm.expr));
+                    }
+                }
+                List<VariableMapping> outMappings = new ArrayList<>();
+                if (ny.outputMapping != null) {
+                    for (NodeYaml.VariableMappingYaml vm : ny.outputMapping) {
+                        outMappings.add(new VariableMapping(vm.from, vm.to, vm.expr));
+                    }
+                }
+                return new CallActivityNode(ny.id, ny.name, ny.calledId,
+                    ny.calledVersion, inMappings, outMappings, listeners);
             default: throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }
     }
