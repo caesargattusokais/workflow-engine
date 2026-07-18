@@ -81,6 +81,9 @@ public class CallActivityRunner implements NodeRunner {
         childInst.setActiveNodeIds(Set.of(childStartNode.getId()));
         instanceRepository.update(childInst);
 
+        // 5. Trigger child instance (both sync and async need this)
+        triggerFn.accept(childInst.getId());
+
         if (caNode.isAsync()) {
             // Async: advance parent past the CallActivity immediately
             ProcessDefinition parentDef = context.getDefinition();
@@ -95,9 +98,6 @@ public class CallActivityRunner implements NodeRunner {
             exec.setStatus(ExecutionStatus.WAITING);
             instanceRepository.updateExecution(exec);
         }
-
-        // 6. Trigger child instance
-        triggerFn.accept(childInst.getId());
 
         return false; // waiting for child to complete (sync mode only)
     }
