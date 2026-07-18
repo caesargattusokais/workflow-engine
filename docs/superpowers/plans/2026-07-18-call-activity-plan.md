@@ -1188,13 +1188,11 @@ git commit -m "chore: final verification — all tests pass, build green"
 
 ---
 
-### Task 13: High — 父流程 terminate 未防护
+### Task 13: High — 父流程 terminate 未防护 ✅ DONE (e9c3c4c)
 
-**File:** `workflow-engine-core/src/main/java/com/github/wf/engine/runner/EndEventRunner.java:42`
+**Fix:** 在 `parentInst != null` 后添加 `&& parentInst.isRunning()` 守卫。父流程被 terminate 后子流程 EndEvent 不再写回变量或设置父执行为 ACTIVE，子流程正常完成。
 
-**Description:** 子流程运行期间 terminate 父流程，子流程 EndEvent 仍写回变量到已终止的父流程并设置父执行为 ACTIVE，造成数据完整性违规。
-
-- [ ] 在 `parentInst != null` 后添加 `&& parentInst.isRunning()` 守卫
+- [x] 在 `parentInst != null` 后添加 `&& parentInst.isRunning()` 守卫
 
 ---
 
