@@ -51,7 +51,7 @@ public class EndEventRunner implements NodeRunner {
             }
 
             ProcessInstance parentInst = repo.findById(instance.getParentInstanceId());
-            if (parentInst != null) {
+            if (parentInst != null && parentInst.isRunning()) {
                 Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
                 if (parentExec != null) {
                     ProcessDefinition parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
