@@ -8,5 +8,6 @@ public enum NodeType {
     EXCLUSIVE_GATEWAY,
     PARALLEL_GATEWAY,
     INCLUSIVE_GATEWAY,
-    TIMER
+    TIMER,
+    CALL_ACTIVITY
 }
