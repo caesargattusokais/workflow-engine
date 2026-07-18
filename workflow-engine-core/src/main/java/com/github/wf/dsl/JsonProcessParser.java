@@ -72,6 +72,7 @@ public class JsonProcessParser implements ProcessParser {
 
         ny.calledId = jo.has("calledId") ? jo.get("calledId").getAsString() : null;
         ny.calledVersion = jo.has("calledVersion") ? jo.get("calledVersion").getAsInt() : null;
+        ny.async = jo.has("async") && jo.get("async").getAsBoolean();
 
         if (jo.has("inputMapping")) {
             JsonArray imArr = jo.getAsJsonArray("inputMapping");
@@ -235,7 +236,7 @@ public class JsonProcessParser implements ProcessParser {
                     }
                 }
                 return new CallActivityNode(ny.id, ny.name, ny.calledId,
-                    ny.calledVersion, inMappings, outMappings, listeners);
+                    ny.calledVersion, inMappings, outMappings, listeners, ny.async);
             default:
                 throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }

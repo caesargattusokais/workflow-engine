@@ -88,6 +88,7 @@ export function graphToYaml(nodes: Node[], edges: Edge[], defId: string, defName
     if (node.type === 'callActivity') {
       if (data.calledId) lines.push(`    calledId: ${y(data.calledId as string)}`);
       if (data.calledVersion) lines.push(`    calledVersion: ${data.calledVersion}`);
+      if (data.async) lines.push('    async: true');
       const inMappings = data.inputMapping as any[] | undefined;
       if (inMappings && inMappings.length > 0) {
         lines.push('    inputMapping:');

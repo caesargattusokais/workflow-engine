@@ -67,9 +67,11 @@ public class CallActivityRunner implements NodeRunner {
             context.getExpressionEvaluator());
 
         // 3. Create child instance with parent linkage
+        // Async mode: parentExecutionId = null so EndEventRunner won't try to wake parent
+        String parentExecId = caNode.isAsync() ? null : exec.getId();
         ProcessInstance childInst = new ProcessInstance(null, def.getId(),
             def.getVersion(), childVars,
-            exec.getInstanceId(), exec.getId());
+            exec.getInstanceId(), parentExecId);
         instanceRepository.save(childInst);
 
         // 4. Create start execution for child
@@ -79,14 +81,25 @@ public class CallActivityRunner implements NodeRunner {
         childInst.setActiveNodeIds(Set.of(childStartNode.getId()));
         instanceRepository.update(childInst);
 
-        // 5. Set parent execution to WAITING
-        exec.setStatus(ExecutionStatus.WAITING);
-        instanceRepository.updateExecution(exec);
+        if (caNode.isAsync()) {
+            // Async: advance parent past the CallActivity immediately
+            ProcessDefinition parentDef = context.getDefinition();
+            List<Transition> outgoings = parentDef.getOutgoingTransitions(exec.getCurrentNodeId());
+            if (!outgoings.isEmpty()) {
+                exec.setCurrentNodeId(outgoings.get(0).getTo());
+            }
+            instanceRepository.updateExecution(exec);
+            return true;
+        } else {
+            // Sync: parent waits for child to complete
+            exec.setStatus(ExecutionStatus.WAITING);
+            instanceRepository.updateExecution(exec);
+        }
 
         // 6. Trigger child instance
         triggerFn.accept(childInst.getId());
 
-        return false; // waiting for child to complete
+        return false; // waiting for child to complete (sync mode only)
     }
 
     private ProcessDefinition resolveDefinition(CallActivityNode node) {

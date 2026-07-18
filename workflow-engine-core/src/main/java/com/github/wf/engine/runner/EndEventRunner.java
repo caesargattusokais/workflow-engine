@@ -37,6 +37,7 @@ public class EndEventRunner implements NodeRunner {
         // ── Sub-process completion: wake parent ──
         ProcessInstance instance = repo.findById(exec.getInstanceId());
         if (instance != null && instance.getParentInstanceId() != null
+            && instance.getParentExecutionId() != null
             && processRepository != null && parentTrigger != null) {
             // Only wake parent when this is the LAST active execution in the child.
             // A child with a parallel gateway has multiple concurrent branches —

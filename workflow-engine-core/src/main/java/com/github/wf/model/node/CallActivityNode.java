@@ -13,12 +13,14 @@ public class CallActivityNode extends Node {
     private final Integer calledVersion;
     private final List<VariableMapping> inputMapping;
     private final List<VariableMapping> outputMapping;
+    private final boolean async;
 
     public CallActivityNode(String id, String name,
                             String calledId, Integer calledVersion,
                             List<VariableMapping> inputMapping,
                             List<VariableMapping> outputMapping,
-                            List<String> listeners) {
+                            List<String> listeners,
+                            boolean async) {
         super(id, name, NodeType.CALL_ACTIVITY, listeners);
         this.calledId = Objects.requireNonNull(calledId, "calledId must not be null");
         this.calledVersion = calledVersion;
@@ -28,10 +30,12 @@ public class CallActivityNode extends Node {
         this.outputMapping = outputMapping != null
             ? Collections.unmodifiableList(outputMapping)
             : Collections.emptyList();
+        this.async = async;
     }
 
     public String getCalledId() { return calledId; }
     public Integer getCalledVersion() { return calledVersion; }
     public List<VariableMapping> getInputMapping() { return inputMapping; }
     public List<VariableMapping> getOutputMapping() { return outputMapping; }
+    public boolean isAsync() { return async; }
 }

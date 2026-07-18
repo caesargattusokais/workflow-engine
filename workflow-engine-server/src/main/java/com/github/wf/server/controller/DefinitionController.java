@@ -158,6 +158,7 @@ public class DefinitionController {
             } else if (n instanceof CallActivityNode ca) {
                 data.put("calledId", ca.getCalledId());
                 if (ca.getCalledVersion() != null) data.put("calledVersion", ca.getCalledVersion());
+                if (ca.isAsync()) data.put("async", true);
                 if (!ca.getInputMapping().isEmpty()) {
                     data.put("inputMapping", ca.getInputMapping().stream().map(vm -> {
                         Map<String, String> m = new HashMap<>();

@@ -26,6 +26,7 @@ public class NodeYaml {
     public String boundaryTimer; // ISO 8601 duration for UserTask boundary timer
     public String calledId;
     public Integer calledVersion;
+    public boolean async;
     public List<VariableMappingYaml> inputMapping;
     public List<VariableMappingYaml> outputMapping;
 

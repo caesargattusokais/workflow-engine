@@ -153,7 +153,7 @@ public class YamlProcessParser implements ProcessParser {
                     }
                 }
                 return new CallActivityNode(ny.id, ny.name, ny.calledId,
-                    ny.calledVersion, inMappings, outMappings, listeners);
+                    ny.calledVersion, inMappings, outMappings, listeners, ny.async);
             default: throw new IllegalArgumentException("Unknown node type: " + ny.type);
         }
     }
