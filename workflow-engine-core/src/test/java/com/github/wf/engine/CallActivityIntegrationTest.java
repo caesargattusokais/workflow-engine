@@ -172,11 +172,11 @@ class CallActivityIntegrationTest {
                     to: end
                 """);
 
-        // Start succeeds (exception is caught inside trigger loop and logged)
+        // Start triggers CallActivity with non-existent definition — engine suspends the instance
         ProcessInstance instance = engine.start("bad-parent", Map.of());
-        assertThat(instance.getStatus()).isEqualTo(InstanceStatus.RUNNING);
+        assertThat(instance.getStatus()).isEqualTo(InstanceStatus.SUSPENDED);
 
-        // The execution is stuck at call-bad — never advanced past the CallActivity
+        // The execution is stuck at call-bad in WAITING state
         List<Execution> activeExecs = engine.instanceRepository
                 .findActiveExecutions(instance.getId());
         assertThat(activeExecs).hasSize(1);
