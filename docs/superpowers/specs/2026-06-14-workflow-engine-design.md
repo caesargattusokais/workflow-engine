@@ -129,16 +129,23 @@ Deployment
 ProcessInstance
   id: String
   definitionId: String
-  status: RUNNING | COMPLETED | TERMINATED
+  definitionVersion: int            # Pins to the version at start time
+  status: RUNNING | COMPLETED | TERMINATED | SUSPENDED
   variables: Map<String, Object>
-  activeNodeIds: Set<String>      # Snapshot for fast query
+  activeNodeIds: Set<String>        # Snapshot for fast query
+  parentInstanceId: String          # Non-null for sub-process instances
+  parentExecutionId: String         # Non-null for sub-process instances
+  createdAt: Instant
+  completedAt: Instant              # Only set for COMPLETED | TERMINATED (not SUSPENDED)
 
 Execution (Token)
   id: String
   instanceId: String
   currentNodeId: String
-  parentExecutionId: String       # null for root; set for parallel forks
+  parentExecutionId: String         # null for root; set for parallel forks
   status: ACTIVE | WAITING | COMPLETED
+  retryState: String                # null | "RETRY_PENDING" | "TIMER_PENDING" | "SUSPENDED"
+  retryAttempt: int
 ```
 
 #### Execution fork/join model
@@ -408,6 +415,7 @@ public interface ProcessRepository {
     void save(ProcessDefinition def);
     ProcessDefinition findById(String id);
     ProcessDefinition findLatestById(String id);
+    ProcessDefinition findByIdAndVersion(String id, int version);  // version-safe lookup
     List<ProcessDefinition> findAllVersions(String id);
 }
 
@@ -416,6 +424,12 @@ public interface InstanceRepository {
     ProcessInstance findById(String id);
     void update(ProcessInstance instance);
     List<ProcessInstance> findByDefinitionId(String defId);
+    void saveExecution(Execution execution);
+    Execution findExecutionById(String id);
+    /** Find all non-completed executions (both ACTIVE and WAITING) for an instance. */
+    List<Execution> findActiveExecutions(String instanceId);
+    List<Execution> findExecutionsByParentId(String parentExecutionId);
+    void updateExecution(Execution execution);
     void saveHistoricActivity(HistoricActivity activity);
     List<HistoricActivity> findHistory(String instanceId);
 }
@@ -471,27 +485,51 @@ engine.terminate(instance.getId(), "申请人撤销");
 ## 9. MVP Scope Boundaries
 
 ### MVP includes
-- All 7 node types (StartEvent, EndEvent, UserTask, ServiceTask, ExclusiveGateway, ParallelGateway, InclusiveGateway)
+- All 8 node types (StartEvent, EndEvent, UserTask, ServiceTask, ExclusiveGateway, ParallelGateway, InclusiveGateway, CallActivity)
 - YAML + JSON DSL parsing
 - Token-driven execution engine with fork/join
 - Task CRUD: query, complete, reject, delegate
 - All 3 extension points: ConditionEvaluator, ProcessListener, DynamicRouter
 - HistoricActivity audit log
 - Variable scoping (instance/node)
-- In-memory persistence
+- In-memory persistence + JDBC persistence (MySQL)
 - Per-instance concurrency safety
+- Distributed locking (Redis)
+- ServiceTask retry with exponential backoff
+- Boundary timer on UserTask with timeout edge routing
+- CallActivity (sub-process) with input/output variable mapping
+- Version-safe definition lookup (instances pin to definition version)
+- OrgService SPI with LDAP, Feishu, DingTalk implementations
+- Spring Boot REST API
+- React visual designer + monitor dashboard
+- Dashboard statistics
+- i18n (Chinese/English)
 
 ### MVP excludes
-- Timer / scheduled events
 - Signal / message events
-- Sub-process / call activity
 - Compensation / saga rollback
 - Batch / async job executor
-- Identity service (LDAP/org integration)
-- RetryPolicy for service tasks
-- DB persistence (SPI is ready, just no impl yet)
 - BPMN XML support
-- REST API layer
+- Collaborative editing
+- Responsive mobile layout
+
+---
+
+## 10. Bug Fixes (2026-07-19)
+
+23 bugs fixed — see `docs/CHANGELOG.md` for full details. Key design changes:
+
+- **Version-safe definition lookup**: `findByIdAndVersion()` added to `ProcessRepository`; `resolveDefinition()` used throughout engine
+- **ExclusiveGateway**: default branch evaluated last (BPMN spec compliance)
+- **Boundary timer**: timerKey only set when timer actually fires; timeout cancels PENDING task
+- **completeTask routing**: evaluates conditional + default transitions from UserTask
+- **Exception handling**: trigger() suspends execution on runner exception instead of swallowing
+- **SUSPENDED status**: non-terminal — does not set `completedAt`
+- **delegateTask**: old task set to DELEGATED (excluded from pending queries)
+- **group: assignee**: adds to candidateGroups, merged with YAML candidateGroups
+- **OrgService decoupled**: `sendTaskNotification()` default method on interface
+- **YAML class→className**: field aliasing in `FieldPropertyUtils`
+- **Sub-process completion**: EndEventRunner marks child COMPLETED, writes back variables, wakes parent
 
 ---
 
