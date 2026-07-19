@@ -129,7 +129,14 @@ public class UserTaskRunner implements NodeRunner {
             }
         }
 
-        task.setCandidateGroups(userTask.getCandidateGroups());
+        // Merge YAML candidateGroups with any groups already set (e.g. from group: assignee)
+        if (userTask.getCandidateGroups() != null && !userTask.getCandidateGroups().isEmpty()) {
+            List<String> merged = new ArrayList<>(task.getCandidateGroups());
+            for (String g : userTask.getCandidateGroups()) {
+                if (!merged.contains(g)) merged.add(g);
+            }
+            task.setCandidateGroups(merged);
+        }
         task.setVariables(new java.util.HashMap<>(variables));
         taskRepository.save(task);
 
