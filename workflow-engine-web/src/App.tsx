@@ -6,7 +6,17 @@ import Dashboard from './monitor/Dashboard';
 
 export default function App() {
   const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
+  const [monitorDefId, setMonitorDefId] = useState<string | null>(null);
+  const [monitorInstId, setMonitorInstId] = useState<string | null>(null);
   const { t } = useT();
+
+  const handleNavigate = (t: 'designer' | 'monitor', defId?: string, instId?: string) => {
+    if (t === 'monitor' && defId) {
+      setMonitorDefId(defId);
+      setMonitorInstId(instId || null);
+    }
+    setTab(t);
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -27,8 +37,8 @@ export default function App() {
         <LanguageSwitcher />
       </header>
       <main className="flex-1 overflow-hidden">
-        {tab === 'designer' && <DesignerPage onNavigate={setTab} />}
-        {tab === 'monitor' && <MonitorPage />}
+        {tab === 'designer' && <DesignerPage onNavigate={handleNavigate} />}
+        {tab === 'monitor' && <MonitorPage initialDefId={monitorDefId} initialInstId={monitorInstId} />}
         {tab === 'dashboard' && <Dashboard />}
       </main>
     </div>

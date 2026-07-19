@@ -19,7 +19,7 @@ interface Draft {
 
 interface VarInfo { name: string; source: string; }
 
-export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designer'|'monitor') => void }) {
+export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designer'|'monitor', defId?: string, instId?: string) => void }) {
   const { t } = useT();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -36,6 +36,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [deployedYaml, setDeployedYaml] = useState<string | null>(null);
   const [showYaml, setShowYaml] = useState(false);
   const [deployedId, setDeployedId] = useState<string | null>(null);
+  const [deployedInstanceId, setDeployedInstanceId] = useState<string | null>(null);
   const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -249,9 +250,11 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         const vars = (startNode?.data?.initialVars as Array<{key:string;value:string}>) || [];
         vars.forEach(v => { if (v.key) initVars[v.key] = v.value || ''; });
         const inst = await startInstance(result.id, initVars);
+        setDeployedInstanceId(inst.id);
         setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
         fetchInstanceSummary().then(setInstanceSummary).catch(() => {});
       } catch {
+        setDeployedInstanceId(null);
         setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
       }
     } catch (e: any) { setToast(t.designer.deployFailed + e.message); }
@@ -318,7 +321,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
             <span className="text-green-300">{toast}</span>
             <div className="flex gap-2">
               {deployedId && (
-                <button onClick={() => onNavigate?.('monitor')}
+                <button onClick={() => onNavigate?.('monitor', deployedId, deployedInstanceId || undefined)}
                   className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
                   {t.designer.viewInMonitor}
                 </button>

@@ -25,7 +25,8 @@ interface DefGroup {
   instLoading: boolean;
 }
 
-export default function MonitorPage() {
+export default function MonitorPage({ initialDefId, initialInstId }:
+    { initialDefId?: string | null; initialInstId?: string | null }) {
   const { t } = useT();
   const [defGroups, setDefGroups] = useState<DefGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -275,6 +276,31 @@ export default function MonitorPage() {
       if (loadId === loadIdRef.current) setHistory([]);
     }
   }, []);
+
+  // Auto-select deployed instance when navigating from designer
+  const autoSelectConsumed = useRef(false);
+  useEffect(() => {
+    if (!initialDefId || !initialInstId || autoSelectConsumed.current) return;
+
+    const group = defGroups.find(g => g.defId === initialDefId);
+    if (!group) {
+      // Definition not loaded yet — add a placeholder so load-instances picks it up
+      setDefGroups(prev => {
+        if (prev.some(g => g.defId === initialDefId)) return prev;
+        return [...prev, {
+          defId: initialDefId, defName: initialDefId,
+          instances: [], instPage: 0, instHasMore: true, instLoading: false
+        }];
+      });
+      return;
+    }
+    // Wait for instances to be loaded
+    const inst = group.instances.find(i => i.id === initialInstId);
+    if (!inst) return;
+
+    autoSelectConsumed.current = true;
+    loadInstance(initialInstId);
+  }, [initialDefId, initialInstId, defGroups, loadInstance]);
 
   const handleComplete = async (taskId: string) => {
     await completeTask(taskId);
