@@ -97,9 +97,8 @@ public class CallActivityRunner implements NodeRunner {
             // Sync: parent waits for child to complete
             exec.setStatus(ExecutionStatus.WAITING);
             instanceRepository.updateExecution(exec);
+            return true;
         }
-
-        return false; // waiting for child to complete (sync mode only)
     }
 
     private ProcessDefinition resolveDefinition(CallActivityNode node) {
@@ -132,7 +131,7 @@ public class CallActivityRunner implements NodeRunner {
                 } else {
                     value = parentVars.get(vm.getFrom());
                     if (value == null && !parentVars.containsKey(vm.getFrom())) {
-                        log.warn("CallActivity inputMapping: variable '" + vm.getFrom()
+                        log.debug("CallActivity inputMapping: variable '" + vm.getFrom()
                             + "' not found in parent instance, mapping to null");
                     }
                 }

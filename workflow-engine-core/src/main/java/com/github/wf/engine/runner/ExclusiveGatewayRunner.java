@@ -13,6 +13,8 @@ public class ExclusiveGatewayRunner implements NodeRunner {
         List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
         Map<String, Object> variables = context.getVariables();
 
+        // First pass: evaluate conditional transitions in order
+        Transition defaultTransition = null;
         for (Transition t : outgoing) {
             if (t.isConditional()) {
                 if (evaluateCondition(t.getCondition(), variables, context)) {
@@ -20,9 +22,19 @@ public class ExclusiveGatewayRunner implements NodeRunner {
                     return true;
                 }
             } else if (t.isDefault()) {
+                // Remember default — only use it if no conditional matches
+                defaultTransition = t;
+            } else if (t.isDirect()) {
+                // Direct transitions are unconditional — match immediately
                 context.getExecution().setCurrentNodeId(t.getTo());
                 return true;
             }
+        }
+
+        // Second pass: fall back to default if no conditional matched
+        if (defaultTransition != null) {
+            context.getExecution().setCurrentNodeId(defaultTransition.getTo());
+            return true;
         }
 
         throw new IllegalStateException("No outgoing transition matched for exclusive gateway: " + node.getId());

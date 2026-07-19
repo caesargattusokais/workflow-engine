@@ -54,6 +54,15 @@ public class YamlProcessParser implements ProcessParser {
                     } catch (NoSuchFieldException ignored) {
                     }
                 }
+                // Map YAML 'class' key to Java 'className' field
+                Property classNameProp = map.remove("className");
+                if (classNameProp != null) {
+                    try {
+                        Field f = GatewayConditionYaml.class.getField("className");
+                        map.put("class", new AliasedFieldProperty("class", f));
+                    } catch (NoSuchFieldException ignored) {
+                    }
+                }
             }
             if (type == NodeYaml.RouteYaml.class) {
                 Property isDefaultProp = map.remove("isDefault");
@@ -61,6 +70,14 @@ public class YamlProcessParser implements ProcessParser {
                     try {
                         java.lang.reflect.Field f = NodeYaml.RouteYaml.class.getField("isDefault");
                         map.put("default", new AliasedFieldProperty("default", f));
+                    } catch (NoSuchFieldException ignored) {}
+                }
+                // Map YAML 'class' key to Java 'className' field
+                Property classNameProp = map.remove("className");
+                if (classNameProp != null) {
+                    try {
+                        java.lang.reflect.Field f = NodeYaml.RouteYaml.class.getField("className");
+                        map.put("class", new AliasedFieldProperty("class", f));
                     } catch (NoSuchFieldException ignored) {}
                 }
             }

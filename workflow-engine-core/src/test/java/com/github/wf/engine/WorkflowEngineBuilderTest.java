@@ -19,6 +19,7 @@ class WorkflowEngineBuilderTest {
         public ProcessDefinition findById(String id) { return null; }
         public ProcessDefinition findLatestById(String id) { return null; }
         public List<ProcessDefinition> findAllVersions(String id) { return List.of(); }
+        public ProcessDefinition findByIdAndVersion(String id, int version) { return null; }
     };
 
     private static final InstanceRepository STUB_INSTANCE = new InstanceRepository() {

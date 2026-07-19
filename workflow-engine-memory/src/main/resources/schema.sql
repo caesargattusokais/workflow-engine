@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS process_instance (
   status VARCHAR(20) NOT NULL DEFAULT 'RUNNING',
   variables_json MEDIUMTEXT,
   active_node_ids_json TEXT,
+  parent_instance_id VARCHAR(64) NULL,
+  parent_execution_id VARCHAR(64) NULL,
   created_at BIGINT NOT NULL,
   completed_at BIGINT NULL
 );
@@ -59,9 +61,6 @@ CREATE TABLE IF NOT EXISTS definition (
   positions_json TEXT,
   PRIMARY KEY (user_id, id, version)
 );
-
-ALTER TABLE process_instance ADD COLUMN IF NOT EXISTS parent_instance_id VARCHAR(64);
-ALTER TABLE process_instance ADD COLUMN IF NOT EXISTS parent_execution_id VARCHAR(64);
 
 CREATE TABLE IF NOT EXISTS historic_activity (
   id VARCHAR(36) PRIMARY KEY,

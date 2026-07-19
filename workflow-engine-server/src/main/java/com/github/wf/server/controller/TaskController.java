@@ -26,7 +26,12 @@ public class TaskController {
         if (assignee != null) q.assignee(assignee);
         if (candidateGroup != null) q.candidateGroup(candidateGroup);
         if (instanceId != null) q.instanceId(instanceId);
-        if (status != null) q.status(com.github.wf.task.TaskStatus.valueOf(status));
+        // Default to PENDING only if no status filter specified
+        if (status != null) {
+            q.status(com.github.wf.task.TaskStatus.valueOf(status));
+        } else {
+            q.status(com.github.wf.task.TaskStatus.PENDING);
+        }
 
         return engine.queryTasks(q).stream().map(t -> {
             Map<String, Object> m = new LinkedHashMap<>();

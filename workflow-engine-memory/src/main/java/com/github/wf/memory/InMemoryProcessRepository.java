@@ -24,13 +24,22 @@ public class InMemoryProcessRepository implements ProcessRepository {
 
     @Override
     public ProcessDefinition findById(String id) {
-        return store.get(id);
+        // If id contains ':', treat as id:version key; otherwise find latest
+        if (id.contains(":")) {
+            return store.get(id);
+        }
+        return findLatestById(id);
     }
 
     @Override
     public ProcessDefinition findLatestById(String id) {
         Integer version = latestVersion.get(id);
         if (version == null) return null;
+        return store.get(id + ":" + version);
+    }
+
+    @Override
+    public ProcessDefinition findByIdAndVersion(String id, int version) {
         return store.get(id + ":" + version);
     }
 

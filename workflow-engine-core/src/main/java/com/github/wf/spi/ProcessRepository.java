@@ -7,5 +7,6 @@ public interface ProcessRepository {
     void save(ProcessDefinition definition);
     ProcessDefinition findById(String id);
     ProcessDefinition findLatestById(String id);
+    ProcessDefinition findByIdAndVersion(String id, int version);
     List<ProcessDefinition> findAllVersions(String id);
 }

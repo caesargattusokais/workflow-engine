@@ -56,4 +56,15 @@ public interface OrgService {
 
     /** Get the full org tree (root nodes = top-level managers). */
     default List<OrgTree> getOrgTree() { return List.of(); }
+
+    /**
+     * Send a task notification (e.g. approval card) to a user.
+     * Returns a message ID if sent, or null if this OrgService does not support notifications.
+     * The default implementation does nothing — override in implementations that support push notifications.
+     */
+    default String sendTaskNotification(String assignee, String taskId, String instanceId,
+                                         String taskName, String applicant,
+                                         String baseUrl, java.util.Map<String, Object> variables) {
+        return null;
+    }
 }

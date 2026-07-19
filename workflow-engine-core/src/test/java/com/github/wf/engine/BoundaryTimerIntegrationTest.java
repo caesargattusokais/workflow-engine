@@ -45,6 +45,7 @@ class BoundaryTimerIntegrationTest {
                 return v != null ? processStore.get(id + ":" + v) : null;
             }
             public List<ProcessDefinition> findAllVersions(String id) { return List.of(); }
+            public ProcessDefinition findByIdAndVersion(String id, int version) { return processStore.get(id + ":" + version); }
         };
     }
 

@@ -57,7 +57,9 @@ public class ParallelGatewayRunner implements NodeRunner {
                 parent.setStatus(ExecutionStatus.ACTIVE);
                 List<Transition> parentOutgoing = context.getDefinition()
                         .getOutgoingTransitions(parent.getCurrentNodeId());
-                parent.setCurrentNodeId(parentOutgoing.get(0).getTo());
+                if (!parentOutgoing.isEmpty()) {
+                    parent.setCurrentNodeId(parentOutgoing.get(0).getTo());
+                }
                 repo.updateExecution(parent);
             }
             for (Execution s : siblings) {

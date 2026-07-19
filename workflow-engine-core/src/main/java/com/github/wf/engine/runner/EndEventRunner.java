@@ -37,8 +37,13 @@ public class EndEventRunner implements NodeRunner {
         // ── Sub-process completion: wake parent ──
         ProcessInstance instance = repo.findById(exec.getInstanceId());
         if (instance != null && instance.getParentInstanceId() != null
-            && instance.getParentExecutionId() != null
-            && processRepository != null && parentTrigger != null) {
+            && instance.getParentExecutionId() != null) {
+            if (processRepository == null || parentTrigger == null) {
+                log.warn("EndEvent: sub-process instance " + instance.getId()
+                    + " completed but EndEventRunner was created without ProcessRepository/parentTrigger"
+                    + " — parent instance " + instance.getParentInstanceId()
+                    + " will NOT be woken. Use the parameterized constructor for sub-process support.");
+            } else {
             // Only wake parent when this is the LAST active execution in the child.
             // A child with a parallel gateway has multiple concurrent branches —
             // each ending at an EndEvent. We must wait for all of them.
@@ -55,7 +60,12 @@ public class EndEventRunner implements NodeRunner {
             if (parentInst != null && parentInst.isRunning()) {
                 Execution parentExec = repo.findExecutionById(instance.getParentExecutionId());
                 if (parentExec != null) {
-                    ProcessDefinition parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
+                    ProcessDefinition parentDef = parentInst.getDefinitionVersion() > 0
+                        ? processRepository.findByIdAndVersion(parentInst.getDefinitionId(), parentInst.getDefinitionVersion())
+                        : processRepository.findLatestById(parentInst.getDefinitionId());
+                    if (parentDef == null) {
+                        parentDef = processRepository.findLatestById(parentInst.getDefinitionId());
+                    }
                     if (parentDef != null) {
                         Node callActivityNode = parentDef.getNode(parentExec.getCurrentNodeId());
                         if (callActivityNode instanceof CallActivityNode ca) {
@@ -113,14 +123,20 @@ public class EndEventRunner implements NodeRunner {
                     }
                 }
             }
-            // Trigger parent instance to continue
-            parentTrigger.accept(instance.getParentInstanceId());
+            // Trigger parent instance to continue (only if we have the callback)
+            if (parentTrigger != null) {
+                parentTrigger.accept(instance.getParentInstanceId());
+            }
 
             // Mark child execution and instance COMPLETED
             exec.setStatus(ExecutionStatus.COMPLETED);
             repo.updateExecution(exec);
+            instance.setStatus(InstanceStatus.COMPLETED);
+            instance.setActiveNodeIds(java.util.Set.of());
+            repo.update(instance);
             return true;
-        }
+        }  // end else
+        }  // end if (instance.getParentInstanceId() != null)
 
         // ── Existing parallel gateway join logic ──
         if (exec.isChild()) {

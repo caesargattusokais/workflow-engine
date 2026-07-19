@@ -56,6 +56,7 @@ class CallActivityIntegrationTest {
                         .filter(d -> d.getId().equals(id))
                         .toList();
             }
+            public ProcessDefinition findByIdAndVersion(String id, int version) { return processStore.get(id + ":" + version); }
         };
     }
 

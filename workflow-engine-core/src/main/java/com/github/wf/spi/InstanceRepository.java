@@ -93,6 +93,7 @@ public interface InstanceRepository {
 
     void saveExecution(Execution execution);
     Execution findExecutionById(String id);
+    /** Find all non-completed executions (both ACTIVE and WAITING) for an instance. */
     List<Execution> findActiveExecutions(String instanceId);
     List<Execution> findExecutionsByParentId(String parentExecutionId);
     void updateExecution(Execution execution);

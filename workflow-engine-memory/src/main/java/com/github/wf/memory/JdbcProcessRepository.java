@@ -55,6 +55,16 @@ public class JdbcProcessRepository implements ProcessRepository {
     }
 
     @Override
+    public ProcessDefinition findByIdAndVersion(String id, int version) {
+        List<ProcessDefinition> list = jdbc.query(
+            "SELECT version, name, nodes_json, transitions_json FROM process_definition WHERE id = ? AND version = ?",
+            (rs, rowNum) -> buildDefStatic(id, rs.getInt("version"), rs.getString("name"),
+                rs.getString("nodes_json"), rs.getString("transitions_json")),
+            id, version);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    @Override
     public List<ProcessDefinition> findAllVersions(String id) {
         return jdbc.query(
             "SELECT version, name, nodes_json, transitions_json FROM process_definition WHERE id = ? ORDER BY version ASC",

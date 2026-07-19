@@ -41,7 +41,7 @@ public class ServiceTaskRunner implements NodeRunner {
         ProcessInstance instance = repo.findById(context.getInstanceId());
         Map<String, Object> variables = new HashMap<>(instance.getVariables());
 
-        log.warn("Running ServiceTask " + exec.getInstanceId());
+        log.info("Running ServiceTask " + exec.getInstanceId());
 
         try {
             boolean httpMode = serviceTask.isHttpTask();
@@ -141,7 +141,7 @@ public class ServiceTaskRunner implements NodeRunner {
                     repo.update(instance);
                     if (scheduler != null) {
                         scheduler.accept(exec.getInstanceId(), delay);
-                        log.warn("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");
+                        log.info("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");
                     }
                     exec.setStatus(ExecutionStatus.WAITING);
                     exec.setRetryState("RETRY_PENDING");

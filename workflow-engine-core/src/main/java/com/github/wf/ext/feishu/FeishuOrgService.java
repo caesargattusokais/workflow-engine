@@ -187,6 +187,14 @@ public class FeishuOrgService implements OrgService {
         return buildDeptTree("0");
     }
 
+    @Override
+    public String sendTaskNotification(String assignee, String taskId, String instanceId,
+                                        String taskName, String applicant,
+                                        String baseUrl, java.util.Map<String, Object> variables) {
+        FeishuNotifier notifier = new FeishuNotifier(this);
+        return notifier.sendApprovalCard(assignee, taskId, instanceId, taskName, applicant, baseUrl, variables);
+    }
+
     private List<OrgTree> buildDeptTree(String parentId) {
         List<OrgTree> result = new ArrayList<>();
         try {

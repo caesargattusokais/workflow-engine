@@ -177,19 +177,38 @@ public class WorkflowEngine {
 
     // === Trigger Loop ===
 
+    /**
+     * Resolve the ProcessDefinition for a running instance using its pinned version.
+     * Falls back to findLatestById if version is 0 (legacy instances without version).
+     */
+    private ProcessDefinition resolveDefinition(ProcessInstance instance) {
+        if (instance.getDefinitionVersion() > 0) {
+            ProcessDefinition def = processRepository.findByIdAndVersion(
+                    instance.getDefinitionId(), instance.getDefinitionVersion());
+            if (def != null) return def;
+        }
+        return processRepository.findLatestById(instance.getDefinitionId());
+    }
+
     public void trigger(String instanceId) {
         lockManager.lock(instanceId);
         try {
             ProcessInstance instance = instanceRepository.findById(instanceId);
             if (instance == null || !instance.isRunning()) return;
 
-            ProcessDefinition def = processRepository.findLatestById(instance.getDefinitionId());
+            ProcessDefinition def = resolveDefinition(instance);
             if (def == null) return;
 
             // Reactivate pending executions BEFORE the loop (only from daemon wake-ups)
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
                 if (exec.isWaiting() && ("RETRY_PENDING".equals(exec.getRetryState()) || "TIMER_PENDING".equals(exec.getRetryState()))) {
+                    // Signal boundary timer expiry before reactivating, so UserTaskRunner can detect it
+                    if ("TIMER_PENDING".equals(exec.getRetryState())) {
+                        String timerKey = exec.getCurrentNodeId() + "_boundaryTimerFired";
+                        instance.setVariable(timerKey, true);
+                        instanceRepository.update(instance);
+                    }
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     exec.setRetryState(null);
                     instanceRepository.updateExecution(exec);
@@ -221,42 +240,57 @@ public class WorkflowEngine {
                         try {
                             if (runner.run(node, ctx)) {
                                 advanced = true;
-                            }
-                            instanceRepository.updateExecution(exec);
-                            instanceRepository.saveHistoricActivity(
-                                    HistoricActivity.nodeEnter(instanceId, node.getId(),
-                                            node.getName(), node.getType()));
-                            invokeListeners(node, instanceId, instance.getVariables(), true);
+                                instanceRepository.updateExecution(exec);
+                                instanceRepository.saveHistoricActivity(
+                                        HistoricActivity.nodeEnter(instanceId, node.getId(),
+                                                node.getName(), node.getType()));
+                                invokeListeners(node, instanceId, instance.getVariables(), true);
 
-                            // Check if runner signaled suspension
-                            if ("SUSPENDED".equals(exec.getRetryState())) {
-                                if (!exec.isChild()) {
-                                    // Main execution — suspend instance immediately
-                                    instance = instanceRepository.findById(instanceId);
-                                    instance.setStatus(InstanceStatus.SUSPENDED);
-                                    instanceRepository.update(instance);
-                                    notifyStateListeners(instanceId);
-                                    return;
+                                // Check if runner signaled suspension
+                                if ("SUSPENDED".equals(exec.getRetryState())) {
+                                    if (!exec.isChild()) {
+                                        // Main execution — suspend instance immediately
+                                        instance = instanceRepository.findById(instanceId);
+                                        instance.setStatus(InstanceStatus.SUSPENDED);
+                                        instanceRepository.update(instance);
+                                        notifyStateListeners(instanceId);
+                                        return;
+                                    }
+                                    // Child execution (parallel fork) — check remaining siblings
+                                    List<Execution> siblings = instanceRepository.findExecutionsByParentId(exec.getParentExecutionId());
+                                    // Exclude completed siblings — check only the ones still alive
+                                    List<Execution> remaining = siblings.stream()
+                                            .filter(s -> !s.isCompleted())
+                                            .toList();
+                                    boolean allSuspended = !remaining.isEmpty() && remaining.stream()
+                                            .allMatch(s -> "SUSPENDED".equals(s.getRetryState()));
+                                    if (allSuspended) {
+                                        instance = instanceRepository.findById(instanceId);
+                                        instance.setStatus(InstanceStatus.SUSPENDED);
+                                        instanceRepository.update(instance);
+                                        notifyStateListeners(instanceId);
+                                        return;
+                                    }
+                                    // Some remaining siblings still running — don't suspend yet
                                 }
-                                // Child execution (parallel fork) — check remaining siblings
-                                List<Execution> siblings = instanceRepository.findExecutionsByParentId(exec.getParentExecutionId());
-                                // Exclude completed siblings — check only the ones still alive
-                                List<Execution> remaining = siblings.stream()
-                                        .filter(s -> !s.isCompleted())
-                                        .toList();
-                                boolean allSuspended = !remaining.isEmpty() && remaining.stream()
-                                        .allMatch(s -> "SUSPENDED".equals(s.getRetryState()));
-                                if (allSuspended) {
-                                    instance = instanceRepository.findById(instanceId);
-                                    instance.setStatus(InstanceStatus.SUSPENDED);
-                                    instanceRepository.update(instance);
-                                    notifyStateListeners(instanceId);
-                                    return;
-                                }
-                                // Some remaining siblings still running — don't suspend yet
                             }
                         } catch (Exception e) {
-                            log.error("Error running node " + node.getId(), e);
+                            log.error("Error running node " + node.getId() + " — suspending execution", e);
+                            // Suspend the failed execution instead of leaving it in an inconsistent state
+                            exec.setRetryState("SUSPENDED");
+                            exec.setStatus(ExecutionStatus.WAITING);
+                            instanceRepository.updateExecution(exec);
+                            // Set suspend reason on the instance
+                            instance.setVariable(node.getId() + "_suspendReason", e.getMessage());
+                            instance.setVariable(node.getId() + "_suspendException", e.getClass().getName());
+                            instanceRepository.update(instance);
+                            // If this is the root execution, suspend the entire instance
+                            if (!exec.isChild()) {
+                                instance.setStatus(InstanceStatus.SUSPENDED);
+                                instanceRepository.update(instance);
+                                notifyStateListeners(instanceId);
+                                return;
+                            }
                         }
                     }
                 }
@@ -309,7 +343,7 @@ public class WorkflowEngine {
         taskRepository.update(task);
 
         ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
-        ProcessDefinition def = processRepository.findLatestById(instance.getDefinitionId());
+        ProcessDefinition def = resolveDefinition(instance);
         Node node = def.getNode(task.getNodeId());
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskCompleted(instance.getId(), node.getId(),
@@ -338,17 +372,35 @@ public class WorkflowEngine {
                                 instance.getId(), node.getId(), instance.getVariables());
                         exec.setCurrentNodeId(nextNodeId);
                     } else {
-                        // Pick first non-routing edge (direct/conditional/default), skip timeout/result/exception
+                        // Route via outgoing transitions: direct → conditional (evaluated) → default
                         List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
                         com.github.wf.model.Transition picked = null;
+                        com.github.wf.model.Transition defaultTrans = null;
+
+                        // 1. Prefer direct edge
                         for (com.github.wf.model.Transition t : outgoing) {
                             if (t.isDirect()) { picked = t; break; }
                         }
+
+                        // 2. Evaluate conditional edges (skip timeout/result/exception)
                         if (picked == null) {
                             for (com.github.wf.model.Transition t : outgoing) {
-                                if (t.isConditional() || t.isDefault()) { picked = t; break; }
+                                if (t.isConditional()) {
+                                    if (evaluateCondition(t.getCondition(), instance.getVariables())) {
+                                        picked = t;
+                                        break;
+                                    }
+                                } else if (t.isDefault()) {
+                                    defaultTrans = t; // remember, use only as fallback
+                                }
                             }
                         }
+
+                        // 3. Fall back to default
+                        if (picked == null && defaultTrans != null) {
+                            picked = defaultTrans;
+                        }
+
                         if (picked != null) exec.setCurrentNodeId(picked.getTo());
                     }
                 } else {
@@ -371,7 +423,7 @@ public class WorkflowEngine {
         taskRepository.update(task);
 
         ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
-        ProcessDefinition def = processRepository.findLatestById(instance.getDefinitionId());
+        ProcessDefinition def = resolveDefinition(instance);
         Node node = def.getNode(task.getNodeId());
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskRejected(instance.getId(), node.getId(),
@@ -394,7 +446,7 @@ public class WorkflowEngine {
         taskRepository.save(delegated);
 
         ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
-        ProcessDefinition def = processRepository.findLatestById(instance.getDefinitionId());
+        ProcessDefinition def = resolveDefinition(instance);
         Node node = def.getNode(task.getNodeId());
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskDelegated(instance.getId(), node.getId(),
@@ -473,6 +525,25 @@ public class WorkflowEngine {
             return router.nextNode(instanceId, currentNodeId, variables);
         } catch (Exception e) {
             throw new RuntimeException("Cannot invoke DynamicRouter: " + routerClass, e);
+        }
+    }
+
+    /**
+     * Evaluate a Condition using either SpEL expression or Java class.
+     */
+    private boolean evaluateCondition(com.github.wf.model.Condition condition, Map<String, Object> variables) {
+        if (condition == null) return false;
+        if (condition.getType() == com.github.wf.model.ConditionType.EXPRESSION) {
+            return expressionEvaluator.evaluateToBoolean(condition.getExpr(), variables);
+        } else {
+            try {
+                Class<?> clazz = Class.forName(condition.getClassName());
+                com.github.wf.ext.ConditionEvaluator evaluator =
+                        (com.github.wf.ext.ConditionEvaluator) clazz.getDeclaredConstructor().newInstance();
+                return evaluator.evaluate(variables);
+            } catch (Exception e) {
+                throw new RuntimeException("Cannot evaluate condition: " + condition.getClassName(), e);
+            }
         }
     }
 }

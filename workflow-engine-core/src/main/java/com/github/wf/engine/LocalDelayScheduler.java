@@ -28,7 +28,7 @@ public class LocalDelayScheduler implements DelayScheduler {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     DelayedTrigger dt = delayQueue.take();
-                    log.warn("Delayed trigger: " + dt.instanceId);
+                    log.info("Delayed trigger: " + dt.instanceId);
                     triggerFn.accept(dt.instanceId);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

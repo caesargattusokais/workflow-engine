@@ -3,8 +3,6 @@ package com.github.wf.engine.runner;
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
 import com.github.wf.ext.OrgService;
-import com.github.wf.ext.feishu.FeishuNotifier;
-import com.github.wf.ext.feishu.FeishuOrgService;
 import com.github.wf.ext.http.HttpClientUtil;
 import com.github.wf.model.ExecutionStatus;
 import com.github.wf.model.Node;
@@ -17,7 +15,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -69,18 +69,35 @@ public class UserTaskRunner implements NodeRunner {
         String timerKey = node.getId() + "_boundaryTimerFired";
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
         if (Boolean.TRUE.equals(instance.getVariable(timerKey))) {
-            log.warn("Boundary timer fired for node=" + node.getId() + " instance=" + context.getInstanceId());
+            log.info("Boundary timer fired for node=" + node.getId() + " instance=" + context.getInstanceId());
             instance.removeVariable(timerKey);
             context.getInstanceRepository().update(instance);
+
+            // Cancel any PENDING task for this node — it timed out
+            taskRepository.query(new com.github.wf.task.TaskQuery()
+                    .instanceId(exec.getInstanceId()))
+                    .stream()
+                    .filter(t -> t.getNodeId().equals(node.getId()) && t.isPending())
+                    .findFirst()
+                    .ifPresent(t -> {
+                        t.setStatus(com.github.wf.task.TaskStatus.REJECTED);
+                        taskRepository.update(t);
+                    });
+
+            // Record timeout in history
+            context.getInstanceRepository().saveHistoricActivity(
+                    com.github.wf.model.HistoricActivity.nodeLeave(
+                            exec.getInstanceId(), node.getId(), node.getName(), node.getType()));
+
             for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
                 if (t.isTimeout()) {
-                    log.warn("Timeout edge matched, routing to " + t.getTo());
+                    log.info("Timeout edge matched, routing to " + t.getTo());
                     exec.setCurrentNodeId(t.getTo());
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     return true;
                 }
             }
-            log.warn("No timeout edge found for node=" + node.getId() + " — falling through");
+            log.info("No timeout edge found for node=" + node.getId() + " — falling through");
         }
 
         // Check if a pending task already exists for this execution+node
@@ -98,23 +115,35 @@ public class UserTaskRunner implements NodeRunner {
 
         // Evaluate assignee expression or use literal
         if (userTask.getAssignee() != null) {
-            task.setAssignee(resolveAssignee(userTask.getAssignee(), variables, context.getExpressionEvaluator()));
+            String resolved = resolveAssignee(userTask.getAssignee(), variables, context.getExpressionEvaluator());
+            if (userTask.getAssignee().startsWith("group:") && userTask.getAssignee().length() > 6) {
+                // group:xxx → add to candidateGroups, not assignee
+                String groupName = userTask.getAssignee().substring(6);
+                List<String> groups = new ArrayList<>(task.getCandidateGroups());
+                if (!groups.contains(groupName)) {
+                    groups.add(groupName);
+                }
+                task.setCandidateGroups(groups);
+            } else {
+                task.setAssignee(resolved);
+            }
         }
 
         task.setCandidateGroups(userTask.getCandidateGroups());
         task.setVariables(new java.util.HashMap<>(variables));
         taskRepository.save(task);
 
-        // ── Feishu notification — auto if FeishuOrgService is configured ──
-        if (!userTask.isHttpTask() && orgService instanceof FeishuOrgService) {
+        // ── Notification — auto if OrgService supports push notifications ──
+        if (!userTask.isHttpTask() && orgService != null && baseUrl != null && !baseUrl.isBlank()) {
             String assignee = task.getAssignee();
-            if (assignee != null && baseUrl != null && !baseUrl.isBlank()) {
+            if (assignee != null) {
                 String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-                FeishuNotifier notifier = new FeishuNotifier((FeishuOrgService) orgService);
-                String msgId = notifier.sendApprovalCard(assignee, task.getId(),
+                String msgId = orgService.sendTaskNotification(assignee, task.getId(),
                     exec.getInstanceId(), userTask.getName() != null ? userTask.getName() : "审批",
                     String.valueOf(variables.getOrDefault("applicant", "系统")), base, variables);
-                log.warn("Feishu card sent: task=" + task.getId() + " to=" + assignee + " msgId=" + msgId);
+                if (msgId != null) {
+                    log.info("Task notification sent: task=" + task.getId() + " to=" + assignee + " msgId=" + msgId);
+                }
             }
         }
 
@@ -138,7 +167,7 @@ public class UserTaskRunner implements NodeRunner {
                 callHeaders.put("X-Callback-Reject", rejectUrl);
                 callHeaders.put("X-Task-Id", taskId);
             }
-            log.warn("Sending HTTP callback for task " + taskId + " to " + userTask.getUrl());
+            log.info("Sending HTTP callback for task " + taskId + " to " + userTask.getUrl());
             try {
                 HttpClientUtil.fireAndForget(userTask.getUrl(), userTask.getMethod(),
                         callHeaders, userTask.getBody(), httpVars);
@@ -154,9 +183,8 @@ public class UserTaskRunner implements NodeRunner {
             try {
                 long delayMs = Duration.parse(userTask.getBoundaryTimer()).toMillis();
                 if (delayMs > 0) {
-                    log.warn("Scheduling boundary timer for node=" + node.getId() + " delay=" + delayMs + "ms");
-                    instance.setVariable(timerKey, true);
-                    context.getInstanceRepository().update(instance);
+                    log.info("Scheduling boundary timer for node=" + node.getId() + " delay=" + delayMs + "ms");
+                    // Note: timerKey is NOT set here — it will be set by trigger() when the timer actually fires
                     scheduler.accept(exec.getInstanceId(), delayMs);
                     exec.setRetryState("TIMER_PENDING");
                 }
