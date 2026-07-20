@@ -32,6 +32,9 @@ java -jar workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.ja
 
 # 启动前端开发服务器
 cd workflow-engine-web && npm run dev
+
+# 运行 E2E 测试（需先启动后端 memory+mock-ldap 模式）
+cd workflow-engine-web && npx playwright test
 ```
 
 浏览器打开 `http://localhost:5173`，左侧草稿列表 → 新建草稿 → 拖拽节点到画布 → 连线 → Deploy。
@@ -301,6 +304,12 @@ Designer 侧边栏 `T` 按钮 → 5 个预置模板：请假审批、报销审�
 | GET | `/api/tasks` | 任务列表 |
 | POST | `/api/tasks/{id}/complete` | 完成任务 |
 | POST | `/api/tasks/{id}/reject` | 驳回任务 |
+| POST | `/api/tasks/{id}/delegate` | 委派任务 |
+| DELETE | `/api/instances/{id}` | 删除实例 |
+| GET | `/api/instances/summary` | 实例汇总统计 |
+| GET | `/api/dashboard/stats` | 看板统计（支持 ?definitionId=） |
+| GET | `/api/dashboard/timeline/{id}` | 实例时间线 |
+| DELETE | `/api/definitions/{id}` | 删除定义 |
 | GET | `/api/drafts` | 草稿列表 |
 | POST | `/api/drafts` | 创建草稿 |
 | PUT | `/api/drafts/{id}` | 更新草稿 |
@@ -365,4 +374,4 @@ engine.registerServiceHandler("com.myapp.Handler", vars -> Map.of("status", "PAS
 | v3.3.0 | 流程模板市场（5 个预置模板）、ServiceTask SPI 自动发现 |
 | v3.4.0 | LDAP 组织架构集成、组织树选择器、Mock LDAP 模块 |
 | v5.0.0 | CallActivity 子流程、Redis 分布式锁、RocketMQ 延迟调度、Dashboard 看板 |
-| v5.1.0 | 23 个 bug 修复（版本安全查找、网关默认分支、定时器生命周期、X-User-Id 强制校验等）、JDBC 测试覆盖（51 个新增） |
+| v5.1.0 | 23 个 bug 修复 + 3 个引擎核心 bug 修复（ParallelGateway join 路由、EndEventRunner 子执行 join、mock-ldap Bean 冲突）、JDBC 测试覆盖（51 个新增）、Playwright E2E 测试（117 个） |

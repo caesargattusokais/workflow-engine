@@ -1,6 +1,6 @@
 # Workflow Engine — Changelog & Status
 
-**Last updated:** 2026-07-19  
+**Last updated:** 2026-07-20  
 **Branch:** 5.1.0
 
 ---
@@ -21,7 +21,7 @@ D:\workflow-engine\
 
 ---
 
-## Node Types (8)
+## Node Types (9)
 
 | Type | Runner | Description |
 |------|--------|-------------|
@@ -31,7 +31,8 @@ D:\workflow-engine\
 | serviceTask | ServiceTaskRunner | Executes handler (code/HTTP), retry with backoff, result/exception routing |
 | exclusiveGateway | ExclusiveGatewayRunner | Evaluates conditional first, default last (BPMN spec) |
 | parallelGateway | ParallelGatewayRunner | Fork: creates child executions; Join: waits for all siblings |
-| inclusiveGateway | InclusiveGatewayRunner | Evaluates conditions, forks matching branches |
+| inclusiveGateway | InclusiveGatewayRunner | Evaluates conditions, forks matching branches; default branch when zero match |
+| timer | TimerRunner | Waits via delay queue, then advances |
 | callActivity | CallActivityRunner | Starts child process instance, sync/async modes |
 
 ---
@@ -139,6 +140,32 @@ default String sendTaskNotification(String assignee, String taskId, String insta
 - **8 custom node components** (one per type including CallActivity)
 - **handleReject:** Calls the `/api/tasks/{id}/reject` endpoint
 - **PropertyPanel:** Uses `setNodes()` to trigger re-render on data change
+- **E2E tests:** 117 Playwright tests covering all user flows (see Test Coverage below)
+
+---
+
+## E2E Test Infrastructure
+
+### Running E2E Tests
+
+```bash
+# 1. Build backend
+mvn clean package -DskipTests
+
+# 2. Start backend in memory + mock-ldap mode (no MySQL needed)
+java -jar workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar \
+  --spring.profiles.active=memory,mock-ldap \
+  --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+
+# 3. Run E2E tests
+cd workflow-engine-web && npx playwright test
+```
+
+### Key Design Patterns
+
+- **Polling helpers** (`waitForTasks`, `waitForTaskStatus`) handle async engine behavior — no fixed `setTimeout`
+- **Data isolation** via Proxy-generated unique YAML IDs per test access, `instanceId`-scoped task queries, timestamped draft names
+- **`workflowTemplates`** (raw YAML) vs **`workflows`** (Proxy with auto-unique IDs) — use `workflowTemplates` + `uniqueYamlId()` when you need stable IDs for assertions
 
 ---
 
@@ -159,10 +186,15 @@ All endpoints require `X-User-Id` header. `@CrossOrigin(origins = "*")`.
 | GET | `/api/instances/{id}/history` | History list |
 | POST | `/api/instances/{id}/resume` | Resume suspended |
 | POST | `/api/instances/{id}/terminate` | Terminate |
+| DELETE | `/api/instances/{id}` | Delete instance |
 | GET | `/api/tasks` | Query tasks (default status=PENDING) |
 | POST | `/api/tasks/{id}/complete` | Complete task |
 | POST | `/api/tasks/{id}/reject` | Reject task |
 | POST | `/api/tasks/{id}/delegate` | Delegate task |
+| GET | `/api/dashboard/stats` | Dashboard stats (optional ?definitionId=) |
+| GET | `/api/dashboard/timeline/{instanceId}` | Instance timeline |
+| GET | `/api/instances/summary` | Instance summary stats |
+| POST | `/api/instances/recover` | Recover pending timers/retries |
 
 ---
 
@@ -199,9 +231,31 @@ All endpoints require `X-User-Id` header. `@CrossOrigin(origins = "*")`.
 
 ---
 
+## Bug Fixes Applied (2026-07-20) — E2E Testing Round
+
+3 additional engine bugs discovered and fixed during E2E test development:
+
+| # | Bug | Root Cause | Fix |
+|---|-----|-----------|-----|
+| 25 | ParallelGateway join routes parent to wrong branch | Join handler used `parent.getCurrentNodeId()` (fork node) to find outgoing transitions, routing parent to fork's first branch instead of join's outgoing | Use `node.getId()` (join node) for outgoing transitions lookup |
+| 26 | EndEventRunner child execution join routes parent incorrectly | When all child executions reach EndEvent without explicit join node, parent was set ACTIVE and routed through fork's outgoing instead of being completed | Set parent status to COMPLETED directly |
+| 27 | mock-ldap + feishu OrgService bean conflict | `application.yml` has `feishu.app-id` configured, causing both `mockOrgService` and `feishuOrgService` beans when `mock-ldap` profile is active | Add `@Primary` to `mockOrgService()` bean definition |
+
+### E2E Test Infrastructure
+
+- **Playwright** E2E test suite with Chromium against Spring Boot backend (memory + mock-ldap profile)
+- **117 E2E tests** covering: app shell, designer drafts, designer canvas, designer deploy, monitor instances, monitor list, dashboard, API endpoints, workflow scenarios, error handling, auth, definitions, tasks, drafts
+- **Polling helpers** (`waitForTasks`, `waitForTaskStatus`) for handling async engine behavior
+- **Data isolation** via unique YAML IDs (Proxy pattern), instanceId-scoped task queries, timestamped draft names
+- **Global setup** starts backend in memory+mock-ldap mode with DataSource auto-config excluded
+
+---
+
 ## Test Coverage
 
-81 tests total in `workflow-engine-core`:
+### Java Unit/Integration Tests (84 total)
+
+`workflow-engine-core` (84 tests):
 
 | Test Class | Count | Coverage |
 |------------|-------|----------|
@@ -211,9 +265,39 @@ All endpoints require `X-User-Id` header. `@CrossOrigin(origins = "*")`.
 | CallActivityIntegrationTest | 2 | Sub-process start + non-existent definition |
 | LeaveApprovalIntegrationTest | 2 | Full approval flow (long + short leave) |
 | ServiceTaskRoutingIntegrationTest | 3 | Result routing, exception routing, suspend |
+| InclusiveGatewayIntegrationTest | 1 | Inclusive gateway with default branch |
 | GatewayRunnerTest | 4 | Exclusive (match + default), Parallel (fork + join) |
 | ServiceTaskRunnerTest | 7 | Handler execution, retry, routing |
 | SpelExpressionEvaluatorTest | 9 | SpEL expressions |
 | NodeTest | 9 | Node model tests |
 | ProcessDefinitionTest | 5 | Definition model tests |
-| Other | 22 | Execution, TaskQuery, HTTP, builder, etc. |
+| Other | 24 | Execution, TaskQuery, HTTP, builder, etc. |
+
+`workflow-engine-memory` (51 JDBC tests):
+
+| Test Class | Count | Coverage |
+|------------|-------|----------|
+| JdbcProcessRepositoryTest | ~17 | CRUD, versioning, findLatest, findAllVersions |
+| JdbcInstanceRepositoryTest | ~17 | Instance lifecycle, executions, history, stats |
+| JdbcTaskRepositoryTest | ~17 | Task CRUD, queries, status transitions |
+
+### E2E Tests (117 total)
+
+`workflow-engine-web/e2e/` — Playwright + Chromium:
+
+| Spec File | Count | Coverage |
+|-----------|-------|----------|
+| app-shell.spec.ts | 3 | Tab switching, language toggle, navigation |
+| designer-drafts.spec.ts | 7 | Draft CRUD, copy, import, auto-save |
+| designer-canvas.spec.ts | 6 | Drag nodes, connect edges, select, delete, edit properties |
+| designer-deploy.spec.ts | 4 | Deploy empty/valid, view/download YAML |
+| monitor-instances.spec.ts | 6 | Start, view, complete, reject, terminate, resume |
+| monitor-list.spec.ts | 4 | Status filter, refresh, delete, restart |
+| dashboard-api.spec.ts | 4 | Stats, per-draft stats, timeline, empty state |
+| workflow-scenarios.spec.ts | 7 | Simple linear, exclusive/parallel/inclusive gateway, timer, zero-match default |
+| definitions.spec.ts | 8 | Deploy, list, get, graph, version, delete, error |
+| tasks.spec.ts | 8 | List, complete, reject, delegate, candidate groups, feishu |
+| drafts.spec.ts | 8 | CRUD, copy, import, update, delete |
+| error-handling.spec.ts | 8 | 404, 401, toast, long name, special chars, concurrent, Swagger, OpenAPI |
+| auth.spec.ts | 4 | Multi-tenant isolation, X-User-Id enforcement |
+| dashboard.spec.ts | 4 | Stats display, per-draft, timeline, empty |
