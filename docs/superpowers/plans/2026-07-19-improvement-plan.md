@@ -295,68 +295,108 @@ Integration Test ✅
 
 ## 🐛 Issues Found During E2E Review
 
-### Issue 1: InclusiveGateway 零匹配崩溃（🔴 High）
+### Issue 1: InclusiveGateway 零匹配崩溃（🔴 High） ✅
 
 **问题：** `InclusiveGatewayRunner.handleFork()` 在 `forked == 0` 时直接抛 `IllegalStateException`，实例报错。E2E 测试中的 `inclusive-gw` YAML 没有 `default: true` 分支，当所有条件都不匹配（如 `flagA=false, flagB=false`）时流程崩溃。
 
 **对比：** `ExclusiveGatewayRunner` 有 default 分支兜底机制，InclusiveGateway 没有。
 
-**修复方案：** 在 InclusiveGatewayRunner 中增加 default 分支支持——当所有条件都不匹配时，走 default 分支（如果有的话）；如果没有 default 分支才抛异常。同时给 E2E 测试的 `inclusive-gw` YAML 加上 default 分支。
+**修复方案：** InclusiveGatewayRunner 已有 default 分支逻辑（`match = (forked == 0)`），只需在 YAML 中加 default 分支。同时发现并修复了 ParallelGatewayRunner join bug 和 EndEventRunner join bug。
+
+**实际修复：**
+- 给 inclusive-gw YAML 加 default 分支 + join 节点
+- **ParallelGatewayRunner join bug**：join 完成后用 join 节点的 outgoing transitions，而不是 parent（fork）节点的
+- **EndEventRunner join bug**：所有 child 到达 end 时，parent 应标记为 COMPLETED
+- **EngineConfig @Primary**：mockOrgService 加 @Primary 解决 mock-ldap + feishu bean 冲突
 
 **文件：**
-- 修改: `workflow-engine-core/src/main/java/com/github/wf/engine/runner/InclusiveGatewayRunner.java`
-- 修改: `workflow-engine-web/e2e/fixtures.ts`（YAML 加 default 分支）
+- 修改: `workflow-engine-core/src/main/java/com/github/wf/engine/runner/ParallelGatewayRunner.java`
+- 修改: `workflow-engine-core/src/main/java/com/github/wf/engine/runner/EndEventRunner.java`
+- 修改: `workflow-engine-server/src/main/java/com/github/wf/server/config/EngineConfig.java`
+- 修改: `workflow-engine-web/e2e/fixtures.ts`（YAML 加 default 分支 + join 节点）
 
-- [ ] Step 1: InclusiveGatewayRunner 增加 default 分支逻辑
-- [ ] Step 2: 更新 E2E YAML fixtures 加 default 分支
-- [ ] Step 3: 新增 E2E 测试：inclusive gateway 零匹配走 default
-- [ ] Step 4: 运行测试验证
+- [x] Step 1: InclusiveGatewayRunner 增加 default 分支逻辑（已存在）
+- [x] Step 2: 更新 E2E YAML fixtures 加 default 分支 + join 节点
+- [x] Step 3: 修复 ParallelGatewayRunner join bug（用 join 节点 outgoing）
+- [x] Step 4: 修复 EndEventRunner join bug（parent COMPLETED）
+- [x] Step 5: 新增 E2E 测试：inclusive gateway 零匹配走 default
+- [x] Step 6: 运行测试验证（117/117 passing）
 
 ---
 
-### Issue 2: E2E 测试静默跳过未创建的 Task（🟡 Medium）
+### Issue 2: E2E 测试静默跳过未创建的 Task（🟡 Medium） ✅
 
 **问题：** `workflow-scenarios.spec.ts` 中多处使用 `if (submitTasks.length > 0)` 来检查 task 是否存在，如果 task 还没创建（时序问题），测试会静默跳过而不是报错，导致断言意外通过或失败但无法定位原因。
 
-**修复方案：** 把 `if (tasks.length > 0)` 改为先用 `expect(tasks.length).toBeGreaterThan(0)` 断言，确保 task 存在后再操作。如果需要等待，加 `page.waitForTimeout()` 或 retry 逻辑。
+**修复方案：** 把 `if (tasks.length > 0)` 改为先用 `expect(tasks.length).toBeGreaterThan(0)` 断言，确保 task 存在后再操作。用 `waitForTasks()` 轮询替代直接 `listTasks()`。
 
 **文件：**
 - 修改: `workflow-engine-web/e2e/workflow-scenarios.spec.ts`
 - 修改: `workflow-engine-web/e2e/tasks.spec.ts`
 
-- [ ] Step 1: 替换所有 `if (tasks.length > 0)` 为先断言再操作
-- [ ] Step 2: 对有时序依赖的测试添加适当的等待
-- [ ] Step 3: 运行测试验证
+- [x] Step 1: 替换所有 `if (tasks.length > 0)` 为先断言再操作
+- [x] Step 2: 对有时序依赖的测试添加适当的等待（waitForTasks 轮询）
+- [x] Step 3: 运行测试验证（117/117 passing）
 
 ---
 
-### Issue 3: Timer E2E 测试不稳定（🟡 Medium）
+### Issue 3: Timer E2E 测试不稳定（🟡 Medium） ✅
 
 **问题：** TimerRunner 设置 execution 为 `WAITING + TIMER_PENDING`，依赖 DelayQueue daemon 线程在 2 秒后触发。E2E 测试用 `setTimeout(4000)` 等待，但如果后端启动慢或 DelayQueue 有延迟，4 秒可能不够，导致测试 flaky。
 
-**修复方案：** 增加等待时间到 6 秒，或使用轮询方式（每秒检查 task 是否出现，最多 10 秒）替代固定等待。
+**修复方案：** 使用轮询方式（waitForTasks，最多 10 秒）替代固定 setTimeout。
 
 **文件：**
 - 修改: `workflow-engine-web/e2e/workflow-scenarios.spec.ts`
 
-- [ ] Step 1: Timer 测试改用轮询等待替代固定 setTimeout
-- [ ] Step 2: 运行测试验证
+- [x] Step 1: Timer 测试改用 waitForTasks 轮询替代固定 setTimeout
+- [x] Step 2: 运行测试验证（117/117 passing）
 
 ---
 
-### Issue 4: listTasks 查询已完成 Task 可能有延迟（🟢 Low）
+### Issue 4: listTasks 查询已完成 Task 可能有延迟（🟢 Low） ✅
 
 **问题：** `tasks.spec.ts` 中 completeTask 后立即用 `listTasks({ status: 'COMPLETED' })` 查询，但 task 状态更新和查询之间没有等待，可能出现时序问题。
 
-**修复方案：** 在 completeTask 和查询之间加短暂等待（200-500ms），或在 fixtures.ts 中增加带重试的查询辅助方法。
+**修复方案：** 在 fixtures.ts 中增加带重试的 `waitForTaskStatus()` 辅助方法，tasks.spec.ts 中状态依赖查询改用该方法。
 
 **文件：**
 - 修改: `workflow-engine-web/e2e/tasks.spec.ts`
-- 修改: `workflow-engine-web/e2e/fixtures.ts`（增加 waitForTask 辅助方法）
+- 修改: `workflow-engine-web/e2e/fixtures.ts`（增加 waitForTaskStatus 辅助方法）
 
-- [ ] Step 1: fixtures.ts 增加 waitForTask 轮询辅助方法
-- [ ] Step 2: tasks.spec.ts 中状态依赖查询改用 waitForTask
-- [ ] Step 3: 运行测试验证
+- [x] Step 1: fixtures.ts 增加 waitForTaskStatus 轮询辅助方法
+- [x] Step 2: tasks.spec.ts 中状态依赖查询改用 waitForTaskStatus
+- [x] Step 3: 运行测试验证（117/117 passing）
+
+---
+
+## 🔧 Additional Bugs Found & Fixed During E2E Testing
+
+### Bug A: ParallelGatewayRunner join 使用了错误的 outgoing transitions
+
+**问题：** `ParallelGatewayRunner.handleJoin()` 在所有 sibling 到达 join 后，reactivates parent execution，但用 `parent.getCurrentNodeId()`（即 fork 节点）的 outgoing transitions 来推进 parent。这导致 parent 被错误地推进到 fork 的第一个分支（taskA），而不是 join 的后续节点（end）。
+
+**根因：** Parent execution 在 fork 时被设为 WAITING，currentNodeId 仍然是 "fork"。Join 完成后应该用 join 节点的 outgoing transitions。
+
+**修复：** 改用 `context.getDefinition().getOutgoingTransitions(node.getId())`（node 是 join 节点）。
+
+### Bug B: EndEventRunner child execution 到达 end 后 parent 被错误路由
+
+**问题：** `EndEventRunner` 在处理没有显式 join 节点的并行分支时，当所有 child execution 都到达 end，它尝试用 parent 的 currentNodeId 的 outgoing transitions 来推进 parent，导致 parent 被路由到错误节点。
+
+**修复：** 当所有 child 都到达 end 时，直接将 parent 标记为 COMPLETED。
+
+### Bug C: mock-ldap + feishu OrgService bean 冲突
+
+**问题：** `application.yml` 中 `feishu.app-id` 被配置，导致 `feishuOrgService` bean 被创建。当同时激活 `mock-ldap` profile 时，`mockOrgService` 和 `feishuOrgService` 两个 OrgService bean 冲突。
+
+**修复：** 给 `mockOrgService` 加 `@Primary` 注解。
+
+### Bug D: Playwright config ESM 不兼容
+
+**问题：** `require.resolve('./e2e/global-setup')` 在 ESM module 中不可用。
+
+**修复：** 改为直接使用字符串路径 `'./e2e/global-setup'`。
 
 ---
 
