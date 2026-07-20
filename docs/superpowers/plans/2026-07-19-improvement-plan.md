@@ -293,6 +293,73 @@ Integration Test ✅
 
 ---
 
+## 🐛 Issues Found During E2E Review
+
+### Issue 1: InclusiveGateway 零匹配崩溃（🔴 High）
+
+**问题：** `InclusiveGatewayRunner.handleFork()` 在 `forked == 0` 时直接抛 `IllegalStateException`，实例报错。E2E 测试中的 `inclusive-gw` YAML 没有 `default: true` 分支，当所有条件都不匹配（如 `flagA=false, flagB=false`）时流程崩溃。
+
+**对比：** `ExclusiveGatewayRunner` 有 default 分支兜底机制，InclusiveGateway 没有。
+
+**修复方案：** 在 InclusiveGatewayRunner 中增加 default 分支支持——当所有条件都不匹配时，走 default 分支（如果有的话）；如果没有 default 分支才抛异常。同时给 E2E 测试的 `inclusive-gw` YAML 加上 default 分支。
+
+**文件：**
+- 修改: `workflow-engine-core/src/main/java/com/github/wf/engine/runner/InclusiveGatewayRunner.java`
+- 修改: `workflow-engine-web/e2e/fixtures.ts`（YAML 加 default 分支）
+
+- [ ] Step 1: InclusiveGatewayRunner 增加 default 分支逻辑
+- [ ] Step 2: 更新 E2E YAML fixtures 加 default 分支
+- [ ] Step 3: 新增 E2E 测试：inclusive gateway 零匹配走 default
+- [ ] Step 4: 运行测试验证
+
+---
+
+### Issue 2: E2E 测试静默跳过未创建的 Task（🟡 Medium）
+
+**问题：** `workflow-scenarios.spec.ts` 中多处使用 `if (submitTasks.length > 0)` 来检查 task 是否存在，如果 task 还没创建（时序问题），测试会静默跳过而不是报错，导致断言意外通过或失败但无法定位原因。
+
+**修复方案：** 把 `if (tasks.length > 0)` 改为先用 `expect(tasks.length).toBeGreaterThan(0)` 断言，确保 task 存在后再操作。如果需要等待，加 `page.waitForTimeout()` 或 retry 逻辑。
+
+**文件：**
+- 修改: `workflow-engine-web/e2e/workflow-scenarios.spec.ts`
+- 修改: `workflow-engine-web/e2e/tasks.spec.ts`
+
+- [ ] Step 1: 替换所有 `if (tasks.length > 0)` 为先断言再操作
+- [ ] Step 2: 对有时序依赖的测试添加适当的等待
+- [ ] Step 3: 运行测试验证
+
+---
+
+### Issue 3: Timer E2E 测试不稳定（🟡 Medium）
+
+**问题：** TimerRunner 设置 execution 为 `WAITING + TIMER_PENDING`，依赖 DelayQueue daemon 线程在 2 秒后触发。E2E 测试用 `setTimeout(4000)` 等待，但如果后端启动慢或 DelayQueue 有延迟，4 秒可能不够，导致测试 flaky。
+
+**修复方案：** 增加等待时间到 6 秒，或使用轮询方式（每秒检查 task 是否出现，最多 10 秒）替代固定等待。
+
+**文件：**
+- 修改: `workflow-engine-web/e2e/workflow-scenarios.spec.ts`
+
+- [ ] Step 1: Timer 测试改用轮询等待替代固定 setTimeout
+- [ ] Step 2: 运行测试验证
+
+---
+
+### Issue 4: listTasks 查询已完成 Task 可能有延迟（🟢 Low）
+
+**问题：** `tasks.spec.ts` 中 completeTask 后立即用 `listTasks({ status: 'COMPLETED' })` 查询，但 task 状态更新和查询之间没有等待，可能出现时序问题。
+
+**修复方案：** 在 completeTask 和查询之间加短暂等待（200-500ms），或在 fixtures.ts 中增加带重试的查询辅助方法。
+
+**文件：**
+- 修改: `workflow-engine-web/e2e/tasks.spec.ts`
+- 修改: `workflow-engine-web/e2e/fixtures.ts`（增加 waitForTask 辅助方法）
+
+- [ ] Step 1: fixtures.ts 增加 waitForTask 轮询辅助方法
+- [ ] Step 2: tasks.spec.ts 中状态依赖查询改用 waitForTask
+- [ ] Step 3: 运行测试验证
+
+---
+
 ## Known Limitations (not in scope)
 
 These issues were identified but are out of scope for this improvement plan:
