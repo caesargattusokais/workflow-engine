@@ -33,8 +33,8 @@ test.describe('Designer — Draft CRUD', () => {
     await page.waitForTimeout(1000);
     const draftItem = page.locator('.text-gray-300.truncate').first();
     await draftItem.click({ button: 'right' });
-    // Click Delete in context menu
-    const deleteBtn = page.locator('text=Delete').last();
+    // Click Delete in context menu (use precise selector to avoid ReactFlow edge labels)
+    const deleteBtn = page.locator('.fixed.z-50 button:has-text("Delete"), .fixed.z-50 button:has-text("删除")');
     await expect(deleteBtn).toBeVisible();
   });
 

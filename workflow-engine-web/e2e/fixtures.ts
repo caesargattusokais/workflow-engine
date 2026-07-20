@@ -103,10 +103,49 @@ export class ApiClient {
     return this.request('GET', `/dashboard/stats${q}`);
   }
   getTimeline(instanceId: string) { return this.request('GET', `/dashboard/timeline/${instanceId}`); }
+
+  // Polling helpers — wait for tasks matching criteria to appear
+  async waitForTasks(
+    params: { assignee?: string; candidateGroup?: string; instanceId?: string; status?: string },
+    timeoutMs = 5000,
+    intervalMs = 500,
+  ): Promise<any[]> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const tasks = await this.listTasks(params);
+      if (tasks.length > 0) return tasks;
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    // Final attempt — return whatever we have (may be empty, caller asserts)
+    return this.listTasks(params);
+  }
+
+  // Wait for a specific task by ID to reach a given status
+  async waitForTaskStatus(
+    taskId: string,
+    status: string,
+    timeoutMs = 5000,
+    intervalMs = 500,
+  ): Promise<any> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const tasks = await this.listTasks({ status });
+      const found = tasks.find((t: any) => t.id === taskId);
+      if (found) return found;
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    throw new Error(`Task ${taskId} did not reach status ${status} within ${timeoutMs}ms`);
+  }
 }
 
 // ── YAML Workflow Fixtures ──
-export const workflows = {
+// Each YAML has a stable ID for reference but can be made unique per deploy
+let _wfCounter = 0;
+export function uniqueYamlId(base: string): string {
+  return base.replace(/^id: .+/m, `id: ${Date.now()}-${++_wfCounter}`).replace(/^name: .+/m, `name: Test ${_wfCounter}`);
+}
+
+export const workflowTemplates = {
   simpleLinear: `id: simple-linear
 name: Simple Linear Flow
 version: 1
@@ -215,6 +254,12 @@ nodes:
     type: userTask
     name: Path B
     assignee: userB
+  - id: defaultTask
+    type: userTask
+    name: Default Path
+    assignee: defaultUser
+  - id: join
+    type: inclusiveGateway
   - id: end
     type: endEvent
 transitions:
@@ -228,9 +273,16 @@ transitions:
     to: taskB
     type: conditional
     expr: "flagB == true"
+  - from: gw
+    to: defaultTask
+    type: default
   - from: taskA
-    to: end
+    to: join
   - from: taskB
+    to: join
+  - from: defaultTask
+    to: join
+  - from: join
     to: end`,
 
   timerFlow: `id: timer-flow
@@ -297,6 +349,17 @@ transitions:
   - from: dept-approve
     to: end`,
 };
+
+// Backward-compatible alias
+export const workflows = new Proxy(workflowTemplates, {
+  get(target, prop) {
+    if (prop in target) {
+      // Return a unique-yaml-ID version each time to avoid collisions
+      return uniqueYamlId((target as any)[prop]);
+    }
+    return undefined;
+  },
+});
 
 // ── Extended test fixture ──
 export const test = base.extend<{ api: ApiClient }>({

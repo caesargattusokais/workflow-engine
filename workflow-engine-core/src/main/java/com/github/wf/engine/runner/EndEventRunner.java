@@ -146,12 +146,8 @@ public class EndEventRunner implements NodeRunner {
                 boolean allDone = siblings.stream()
                         .allMatch(e -> e.getId().equals(exec.getId()) || e.isCompleted());
                 if (allDone) {
-                    parent.setStatus(ExecutionStatus.ACTIVE);
-                    List<Transition> outgoing = context.getDefinition()
-                            .getOutgoingTransitions(parent.getCurrentNodeId());
-                    if (!outgoing.isEmpty()) {
-                        parent.setCurrentNodeId(outgoing.get(0).getTo());
-                    }
+                    // All child executions reached their end — complete the parent too
+                    parent.setStatus(ExecutionStatus.COMPLETED);
                     repo.updateExecution(parent);
                 }
             }

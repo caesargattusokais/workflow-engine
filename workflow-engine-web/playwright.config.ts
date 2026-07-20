@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'html' : 'list',
   timeout: 30000,
   expect: { timeout: 10000 },
-  globalSetup: require.resolve('./e2e/global-setup'),
+  globalSetup: './e2e/global-setup',
 
   projects: [
     {

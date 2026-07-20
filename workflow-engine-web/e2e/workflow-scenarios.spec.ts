@@ -6,8 +6,8 @@ test.describe('E2E Workflow Scenarios', () => {
     const inst = await api.startInstance(def.id);
     expect(inst.status).toBe('RUNNING');
 
-    // Find and complete the task
-    const tasks = await api.listTasks({ assignee: 'reviewer' });
+    // Find task for THIS instance only
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
     expect(tasks.length).toBeGreaterThan(0);
     await api.completeTask(tasks[0].id);
 
@@ -22,13 +22,12 @@ test.describe('E2E Workflow Scenarios', () => {
     expect(inst.status).toBe('RUNNING');
 
     // Complete the submit task
-    const submitTasks = await api.listTasks({ assignee: 'applicant' });
-    if (submitTasks.length > 0) {
-      await api.completeTask(submitTasks[0].id, { days: 5 });
-    }
+    const submitTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'applicant' });
+    expect(submitTasks.length).toBeGreaterThan(0);
+    await api.completeTask(submitTasks[0].id, { days: 5 });
 
     // Should route to director (days > 3)
-    const directorTasks = await api.listTasks({ assignee: 'director' });
+    const directorTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'director' });
     expect(directorTasks.length).toBeGreaterThan(0);
 
     // Complete director task
@@ -41,13 +40,12 @@ test.describe('E2E Workflow Scenarios', () => {
     const def = await api.deploy(workflows.exclusiveGateway);
     const inst = await api.startInstance(def.id, { days: 2 });
 
-    const submitTasks = await api.listTasks({ assignee: 'applicant' });
-    if (submitTasks.length > 0) {
-      await api.completeTask(submitTasks[0].id, { days: 2 });
-    }
+    const submitTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'applicant' });
+    expect(submitTasks.length).toBeGreaterThan(0);
+    await api.completeTask(submitTasks[0].id, { days: 2 });
 
     // Should route to manager (days <= 3)
-    const managerTasks = await api.listTasks({ assignee: 'manager' });
+    const managerTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'manager' });
     expect(managerTasks.length).toBeGreaterThan(0);
 
     await api.completeTask(managerTasks[0].id);
@@ -60,9 +58,9 @@ test.describe('E2E Workflow Scenarios', () => {
     const inst = await api.startInstance(def.id);
     expect(inst.status).toBe('RUNNING');
 
-    // Both tasks should be created
-    const tasksA = await api.listTasks({ assignee: 'userA' });
-    const tasksB = await api.listTasks({ assignee: 'userB' });
+    // Both tasks should be created for this instance
+    const tasksA = await api.waitForTasks({ instanceId: inst.id, assignee: 'userA' });
+    const tasksB = await api.waitForTasks({ instanceId: inst.id, assignee: 'userB' });
     expect(tasksA.length).toBeGreaterThan(0);
     expect(tasksB.length).toBeGreaterThan(0);
 
@@ -80,9 +78,9 @@ test.describe('E2E Workflow Scenarios', () => {
     const inst = await api.startInstance(def.id, { flagA: true, flagB: true });
     expect(inst.status).toBe('RUNNING');
 
-    // Both tasks should be created
-    const tasksA = await api.listTasks({ assignee: 'userA' });
-    const tasksB = await api.listTasks({ assignee: 'userB' });
+    // Both tasks should be created for this instance
+    const tasksA = await api.waitForTasks({ instanceId: inst.id, assignee: 'userA' });
+    const tasksB = await api.waitForTasks({ instanceId: inst.id, assignee: 'userB' });
     expect(tasksA.length).toBeGreaterThan(0);
     expect(tasksB.length).toBeGreaterThan(0);
 
@@ -97,11 +95,24 @@ test.describe('E2E Workflow Scenarios', () => {
     const def = await api.deploy(workflows.inclusiveGateway);
     const inst = await api.startInstance(def.id, { flagA: true, flagB: false });
 
-    // Only taskA should be created
-    const tasksA = await api.listTasks({ assignee: 'userA' });
+    // Only taskA should be created for this instance
+    const tasksA = await api.waitForTasks({ instanceId: inst.id, assignee: 'userA' });
     expect(tasksA.length).toBeGreaterThan(0);
 
     await api.completeTask(tasksA[0].id);
+    const updated = await api.getInstance(inst.id);
+    expect(updated.status).toBe('COMPLETED');
+  });
+
+  test('inclusive gateway: zero match falls to default branch', async ({ api }) => {
+    const def = await api.deploy(workflows.inclusiveGateway);
+    const inst = await api.startInstance(def.id, { flagA: false, flagB: false });
+
+    // Should fall to default branch task
+    const defaultTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'defaultUser' });
+    expect(defaultTasks.length).toBeGreaterThan(0);
+
+    await api.completeTask(defaultTasks[0].id);
     const updated = await api.getInstance(inst.id);
     expect(updated.status).toBe('COMPLETED');
   });
@@ -110,10 +121,9 @@ test.describe('E2E Workflow Scenarios', () => {
     const def = await api.deploy(workflows.simpleLinear);
     const inst = await api.startInstance(def.id);
 
-    const tasks = await api.listTasks({ assignee: 'reviewer' });
-    if (tasks.length > 0) {
-      await api.rejectTask(tasks[0].id, 'rejected');
-    }
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
+    expect(tasks.length).toBeGreaterThan(0);
+    await api.rejectTask(tasks[0].id, 'rejected');
 
     const afterReject = await api.getInstance(inst.id);
     // Instance may be SUSPENDED after rejection
@@ -136,17 +146,16 @@ test.describe('E2E Workflow Scenarios', () => {
 
   test('task delegation', async ({ api }) => {
     const def = await api.deploy(workflows.simpleLinear);
-    await api.startInstance(def.id);
+    const inst = await api.startInstance(def.id);
 
-    const tasks = await api.listTasks({ assignee: 'reviewer' });
-    if (tasks.length > 0) {
-      await api.delegateTask(tasks[0].id, 'delegated-user');
-      const delegatedTasks = await api.listTasks({ assignee: 'delegated-user' });
-      expect(delegatedTasks.length).toBeGreaterThan(0);
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
+    expect(tasks.length).toBeGreaterThan(0);
+    await api.delegateTask(tasks[0].id, 'delegated-user');
+    const delegatedTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'delegated-user' });
+    expect(delegatedTasks.length).toBeGreaterThan(0);
 
-      // Complete via delegated user
-      await api.completeTask(delegatedTasks[0].id);
-    }
+    // Complete via delegated user
+    await api.completeTask(delegatedTasks[0].id);
   });
 
   test('full leave-approval flow (short leave)', async ({ api }) => {
@@ -154,16 +163,14 @@ test.describe('E2E Workflow Scenarios', () => {
     const inst = await api.startInstance(def.id, { applicant: 'zhangsan', days: 2 });
 
     // Complete submit task
-    const applyTasks = await api.listTasks({ assignee: 'zhangsan' });
-    if (applyTasks.length > 0) {
-      await api.completeTask(applyTasks[0].id, { days: 2 });
-    }
+    const applyTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'zhangsan' });
+    expect(applyTasks.length).toBeGreaterThan(0);
+    await api.completeTask(applyTasks[0].id, { days: 2 });
 
     // Should route to dept-approve (days <= 3)
-    const deptTasks = await api.listTasks({ assignee: 'dept-head' });
-    if (deptTasks.length > 0) {
-      await api.completeTask(deptTasks[0].id);
-    }
+    const deptTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'dept-head' });
+    expect(deptTasks.length).toBeGreaterThan(0);
+    await api.completeTask(deptTasks[0].id);
 
     const updated = await api.getInstance(inst.id);
     expect(updated.status).toBe('COMPLETED');
@@ -174,16 +181,14 @@ test.describe('E2E Workflow Scenarios', () => {
     const inst = await api.startInstance(def.id, { applicant: 'zhangsan', days: 5 });
 
     // Complete submit task
-    const applyTasks = await api.listTasks({ assignee: 'zhangsan' });
-    if (applyTasks.length > 0) {
-      await api.completeTask(applyTasks[0].id, { days: 5 });
-    }
+    const applyTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'zhangsan' });
+    expect(applyTasks.length).toBeGreaterThan(0);
+    await api.completeTask(applyTasks[0].id, { days: 5 });
 
     // Should route to manager-approve (days > 3)
-    const managerTasks = await api.listTasks({ candidateGroup: 'manager' });
-    if (managerTasks.length > 0) {
-      await api.completeTask(managerTasks[0].id);
-    }
+    const managerTasks = await api.waitForTasks({ instanceId: inst.id, candidateGroup: 'manager' });
+    expect(managerTasks.length).toBeGreaterThan(0);
+    await api.completeTask(managerTasks[0].id);
 
     const updated = await api.getInstance(inst.id);
     expect(updated.status).toBe('COMPLETED');
@@ -195,11 +200,8 @@ test.describe('E2E Workflow Scenarios', () => {
     // After start, should be at timer node (not at task yet)
     expect(inst.status).toBe('RUNNING');
 
-    // Wait for timer to fire (2s + buffer)
-    await new Promise(r => setTimeout(r, 4000));
-
-    // Task should now be available
-    const tasks = await api.listTasks({ assignee: 'user1' });
+    // Poll for task to appear (timer is 2s, allow up to 10s)
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'user1' }, 10000);
     expect(tasks.length).toBeGreaterThan(0);
 
     await api.completeTask(tasks[0].id);

@@ -28,10 +28,9 @@ test.describe('Dashboard API', () => {
     const def = await api.deploy(workflows.simpleLinear);
     const inst = await api.startInstance(def.id);
     // Complete the task to generate history
-    const tasks = await api.listTasks({ assignee: 'reviewer' });
-    if (tasks.length > 0) {
-      await api.completeTask(tasks[0].id);
-    }
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
+    expect(tasks.length).toBeGreaterThan(0);
+    await api.completeTask(tasks[0].id);
     const timeline = await api.getTimeline(inst.id);
     expect(Array.isArray(timeline)).toBe(true);
     if (timeline.length > 0) {
@@ -44,10 +43,9 @@ test.describe('Dashboard API', () => {
   test('timeline duration calculation', async ({ api }) => {
     const def = await api.deploy(workflows.simpleLinear);
     const inst = await api.startInstance(def.id);
-    const tasks = await api.listTasks({ assignee: 'reviewer' });
-    if (tasks.length > 0) {
-      await api.completeTask(tasks[0].id);
-    }
+    const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
+    expect(tasks.length).toBeGreaterThan(0);
+    await api.completeTask(tasks[0].id);
     const timeline = await api.getTimeline(inst.id);
     if (timeline.length >= 2) {
       // At least one step should have durationMs

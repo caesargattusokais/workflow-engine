@@ -55,10 +55,10 @@ public class ParallelGatewayRunner implements NodeRunner {
             Execution parent = repo.findExecutionById(exec.getParentExecutionId());
             if (parent != null) {
                 parent.setStatus(ExecutionStatus.ACTIVE);
-                List<Transition> parentOutgoing = context.getDefinition()
-                        .getOutgoingTransitions(parent.getCurrentNodeId());
-                if (!parentOutgoing.isEmpty()) {
-                    parent.setCurrentNodeId(parentOutgoing.get(0).getTo());
+                // Use the JOIN node's outgoing transitions, not the parent's (which is still at fork)
+                List<Transition> afterJoin = context.getDefinition().getOutgoingTransitions(node.getId());
+                if (!afterJoin.isEmpty()) {
+                    parent.setCurrentNodeId(afterJoin.get(0).getTo());
                 }
                 repo.updateExecution(parent);
             }

@@ -25,7 +25,7 @@ test.describe('Authentication / X-User-Id', () => {
   });
 
   test('multi-tenant data isolation', async ({ api }) => {
-    const draft = await api.createDraft('user-a-draft');
+    const draft = await api.createDraft(`user-a-draft-${Date.now()}`);
     const userB = new ApiClient('user-b');
     const bDrafts = await userB.listDrafts();
     const found = (bDrafts.items as any[]).some((d: any) => d.id === draft.id);

@@ -47,6 +47,7 @@ public class EngineConfig {
     // ── OrgService (LDAP) — only created if ldap.url is configured ──
     @Bean
     @Profile("mock-ldap")
+    @org.springframework.context.annotation.Primary
     public OrgService mockOrgService() {
         return new com.github.wf.mockldap.MockOrgService();
     }
