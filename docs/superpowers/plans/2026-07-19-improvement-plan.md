@@ -18,7 +18,7 @@
 | Task 2: candidateGroups SQL Fix | 🔴 High | ✅ Done | `455956a` |
 | Task 3: X-User-Id Header Enforcement | 🔴 High | ✅ Done | (prior commit) |
 | Task 4: Dashboard Stats Panel | 🟡 Medium | ✅ Done | `8ee05c0` et al. |
-| Task 5: Timer Node Designer Support | 🟡 Medium | ⬜ Pending | — |
+| Task 5: Timer Node Designer Support | 🟡 Medium | ✅ Done | (prior commit) |
 | Task 6: InclusiveGateway Integration Test | 🟡 Medium | ✅ Done | `455956a` |
 | Task 7: Frontend Error Handling & Loading | 🟡 Medium | ⬜ Pending | — |
 | Task 8: Draft API Frontend Integration | 🟡 Medium | ✅ Done | `d8104ca` |
@@ -27,7 +27,7 @@
 | Task 11: Swagger/OpenAPI Integration | 🟢 Low | ✅ Done | `4c953ea` |
 | Task 12: Frontend E2E Tests | 🟢 Low | ⬜ Pending | — |
 
-**Completed: 8 / 12** | **Remaining: 4**
+**Completed: 9 / 12** | **Remaining: 3**
 
 ---
 
@@ -114,26 +114,24 @@
 
 ---
 
-### Task 5: Timer Node — Designer Support ⬜
+### Task 5: Timer Node — Designer Support ✅
 
-**Problem:** Timer node exists in the engine (`TimerRunner`, `NodeType.TIMER`) but is missing from the designer's `NodePalette` and `PropertyPanel`. Users cannot visually add timer nodes or configure their delay duration.
+**Problem:** Timer node exists in the engine (`TimerRunner`, `NodeType.TIMER`) but was thought to be missing from the designer.
 
-**Scope:**
-- Add Timer to `NodePalette` with appropriate icon
-- Add Timer property editor in `PropertyPanel` (delay duration input)
-- Verify `graphToYaml` / `yamlToGraph` handle timer nodes correctly
+**Status:** Already fully implemented — Timer node is in the NodePalette, has a custom `TimerNode.tsx` component, has property editor in PropertyPanel (duration + deadline), and is handled by graphToYaml/yamlToGraph.
 
 **Files:**
-- Modify: `workflow-engine-web/src/designer/NodePalette.tsx` (or wherever node types are listed for drag-and-drop)
-- Modify: `workflow-engine-web/src/designer/PropertyPanel.tsx`
-- Verify: `workflow-engine-web/src/designer/graphToYaml.ts`, `yamlToGraph.ts`
+- `workflow-engine-web/src/designer/nodes/TimerNode.tsx` — custom node component
+- `workflow-engine-web/src/designer/NodePalette.tsx` — timer entry in palette
+- `workflow-engine-web/src/designer/PropertyPanel.tsx` — timer config editor
+- `workflow-engine-web/src/designer/graphToYaml.ts` / `yamlToGraph.ts` — serialization
 
-- [ ] **Step 1:** Add Timer entry to NodePalette
-- [ ] **Step 2:** Add Timer property editor in PropertyPanel (delay field)
-- [ ] **Step 3:** Verify graphToYaml serializes timer delay correctly
-- [ ] **Step 4:** Verify yamlToGraph deserializes timer node correctly
-- [ ] **Step 5:** Build frontend and test manually
-- [ ] **Step 6:** Commit
+- [x] **Step 1:** Add Timer entry to NodePalette
+- [x] **Step 2:** Add Timer property editor in PropertyPanel (delay field)
+- [x] **Step 3:** Verify graphToYaml serializes timer delay correctly
+- [x] **Step 4:** Verify yamlToGraph deserializes timer node correctly
+- [x] **Step 5:** Build frontend and test manually
+- [x] **Step 6:** Commit
 
 ---
 
@@ -277,20 +275,17 @@ Integration Test ✅
 
 ---
 
-## Remaining Work (4 tasks)
+## Remaining Work (3 tasks)
 
 | # | Task | Priority | Effort | Notes |
 |---|------|----------|--------|-------|
-| 5 | Timer Node Designer Support | 🟡 Medium | Small | Add Timer to palette + property panel |
 | 7 | Frontend Error Handling & Loading | 🟡 Medium | Medium | Shared apiFetch wrapper + loading states |
 | 12 | Frontend E2E Tests | 🟢 Low | Large | Playwright setup + smoke tests |
-| — | (Task 5 & 7 could be done in parallel) | | | |
 
 ### Suggested Next Steps
 
-1. **Task 5** (Timer designer) — small scope, quick win, completes engine↔designer parity
-2. **Task 7** (Frontend error handling) — medium scope, improves UX across all pages
-3. **Task 12** (E2E tests) — large scope, best done after frontend is fully stable
+1. **Task 7** (Frontend error handling) — medium scope, improves UX across all pages
+2. **Task 12** (E2E tests) — large scope, best done after frontend is fully stable
 
 ---
 
