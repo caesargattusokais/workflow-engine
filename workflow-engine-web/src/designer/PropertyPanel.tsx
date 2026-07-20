@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Node } from '@xyflow/react';
 import { useT } from '../i18n';
 import { listDefinitions } from '../api/client';
+import { showToast } from '../api/toast';
 
 interface ConditionItem {
   expr: string;
@@ -55,7 +56,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
   // Fetch deployed definitions for Call Activity calledId dropdown
   const [allDefs, setAllDefs] = useState<any[]>([]);
   useEffect(() => {
-    listDefinitions(1, 200).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
+    listDefinitions(1, 200).then((r: any) => setAllDefs(r.items || r)).catch(e => showToast(e.message, 'error'));
   }, []);
 
   if (!node) {
@@ -126,7 +127,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
             <div className="text-[10px] text-gray-500 mb-2">{t.props.initialVarsHint}</div>
             <KvEditor label="" entries={(node.data.initialVars as Array<{key:string;value:string}>) || []}
               onChange={v => updateData('initialVars', v)}
-              keyPlaceholder="变量名" valPlaceholder="默认值" />
+              keyPlaceholder={t.designer.varName} valPlaceholder={t.designer.defaultValue} />
           </div>
         )}
 
@@ -327,7 +328,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-orange-800'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-orange-400'}`}>
-                    {c.isDefault ? t.props.defaultBranch : `判断 ${i + 1}`}</span>
+                    {c.isDefault ? t.props.defaultBranch : t.designer.conditionN.replace('{n}', String(i + 1))}</span>
                   <div className="flex gap-1 items-center">
                     <label className="text-[10px] text-gray-500 flex items-center gap-1">
                       <input type="checkbox" checked={c.isDefault} onChange={e => updateCondition(i, 'isDefault', e.target.checked)} className="accent-orange-500" /> default
@@ -340,7 +341,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     value={c.expr} placeholder="SpEL: days > 3" onChange={e => updateCondition(i, 'expr', e.target.value)} />
                 )}
                 <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs"
-                  value={c.to} placeholder="目标节点 ID" onChange={e => updateCondition(i, 'to', e.target.value)} />
+                  value={c.to} placeholder={t.designer.targetNodeId} onChange={e => updateCondition(i, 'to', e.target.value)} />
               </div>
             ))}
           </div>
@@ -358,7 +359,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
               <div key={i} className={`mb-2 p-2 rounded border ${c.isDefault ? 'bg-gray-750 border-gray-600' : 'bg-gray-750 border-purple-800'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-[10px] ${c.isDefault ? 'text-gray-400' : 'text-purple-400'}`}>
-                    {c.isDefault ? t.props.fallbackNoMatch : `分支 ${i + 1}`}</span>
+                    {c.isDefault ? t.props.fallbackNoMatch : t.designer.branchN.replace('{n}', String(i + 1))}</span>
                   <div className="flex gap-1 items-center">
                     <label className="text-[10px] text-gray-500 flex items-center gap-1">
                       <input type="checkbox" checked={c.isDefault} onChange={e => updateCondition(i, 'isDefault', e.target.checked)} className="accent-purple-500" /> default
@@ -371,7 +372,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
                     value={c.expr} placeholder="SpEL: amount > 1000" onChange={e => updateCondition(i, 'expr', e.target.value)} />
                 )}
                 <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs"
-                  value={c.to} placeholder="目标节点 ID" onChange={e => updateCondition(i, 'to', e.target.value)} />
+                  value={c.to} placeholder={t.designer.targetNodeId} onChange={e => updateCondition(i, 'to', e.target.value)} />
               </div>
             ))}
           </div>

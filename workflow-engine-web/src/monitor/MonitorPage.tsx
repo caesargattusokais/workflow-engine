@@ -4,6 +4,7 @@ import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
 import { listInstances, listDefinitions, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, getInstance } from '../api/client';
+import { showToast } from '../api/toast';
 import { useT } from '../i18n';
 
 /** Normalize backend graph nodes (flat x/y) to ReactFlow format (position: {x,y}). */
@@ -66,7 +67,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         }))]);
       }
       setDefPage(page);
-    } catch {} finally {
+    } catch (e: any) { showToast(e.message || 'Failed to load definitions', 'error'); } finally {
       defLoading.current = false;
       setDefLoadingState(false);
     }
@@ -86,7 +87,8 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         const merged = page === 1 ? list : [...g.instances, ...list];
         return { ...g, instances: merged, instPage: page, instHasMore: list.length >= 10, instLoading: false };
       }));
-    } catch {
+    } catch (e: any) {
+      showToast(e.message || 'Failed to load instances', 'error');
       setDefGroups(prev => prev.map(g => g.defId === defId ? { ...g, instLoading: false } : g));
     }
   }, [statusFilter]);
@@ -105,7 +107,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
 
   // Load all definitions for the start dropdown (once)
   useEffect(() => {
-    listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(() => {});
+    listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(e => showToast(e.message, 'error'));
   }, []);
 
   // Manual refresh: reload definitions page 1, then refresh instances for all loaded defs
@@ -122,7 +124,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
           for (const item of fresh) map.set(item.id, item);
           return { ...pg, instances: [...map.values()] };
         }));
-      }).catch(() => {});
+      }).catch(e => showToast(e.message, 'error'));
     }
   }, [defGroups, statusFilter, loadDefinitions]);
 
@@ -266,8 +268,8 @@ export default function MonitorPage({ initialDefId, initialInstId }:
       const ts = await queryTasks({ instanceId: id });
       if (loadId !== loadIdRef.current) return;
       setTasks(ts.filter((t: any) => t.status === 'PENDING'));
-    } catch {
-      if (loadId === loadIdRef.current) setTasks([]);
+    } catch (e: any) {
+      if (loadId === loadIdRef.current) { setTasks([]); showToast(e.message, 'error'); }
     }
     try {
       const h = await apiGet(`/instances/${id}/history`);
@@ -308,7 +310,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   };
 
   const handleReject = async (taskId: string) => {
-    try { await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' }); } catch {}
+    try { await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' }); } catch (e: any) { showToast(e.message, 'error'); }
     if (selectedId) loadInstance(selectedId);
   };
 
@@ -342,7 +344,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
       await startInstance(startDefId, vars);
       setStartVars('');
       refreshDef(startDefId);
-    } catch (e: any) { alert('Start failed: ' + e.message); }
+    } catch (e: any) { showToast('Start failed: ' + e.message, 'error'); }
   };
 
   const statusLabel = (s: string) => {
@@ -375,7 +377,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
           className="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded">
           Start Instance
         </button>
-        <span className="text-[10px] text-gray-600">Variables: JSON, e.g. {"{}"}"applicant":"张三"{"}"}</span>
+        <span className="text-[10px] text-gray-600">Variables: JSON, e.g. {"{}"}"applicant":"user1"{"}"}</span>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -421,7 +423,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
                 setDefGroups(prev => prev.map(pg => pg.defId === g.defId
                   ? { ...pg, instances: list, instPage: 1, instHasMore: list.length >= 10 }
                   : pg));
-              }).catch(() => {});
+              }).catch(e => showToast(e.message, 'error'));
             }
           }}
         />

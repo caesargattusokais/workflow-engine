@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet, listInstances, listDrafts } from '../api/client';
+import { showToast } from '../api/toast';
 import { useT } from '../i18n';
 
 export default function Dashboard() {
@@ -17,6 +18,8 @@ export default function Dashboard() {
   const [draftHasMore, setDraftHasMore] = useState(false);
   const [draftLoading, setDraftLoading] = useState(false);
 
+  const [globalStats, setGlobalStats] = useState<any>(null);
+
   const loadDrafts = useCallback(async (page: number) => {
     setDraftLoading(true);
     try {
@@ -26,10 +29,10 @@ export default function Dashboard() {
       if (page === 1) setDrafts(list);
       else setDrafts(prev => [...prev, ...list]);
       setDraftPage(page);
-    } catch {} finally { setDraftLoading(false); }
+    } catch (e: any) { showToast(e.message || 'Failed to load drafts', 'error'); } finally { setDraftLoading(false); }
   }, []);
 
-  useEffect(() => { loadDrafts(1); }, [loadDrafts]);
+  useEffect(() => { loadDrafts(1); apiGet('/dashboard/stats').then(setGlobalStats).catch(e => { showToast(e.message, 'error'); setGlobalStats(null); }); }, [loadDrafts]);
 
   const selectDraft = useCallback(async (draft: any) => {
     setSelectedDraft(draft);
@@ -37,7 +40,7 @@ export default function Dashboard() {
     setTimeline(null);
     setStats(null);
     apiGet(`/dashboard/stats?definitionId=${encodeURIComponent(draft.id)}`)
-      .then(setStats).catch(() => setStats(null));
+      .then(setStats).catch(e => { showToast(e.message, 'error'); setStats(null); });
     loadInstances(draft.id, 1);
   }, []);
 
@@ -50,7 +53,7 @@ export default function Dashboard() {
       if (page === 1) setInstances(list);
       else setInstances(prev => [...prev, ...list]);
       setInstPage(page);
-    } catch {} finally { setInstLoading(false); }
+    } catch (e: any) { showToast(e.message || 'Failed to load instances', 'error'); } finally { setInstLoading(false); }
   }, []);
 
   const loadTimeline = async (instId: string) => {
@@ -58,7 +61,7 @@ export default function Dashboard() {
     try {
       const data = await apiGet(`/dashboard/timeline/${instId}`);
       setTimeline(data);
-    } catch { setTimeline(null); }
+    } catch (e: any) { showToast(e.message, 'error'); setTimeline(null); }
   };
 
   return (
@@ -104,7 +107,36 @@ export default function Dashboard() {
       {/* Right: Stats + Instances */}
       <div className="flex-1 overflow-y-auto p-4">
         {!selectedDraft ? (
-          <div className="text-gray-500 text-sm text-center mt-20">{t.dashboard.selectPrompt}</div>
+          <>
+            {/* Global stats when no draft selected */}
+            {globalStats ? (
+              <div>
+                <h2 className="text-gray-200 font-bold mb-4">{t.dashboard.allFlows || 'All Flows'}</h2>
+                <div className="grid grid-cols-5 gap-3 mb-6">
+                  <Kpi label={t.dashboard.totalInstances} value={globalStats.total || 0} color="text-blue-400" />
+                  <Kpi label={t.dashboard.running} value={globalStats.running || 0} color="text-green-400" />
+                  <Kpi label={t.dashboard.completed} value={globalStats.completed || 0} color="text-gray-300" />
+                  <Kpi label={t.dashboard.suspended} value={globalStats.suspended || 0} color="text-yellow-400" />
+                  <Kpi label={t.dashboard.pendingTasks || 'Pending Tasks'} value={globalStats.pendingTasks || 0} color="text-purple-400" />
+                </div>
+                {(globalStats.total || 0) > 0 && (
+                  <div className="bg-gray-750 rounded p-3">
+                    <div className="text-xs text-gray-400">
+                      {t.dashboard.avgDuration} <span className="text-gray-200 font-bold">{formatDuration(globalStats.avgDurationMs || 0)}</span>
+                    </div>
+                    <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden flex mt-2">
+                      <Bar pct={pct(globalStats.completed, globalStats.total)} color="bg-green-500" />
+                      <Bar pct={pct(globalStats.suspended, globalStats.total)} color="bg-yellow-500" />
+                      <Bar pct={pct(globalStats.terminated, globalStats.total)} color="bg-red-500" />
+                      <Bar pct={pct(globalStats.running, globalStats.total)} color="bg-blue-500" label={pct(globalStats.running, globalStats.total) + '%'} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm text-center mt-20">{t.dashboard.selectPrompt}</div>
+            )}
+          </>
         ) : !stats ? (
           <div className="text-gray-500 text-sm text-center mt-20">{t.dashboard.loading}</div>
         ) : (
@@ -113,11 +145,12 @@ export default function Dashboard() {
             <div className="text-[10px] text-gray-600 mb-4">{selectedDraft.id}</div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-5 gap-3 mb-6">
               <Kpi label={t.dashboard.totalInstances} value={stats.total || 0} color="text-blue-400" />
               <Kpi label={t.dashboard.running} value={stats.running || 0} color="text-green-400" />
               <Kpi label={t.dashboard.completed} value={stats.completed || 0} color="text-gray-300" />
               <Kpi label={t.dashboard.suspended} value={stats.suspended || 0} color="text-yellow-400" />
+              <Kpi label={t.dashboard.pendingTasks || 'Pending Tasks'} value={stats.pendingTasks || 0} color="text-purple-400" />
             </div>
 
             {/* Avg duration + progress */}

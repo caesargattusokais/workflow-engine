@@ -4,6 +4,7 @@ import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
 import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary } from '../api/client';
+import { showToast } from '../api/toast';
 import { graphToYaml } from './graphToYaml';
 import { yamlToGraph } from './yamlToGraph';
 import { useT } from '../i18n';
@@ -56,7 +57,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   // Fetch instance summary for per-draft counts (lightweight, no pagination)
   useEffect(() => {
-    if (drafts.length > 0) fetchInstanceSummary().then(setInstanceSummary).catch(() => {});
+    if (drafts.length > 0) fetchInstanceSummary().then(setInstanceSummary).catch(e => showToast(e.message, 'error'));
   }, [drafts.length]);
 
   // ── Load drafts from server on mount ──
@@ -79,7 +80,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         setDrafts(prev => [...prev, ...mapped]);
       }
       setDraftPage(page);
-    } catch {} finally {
+    } catch (e: any) { showToast(e.message || 'Failed to load drafts', 'error'); } finally {
       draftLoading.current = false;
       setDraftLoadingState(false);
       setLoaded(true);
@@ -93,7 +94,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setNodes(d.nodes || []);
       setEdges(d.edges || []);
       setSelectedNode(null);
-    }).catch(() => {});
+    }).catch(e => showToast(e.message, 'error'));
   }, [activeId, loaded]);
 
   // Live-refresh YAML panel while open
@@ -108,7 +109,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     if (!activeId || !loaded) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      updateDraft(activeId, { nodes, edges }).catch(() => {});
+      updateDraft(activeId, { nodes, edges }).catch(e => showToast(e.message, 'error'));
     }, 10000);
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
@@ -121,7 +122,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       await updateDraft(activeId, { nodes, edges, version: newVersion });
       setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
       setToast(`${t.designer.savedAs}${newVersion}`);
-    } catch (e: any) { alert(e.message || t.designer.saveFailed); }
+    } catch (e: any) { showToast(e.message || t.designer.saveFailed, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -131,7 +132,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const d = await createDraft(`Draft ${drafts.length + 1}`);
       setDrafts(prev => [...prev, { ...d, nodes: [], edges: [] }]);
       setActiveId(d.id);
-    } catch (e: any) { alert('创建失败: ' + (e.message || 'server unavailable')); }
+    } catch (e: any) { showToast(`${t.designer.createFailed}: ` + (e.message || 'server unavailable'), 'error'); }
   };
 
   const renameDraft = async (id: string) => {
@@ -140,12 +141,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     try {
       await updateDraft(id, { name });
       setDrafts(prev => prev.map(d => d.id === id ? { ...d, name } : d));
-    } catch (e: any) { alert('重命名失败: ' + (e.message || 'server error')); }
+    } catch (e: any) { showToast(`${t.designer.renameFailed}: ` + (e.message || 'server error'), 'error'); }
   };
 
   const delDraft = async (id: string) => {
     if (!confirm(t.designer.confirmDelete)) return;
-    try { await removeDraft(id); } catch {}
+    try { await removeDraft(id); } catch (e: any) { showToast(e.message, 'error'); }
     setDrafts(prev => {
       const u = prev.filter(d => d.id !== id);
       if (activeId === id) {
@@ -161,7 +162,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const copy = await copyDraft(id);
       setDrafts(prev => [...prev, { ...copy, nodes: copy.nodes || [], edges: copy.edges || [] }]);
       setToast(`${t.designer.copied}${copy.name}`);
-    } catch (e: any) { alert(e.message || t.designer.saveFailed); }
+    } catch (e: any) { showToast(e.message || t.designer.saveFailed, 'error'); }
   };
 
   const downloadYaml = (draft: Draft) => {
@@ -191,7 +192,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         setActiveId(d.id);
         setToast(`Imported: ${name}`);
       } catch (e: any) {
-        alert('Import failed: ' + e.message);
+        showToast('Import failed: ' + e.message, 'error');
       }
     };
     input.click();
@@ -202,7 +203,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const res = await fetch('/templates/manifest.json');
       setTemplates(await res.json());
       setShowTemplates(true);
-    } catch { alert('加载模板列表失败'); }
+    } catch { showToast(t.designer.loadTemplatesFailed, 'error'); }
   };
 
   const importTemplate = async (file: string) => {
@@ -215,7 +216,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setActiveId(d.id);
       setShowTemplates(false);
       setToast(`Imported: ${name}`);
-    } catch (e: any) { alert('Import failed: ' + e.message); }
+    } catch (e: any) { showToast('Import failed: ' + e.message, 'error'); }
   };
 
   const switchDraft = (id: string) => setActiveId(id);
@@ -252,12 +253,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         const inst = await startInstance(result.id, initVars);
         setDeployedInstanceId(inst.id);
         setToast(`${t.designer.deployStart} Def: ${result.id}, Instance: ${inst.id.substring(0,8)}`);
-        fetchInstanceSummary().then(setInstanceSummary).catch(() => {});
+        fetchInstanceSummary().then(setInstanceSummary).catch(e => showToast(e.message, 'error'));
       } catch {
         setDeployedInstanceId(null);
         setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
       }
-    } catch (e: any) { setToast(t.designer.deployFailed + e.message); }
+    } catch (e: any) { showToast(t.designer.deployFailed + e.message, 'error'); }
   };
 
   // ── Variables ─────────────────────────
@@ -266,7 +267,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     for (const node of nodes) {
       if (node.type === 'startEvent') {
         for (const v of (node.data.initialVars as Array<{key:string;value:string}>) || []) {
-          if (v.key) vars.push({ name: v.key, source: v.value ? `Start (默认: ${v.value})` : 'Start' });
+          if (v.key) vars.push({ name: v.key, source: v.value ? `Start (${t.designer.defaultVar}: ${v.value})` : 'Start' });
         }
       }
       if (node.type === 'serviceTask') {
@@ -362,17 +363,28 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       )}
 
       {/* Main */}
+      {!loaded ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+          <div className="flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {t.dashboard.loading}
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-1 overflow-hidden">
         {/* Draft List Sidebar */}
         <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
           <div className="p-2 border-b border-gray-700 flex items-center gap-1">
             <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
             <button onClick={loadTemplates}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title="模板">
+              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title={t.designer.template}>
               T
             </button>
             <button onClick={importYamlAction}
-              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title="导入 YAML">
+              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title={t.designer.importYaml}>
               {t.designer.import}
             </button>
             <button onClick={newDraft}
@@ -408,9 +420,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                 </div>
                 <div className="hidden group-hover:flex gap-0.5 ml-1">
                   <button onClick={(e) => { e.stopPropagation(); renameDraft(d.id); }}
-                    className="text-gray-500 hover:text-gray-300 text-[10px]" title="重命名">✎</button>
+                    className="text-gray-500 hover:text-gray-300 text-[10px]" title={t.designer.rename}>✎</button>
                   <button onClick={(e) => { e.stopPropagation(); delDraft(d.id); }}
-                    className="text-gray-500 hover:text-red-400 text-[10px]" title="删除">✕</button>
+                    className="text-gray-500 hover:text-red-400 text-[10px]" title={t.designer.delete}>✕</button>
                 </div>
               </div>
             ))}
@@ -423,10 +435,10 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
               <button onClick={() => loadDrafts(draftPage + 1)}
                 disabled={draftLoadingState}
                 className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 disabled:text-gray-600">
-                {draftLoadingState ? '加载中...' : `加载更多 (${drafts.length} 个)`}
+                {draftLoadingState ? t.dashboard.loading : t.designer.loadMoreCount.replace('{n}', String(drafts.length))}
               </button>
             ) : (
-              drafts.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">共 {drafts.length} 个草稿</div>
+              drafts.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">{t.designer.totalDrafts.replace('{n}', String(drafts.length))}</div>
             )}
           </div>
           {/* Draft context menu */}
@@ -477,6 +489,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         />
         <PropertyPanel node={selectedNode} onChange={handleNodeChange} edges={edges} onEdgesChange={setEdges} />
       </div>
+      )}
 
       {/* Template Browser Modal */}
       {showTemplates && (
@@ -485,7 +498,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           <div className="bg-gray-800 rounded-lg shadow-2xl w-[600px] max-h-[80vh] overflow-y-auto p-6"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg text-gray-200 font-bold">流程模板</h2>
+              <h2 className="text-lg text-gray-200 font-bold">{t.designer.processTemplates}</h2>
               <button onClick={() => setShowTemplates(false)}
                 className="text-gray-400 hover:text-white text-xl">&times;</button>
             </div>
@@ -496,7 +509,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
                     <span className="text-gray-200 font-semibold">{tpl.name}</span>
                     <button onClick={() => importTemplate(tpl.file)}
                       className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1 rounded">
-                      使用此模板
+                      {t.designer.useTemplate}
                     </button>
                   </div>
                   <div className="text-xs text-gray-500">{tpl.desc}</div>
