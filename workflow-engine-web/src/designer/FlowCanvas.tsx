@@ -197,13 +197,13 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         <button onClick={() => rfInstance.current?.fitView({ duration: 300 })}
           className="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-2.5 py-1.5
                      text-gray-300 text-xs transition-colors shadow-lg"
-          title={`${t.designer.locate} — 居中显示所有节点`}>
+          title={`${t.designer.locate} — ${t.designer.fitViewHint}`}>
           &#8982; {t.designer.locate}
         </button>
         <button onClick={() => setLocked(!locked)}
           className={`border rounded px-2.5 py-1.5 text-xs transition-colors shadow-lg
             ${locked ? 'bg-red-900 border-red-600 text-red-300' : 'bg-gray-800 hover:bg-gray-700 border-gray-600 text-gray-300'}`}
-          title={locked ? `${t.designer.unlock}编辑` : `${t.designer.lock}画布`}>
+          title={locked ? `${t.designer.unlock}${t.designer.unlockHint}` : `${t.designer.lock}${t.designer.lockHint}`}>
           {locked ? `🔒 ${t.designer.lock}` : '🔓'}
         </button>
       </div>

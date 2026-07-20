@@ -122,11 +122,11 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
                 <button onClick={() => onLoadInstances(g.defId)}
                   disabled={g.instLoading}
                   className="w-full text-center py-1 text-xs text-blue-400 hover:bg-gray-700 rounded disabled:text-gray-600 ml-1">
-                  {g.instLoading ? '加载中...' : `加载更多 (已显示 ${g.instances.length})`}
+                  {g.instLoading ? t.dashboard.loading : t.designer.loadMoreShown.replace('{n}', String(g.instances.length))}
                 </button>
               ) : (
                 <div className="text-[10px] text-gray-600 ml-1 py-0.5">
-                  {g.instances.length > 0 ? `共 ${g.instances.length} 个实例` : '无实例'}
+                  {g.instances.length > 0 ? t.designer.totalInstances.replace('{n}', String(g.instances.length)) : t.designer.noInstances}
                 </div>
               )}
             </>
@@ -140,11 +140,11 @@ export default function InstanceList({ onSelect, selectedId, groups, onTerminate
           <button onClick={onLoadMoreDefs}
             disabled={defLoading}
             className="w-full text-center py-1.5 text-xs text-purple-400 hover:bg-gray-700 rounded disabled:text-gray-600">
-            {defLoading ? '加载中...' : `加载更多定义 (当前 ${groups.length} 个)`}
+            {defLoading ? t.dashboard.loading : t.designer.loadMoreDefs.replace('{n}', String(groups.length))}
           </button>
         ) : (
           <div className="text-center py-1 text-[10px] text-gray-600">
-            共 {groups.length} 个流程定义
+            {t.designer.totalDefs.replace('{n}', String(groups.length))}
           </div>
         )}
       </div>

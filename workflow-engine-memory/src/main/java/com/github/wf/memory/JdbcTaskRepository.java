@@ -91,8 +91,13 @@ public class JdbcTaskRepository implements TaskRepository {
             sql.append(" AND (");
             for (int i = 0; i < query.getCandidateGroups().size(); i++) {
                 if (i > 0) sql.append(" OR ");
-                sql.append("candidate_groups_json LIKE ?");
-                params.add("%\"" + query.getCandidateGroups().get(i) + "\"%");
+                // Exact element match in JSON array: element is followed by ',' or ']'
+                // e.g. ["manager","hr"] — searching for "hr" matches '%"hr"]%' or '%"hr",%'
+                // This avoids substring false positives like "hr" matching "hr-dept"
+                String group = query.getCandidateGroups().get(i);
+                sql.append("(candidate_groups_json LIKE ? OR candidate_groups_json LIKE ?) ");
+                params.add("%\"" + group + "\"]%");
+                params.add("%\"" + group + "\",%");
             }
             sql.append(")");
         }

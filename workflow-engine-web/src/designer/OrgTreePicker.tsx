@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useT } from '../i18n';
 
 interface OrgNode {
   uid: string;
@@ -34,6 +35,7 @@ function fetchTree(): Promise<OrgNode[]> {
 }
 
 export default function OrgTreePicker({ value, values, onChange, onChangeMulti, multi }: Props) {
+  const { t } = useT();
   const [tree, setTree] = useState<OrgNode[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -102,10 +104,10 @@ export default function OrgTreePicker({ value, values, onChange, onChangeMulti, 
   return (
     <div className="border border-gray-600 rounded bg-gray-750 max-h-48 overflow-y-auto">
       <input className="w-full bg-transparent px-2 py-1 text-xs text-gray-400 border-b border-gray-600 outline-none"
-        placeholder="搜索..." value={search} onChange={e => setSearch(e.target.value)} />
+        placeholder={t.designer.search} value={search} onChange={e => setSearch(e.target.value)} />
       {tree.map(n => renderNode(n, 0))}
-      {status === 'loading' && <div className="p-2 text-xs text-gray-600">加载中...</div>}
-      {status === 'empty' && <div className="p-2 text-xs text-gray-600">未配置组织架构 — 后端未连接 LDAP 或无用户数据</div>}
+      {status === 'loading' && <div className="p-2 text-xs text-gray-600">{t.dashboard.loading}</div>}
+      {status === 'empty' && <div className="p-2 text-xs text-gray-600">{t.designer.orgNotConfigured}</div>}
     </div>
   );
 }

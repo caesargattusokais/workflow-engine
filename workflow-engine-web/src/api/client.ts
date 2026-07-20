@@ -8,9 +8,27 @@ function authHeaders(extra?: Record<string,string>): Record<string,string> {
   return { 'X-User-Id': userId(), ...(extra || {}) };
 }
 
+/** Parse error response body for a meaningful message */
+async function parseError(res: Response, path: string): Promise<Error> {
+  const status = res.status;
+  if (status === 401) {
+    return new Error('未登录或登录已过期，请重新登录 / Not authenticated');
+  }
+  if (status === 404) {
+    return new Error(`资源不存在: ${path} / Not found`);
+  }
+  try {
+    const body = await res.json();
+    const msg = body.error || body.message || body.detail || res.statusText;
+    return new Error(`${path} failed (${status}): ${msg}`);
+  } catch {
+    return new Error(`${path} failed: ${status} ${res.statusText}`);
+  }
+}
+
 async function apiGet(path: string) {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  if (!res.ok) throw await parseError(res, path);
   return res.json();
 }
 
@@ -20,7 +38,7 @@ async function apiPost(path: string, body?: unknown) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: body ? JSON.stringify(body) : undefined
   });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  if (!res.ok) throw await parseError(res, path);
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
@@ -31,14 +49,14 @@ async function apiPut(path: string, body: unknown) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  if (!res.ok) throw await parseError(res, path);
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
 async function apiDelete(path: string) {
   const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  if (!res.ok) throw await parseError(res, path);
 }
 
 export async function listInstances(page = 1, size = 10, definitionId?: string, status?: string) {

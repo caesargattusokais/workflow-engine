@@ -3,12 +3,14 @@ import LanguageSwitcher, { useT } from './i18n';
 import DesignerPage from './designer/DesignerPage';
 import MonitorPage from './monitor/MonitorPage';
 import Dashboard from './monitor/Dashboard';
+import { useToasts, ToastContainer } from './api/toast';
 
 export default function App() {
   const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
   const [monitorDefId, setMonitorDefId] = useState<string | null>(null);
   const [monitorInstId, setMonitorInstId] = useState<string | null>(null);
   const { t } = useT();
+  const { toasts, addToast, removeToast } = useToasts();
 
   const handleNavigate = (t: 'designer' | 'monitor', defId?: string, instId?: string) => {
     if (t === 'monitor' && defId) {
@@ -41,6 +43,7 @@ export default function App() {
         {tab === 'monitor' && <MonitorPage initialDefId={monitorDefId} initialInstId={monitorInstId} />}
         {tab === 'dashboard' && <Dashboard />}
       </main>
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useT } from '../../i18n';
 
 export default function ParallelGatewayNode({ data }: NodeProps) {
+  const { t } = useT();
   return (
     <div className="relative flex flex-col items-center">
       <Handle type="target" position={Position.Top} className="!bg-blue-400" />
@@ -10,7 +12,7 @@ export default function ParallelGatewayNode({ data }: NodeProps) {
       </div>
       <Handle type="source" position={Position.Bottom} className="!bg-blue-400" />
       <div className="text-center mt-1">
-        <div className="text-xs text-blue-400 font-semibold">并行分支</div>
+        <div className="text-xs text-blue-400 font-semibold">{t.nodes.and}</div>
         <div className="text-[10px] text-gray-500">{data.name as string}</div>
       </div>
     </div>

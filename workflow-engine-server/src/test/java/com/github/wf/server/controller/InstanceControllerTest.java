@@ -62,12 +62,12 @@ class InstanceControllerTest {
         var inst = instCtrl.start("test-user", sir);
         assertThat(inst.getStatus()).isEqualTo("RUNNING");
 
-        var tasks = taskCtrl.list("user1", null, inst.getId(), null);
+        var tasks = taskCtrl.list("user1", "user1", null, inst.getId(), null);
         assertThat(tasks).hasSize(1);
 
         CompleteTaskRequest ctr = new CompleteTaskRequest();
         ctr.setComment("ok");
-        taskCtrl.complete(tasks.get(0).get("id").toString(), ctr);
+        taskCtrl.complete("user1", tasks.get(0).get("id").toString(), ctr);
 
         var updated = instCtrl.get(inst.getId());
         assertThat(updated.getStatus()).isEqualTo("COMPLETED");

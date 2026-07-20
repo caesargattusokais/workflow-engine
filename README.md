@@ -50,6 +50,7 @@ cd workflow-engine-web && npm run dev
 | **ParallelGateway** | 并行网关 — 分叉到所有连线，汇合等待全部完成 |
 | **InclusiveGateway** | 条件分支 — 满足条件的并行执行 |
 | **Timer** | 定时器 — 延迟或截止时间后自动推进 |
+| **CallActivity** | 子流程调用 — 引用已部署流程定义，支持输入/输出变量映射 |
 
 ---
 
@@ -310,7 +311,7 @@ Designer 侧边栏 `T` 按钮 → 5 个预置模板：请假审批、报销审�
 | GET | `/api/org/users?q=` | 用户搜索（需 LDAP） |
 | GET | `/api/org/groups` | 组列表（需 LDAP） |
 
-**多租户：** 所有请求需带 `X-User-Id` 头，数据按用户隔离。
+**多租户：** 所有请求需带 `X-User-Id` 头，缺失返回 401 Unauthorized。数据按用户隔离。
 
 ---
 
@@ -363,3 +364,5 @@ engine.registerServiceHandler("com.myapp.Handler", vars -> Map.of("status", "PAS
 | v3.2.0 | 草稿 + 定义 JDBC 持久化 |
 | v3.3.0 | 流程模板市场（5 个预置模板）、ServiceTask SPI 自动发现 |
 | v3.4.0 | LDAP 组织架构集成、组织树选择器、Mock LDAP 模块 |
+| v5.0.0 | CallActivity 子流程、Redis 分布式锁、RocketMQ 延迟调度、Dashboard 看板 |
+| v5.1.0 | 23 个 bug 修复（版本安全查找、网关默认分支、定时器生命周期、X-User-Id 强制校验等）、JDBC 测试覆盖（51 个新增） |
