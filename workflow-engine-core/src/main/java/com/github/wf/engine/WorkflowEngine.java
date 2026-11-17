@@ -17,6 +17,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class WorkflowEngine {
 
@@ -32,6 +33,12 @@ public class WorkflowEngine {
     private ProcessParser processParser = new YamlProcessParser();
     private String baseUrl;
     private final List<InstanceStateListener> stateListeners = new ArrayList<>();
+    /**
+     * Cross-instance triggers deferred until the current trigger() releases its
+     * instance lock. Prevents AB-BA deadlocks between parent→child (CallActivity)
+     * and child→parent (EndEvent) lock acquisition orders.
+     */
+    private final ConcurrentLinkedQueue<String> deferredTriggers = new ConcurrentLinkedQueue<>();
 
     WorkflowEngine(ProcessRepository processRepository,
                    InstanceRepository instanceRepository,
@@ -54,7 +61,7 @@ public class WorkflowEngine {
 
     private void registerDefaultRunners(com.github.wf.ext.OrgService orgService) {
         runners.put(NodeType.START_EVENT, new StartEventRunner());
-        runners.put(NodeType.END_EVENT, new EndEventRunner(processRepository, this::trigger));
+        runners.put(NodeType.END_EVENT, new EndEventRunner(processRepository, this::deferTrigger));
         runners.put(NodeType.USER_TASK, new UserTaskRunner(taskRepository, delayScheduler::schedule, baseUrl, orgService));
         runners.put(NodeType.SERVICE_TASK, new ServiceTaskRunner(delayScheduler::schedule));
         runners.put(NodeType.EXCLUSIVE_GATEWAY, new ExclusiveGatewayRunner());
@@ -62,7 +69,28 @@ public class WorkflowEngine {
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
         runners.put(NodeType.TIMER, new TimerRunner(delayScheduler::schedule));
         runners.put(NodeType.CALL_ACTIVITY, new CallActivityRunner(
-            processRepository, instanceRepository, this::trigger));
+            processRepository, instanceRepository, this::deferTrigger));
+    }
+
+    /**
+     * Defer a cross-instance trigger instead of invoking it while the current
+     * trigger() still holds its instance lock. The deferred trigger is drained
+     * synchronously in trigger()'s finally block after the lock is released,
+     * so execution order/semantics are preserved without nested locking.
+     */
+    void deferTrigger(String instanceId) {
+        deferredTriggers.add(instanceId);
+    }
+
+    private void drainDeferredTriggers() {
+        String next;
+        while ((next = deferredTriggers.poll()) != null) {
+            try {
+                trigger(next);
+            } catch (Exception e) {
+                log.error("Deferred trigger failed for instance " + next, e);
+            }
+        }
     }
 
     public void addStateListener(InstanceStateListener listener) {
@@ -310,6 +338,7 @@ public class WorkflowEngine {
 
         } finally {
             lockManager.unlock(instanceId);
+            drainDeferredTriggers();
         }
     }
 
@@ -337,12 +366,19 @@ public class WorkflowEngine {
         Task task = taskRepository.findById(taskId);
         if (task == null) throw new IllegalArgumentException("Task not found: " + taskId);
         if (!task.isPending()) throw new IllegalStateException("Task is not pending: " + taskId);
+        String instanceId = task.getInstanceId();
 
+        // Hold the instance lock for all state mutations — the daemon thread
+        // (boundary timer / retry wake-ups) runs trigger() on the same lock and
+        // must not interleave with task completion. trigger() itself runs OUTSIDE
+        // the lock (Redis locks are non-reentrant).
+        lockManager.lock(instanceId);
+        try {
         task.setStatus(TaskStatus.COMPLETED);
         task.setVariables(variables);
         taskRepository.update(task);
 
-        ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
+        ProcessInstance instance = instanceRepository.findById(instanceId);
         ProcessDefinition def = resolveDefinition(instance);
         Node node = def.getNode(task.getNodeId());
         instanceRepository.saveHistoricActivity(
@@ -355,7 +391,7 @@ public class WorkflowEngine {
         }
 
         // Wake up waiting execution
-        List<Execution> executions = instanceRepository.findActiveExecutions(task.getInstanceId());
+        List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
         for (Execution exec : executions) {
             if (exec.isWaiting() && exec.getCurrentNodeId().equals(task.getNodeId())) {
                 // Clear any pending timer/retry state — user completed manually
@@ -412,101 +448,128 @@ public class WorkflowEngine {
                 break;
             }
         }
+        } finally {
+            lockManager.unlock(instanceId);
+        }
 
-        trigger(task.getInstanceId());
+        trigger(instanceId);
     }
 
     public void rejectTask(String taskId, String comment) {
         Task task = taskRepository.findById(taskId);
         if (task == null) throw new IllegalArgumentException("Task not found: " + taskId);
-        task.setStatus(TaskStatus.REJECTED);
-        taskRepository.update(task);
+        String instanceId = task.getInstanceId();
 
-        ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
-        ProcessDefinition def = resolveDefinition(instance);
-        Node node = def.getNode(task.getNodeId());
-        instanceRepository.saveHistoricActivity(
-                HistoricActivity.taskRejected(instance.getId(), node.getId(),
-                        node.getName(), node.getType(), task.getAssignee(), comment));
+        lockManager.lock(instanceId);
+        try {
+            task.setStatus(TaskStatus.REJECTED);
+            taskRepository.update(task);
 
-        notifyStateListeners(task.getInstanceId());
+            ProcessInstance instance = instanceRepository.findById(instanceId);
+            ProcessDefinition def = resolveDefinition(instance);
+            Node node = def.getNode(task.getNodeId());
+            instanceRepository.saveHistoricActivity(
+                    HistoricActivity.taskRejected(instance.getId(), node.getId(),
+                            node.getName(), node.getType(), task.getAssignee(), comment));
+
+            notifyStateListeners(instanceId);
+        } finally {
+            lockManager.unlock(instanceId);
+        }
     }
 
     public void delegateTask(String taskId, String newAssignee) {
         Task task = taskRepository.findById(taskId);
         if (task == null) throw new IllegalArgumentException("Task not found: " + taskId);
+        String instanceId = task.getInstanceId();
         String oldAssignee = task.getAssignee();
-        task.setStatus(TaskStatus.DELEGATED);
-        taskRepository.update(task);
 
-        Task delegated = new Task(null, task.getInstanceId(), task.getNodeId());
-        delegated.setAssignee(newAssignee);
-        delegated.setCandidateGroups(task.getCandidateGroups());
-        delegated.setVariables(task.getVariables());
-        taskRepository.save(delegated);
+        lockManager.lock(instanceId);
+        try {
+            task.setStatus(TaskStatus.DELEGATED);
+            taskRepository.update(task);
 
-        ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
-        ProcessDefinition def = resolveDefinition(instance);
-        Node node = def.getNode(task.getNodeId());
-        instanceRepository.saveHistoricActivity(
-                HistoricActivity.taskDelegated(instance.getId(), node.getId(),
-                        node.getName(), node.getType(), oldAssignee, newAssignee));
+            Task delegated = new Task(null, task.getInstanceId(), task.getNodeId());
+            delegated.setAssignee(newAssignee);
+            delegated.setCandidateGroups(task.getCandidateGroups());
+            delegated.setVariables(task.getVariables());
+            taskRepository.save(delegated);
 
-        notifyStateListeners(task.getInstanceId());
+            ProcessInstance instance = instanceRepository.findById(instanceId);
+            ProcessDefinition def = resolveDefinition(instance);
+            Node node = def.getNode(task.getNodeId());
+            instanceRepository.saveHistoricActivity(
+                    HistoricActivity.taskDelegated(instance.getId(), node.getId(),
+                            node.getName(), node.getType(), oldAssignee, newAssignee));
+
+            notifyStateListeners(instanceId);
+        } finally {
+            lockManager.unlock(instanceId);
+        }
     }
 
     public void terminate(String instanceId, String reason) {
-        ProcessInstance instance = instanceRepository.findById(instanceId);
-        if (instance == null) throw new IllegalArgumentException("Instance not found: " + instanceId);
-        instance.setStatus(InstanceStatus.TERMINATED);
-        instanceRepository.update(instance);
+        lockManager.lock(instanceId);
+        try {
+            ProcessInstance instance = instanceRepository.findById(instanceId);
+            if (instance == null) throw new IllegalArgumentException("Instance not found: " + instanceId);
+            instance.setStatus(InstanceStatus.TERMINATED);
+            instanceRepository.update(instance);
 
-        List<Task> tasks = taskRepository.query(taskQuery().instanceId(instanceId));
-        for (Task t : tasks) {
-            if (t.isPending()) {
-                t.setStatus(TaskStatus.REJECTED);
-                taskRepository.update(t);
+            List<Task> tasks = taskRepository.query(taskQuery().instanceId(instanceId));
+            for (Task t : tasks) {
+                if (t.isPending()) {
+                    t.setStatus(TaskStatus.REJECTED);
+                    taskRepository.update(t);
+                }
             }
-        }
 
-        List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
-        for (Execution exec : executions) {
-            exec.setStatus(com.github.wf.model.ExecutionStatus.COMPLETED);
-            instanceRepository.updateExecution(exec);
-        }
+            List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+            for (Execution exec : executions) {
+                exec.setStatus(com.github.wf.model.ExecutionStatus.COMPLETED);
+                instanceRepository.updateExecution(exec);
+            }
 
-        if (reason != null) {
-            instanceRepository.saveHistoricActivity(new HistoricActivity(null, instanceId,
-                    "system", "terminate", null, "system", "terminate", null, reason));
-        }
+            if (reason != null) {
+                instanceRepository.saveHistoricActivity(new HistoricActivity(null, instanceId,
+                        "system", "terminate", null, "system", "terminate", null, reason));
+            }
 
-        notifyStateListeners(instanceId);
+            notifyStateListeners(instanceId);
+        } finally {
+            lockManager.unlock(instanceId);
+        }
     }
 
     /**
      * Resume a suspended process instance. The failed service task will re-execute.
      */
     public void resume(String instanceId) {
-        ProcessInstance instance = instanceRepository.findById(instanceId);
-        if (instance == null || instance.getStatus() != InstanceStatus.SUSPENDED) {
-            throw new IllegalStateException("Instance not found or not suspended: " + instanceId);
-        }
-
-        instance.setStatus(InstanceStatus.RUNNING);
-        instance.setVariable("_suspendReason", null);
-        instance.setVariable("_suspendException", null);
-        instanceRepository.update(instance);
-
-        // Find the suspended execution and reactivate it
-        List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
-        for (Execution exec : executions) {
-            if (exec.isWaiting() && "SUSPENDED".equals(exec.getRetryState())) {
-                exec.setRetryState(null);
-                exec.setRetryAttempt(0);
-                exec.setNextRetryAt(0);
-                exec.setStatus(ExecutionStatus.ACTIVE);
-                instanceRepository.updateExecution(exec);
+        lockManager.lock(instanceId);
+        try {
+            ProcessInstance instance = instanceRepository.findById(instanceId);
+            if (instance == null || instance.getStatus() != InstanceStatus.SUSPENDED) {
+                throw new IllegalStateException("Instance not found or not suspended: " + instanceId);
             }
+
+            instance.setStatus(InstanceStatus.RUNNING);
+            instance.setVariable("_suspendReason", null);
+            instance.setVariable("_suspendException", null);
+            instanceRepository.update(instance);
+
+            // Find the suspended execution and reactivate it
+            List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+            for (Execution exec : executions) {
+                if (exec.isWaiting() && "SUSPENDED".equals(exec.getRetryState())) {
+                    exec.setRetryState(null);
+                    exec.setRetryAttempt(0);
+                    exec.setNextRetryAt(0);
+                    exec.setStatus(ExecutionStatus.ACTIVE);
+                    instanceRepository.updateExecution(exec);
+                }
+            }
+        } finally {
+            lockManager.unlock(instanceId);
         }
 
         trigger(instanceId);

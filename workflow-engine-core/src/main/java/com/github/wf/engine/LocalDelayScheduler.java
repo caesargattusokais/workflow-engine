@@ -29,7 +29,13 @@ public class LocalDelayScheduler implements DelayScheduler {
                 try {
                     DelayedTrigger dt = delayQueue.take();
                     log.info("Delayed trigger: " + dt.instanceId);
-                    triggerFn.accept(dt.instanceId);
+                    try {
+                        triggerFn.accept(dt.instanceId);
+                    } catch (Throwable t) {
+                        // Never let a single failure kill the daemon thread —
+                        // that would silently disable ALL future timers and retries.
+                        log.error("Delayed trigger failed for instance " + dt.instanceId, t);
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
