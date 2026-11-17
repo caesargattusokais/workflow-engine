@@ -138,11 +138,14 @@ public class EngineConfig {
 
     // ── Engine ────────────────────────────
 
-    /** Deferred init: load running instances + recover pending timers — after schema.sql has been executed */
+    /** Deferred init: create indexes + load running instances + recover pending timers — after schema.sql has been executed */
     @Bean
     @Profile("!memory")
-    org.springframework.boot.ApplicationRunner engineRecovery(WorkflowEngine engine) {
+    org.springframework.boot.ApplicationRunner engineRecovery(WorkflowEngine engine,
+            javax.sql.DataSource dataSource) {
         return args -> {
+            // Secondary indexes (idempotent — safe for MySQL and H2)
+            com.github.wf.memory.DbIndexInitializer.createIndexes(new JdbcTemplate(dataSource));
             // Load running instances from DB/Redis into cache (depends on schema.sql)
             if (engine.instanceRepository instanceof com.github.wf.memory.JdbcInstanceRepository jdbcRepo) {
                 jdbcRepo.init();

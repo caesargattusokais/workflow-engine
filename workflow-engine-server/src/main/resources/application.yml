@@ -2,12 +2,27 @@ server:
   port: 8080
 
 engine:
-  base-url: http://338q032e33.qicp.vip
+  base-url: ${ENGINE_BASE_URL:http://localhost:8080}
 
-# Feishu (飞书) — uncomment to enable
-feishu:
-  app-id: cli_aabdd43036381cef
-  app-secret: Dm1WYw9K6NBrBThFMgCF9foGSLIuvEsq
+# Secrets are NOT stored in git. Provide them via environment variables or a
+# local override file: create application-local.yml next to this file (it is
+# gitignored) — see the git history of this file for why (leaked credentials).
+#
+# application-local.yml example:
+#   feishu:
+#     app-id: <your-app-id>
+#     app-secret: <your-app-secret>
+#   spring:
+#     datasource:
+#       password: <db-password>
+#     data:
+#       redis:
+#         password: <redis-password>
+
+# Feishu (飞书) — enable via application-local.yml or env vars
+#feishu:
+#  app-id: ${FEISHU_APP_ID:}
+#  app-secret: ${FEISHU_APP_SECRET:}
 
 # DingTalk (钉钉) — uncomment to enable
 #dingtalk:
@@ -43,13 +58,15 @@ feishu:
 
 
 spring:
+  config:
+    import: optional:file:./application-local.yml,optional:file:./workflow-engine-server/application-local.yml
   profiles:
-    active: redis
+    active: ${SPRING_PROFILES_ACTIVE:redis}
   datasource:
-    # MySQL
+    # MySQL — credentials come from env vars or application-local.yml
     url: jdbc:mysql://localhost:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root123
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     # Oracle
 #    url: jdbc:oracle:thin:@localhost:1521/orclpdb1
@@ -76,9 +93,9 @@ spring:
       on-profile: redis
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      password: redis123
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
       timeout: 2000ms
       lettuce:
         shutdown-timeout: 100ms

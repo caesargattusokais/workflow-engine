@@ -80,9 +80,10 @@ public class InstanceController {
             content = @Content(schema = @Schema(implementation = InstanceDetailResponse.class)))
     @ApiResponse(responseCode = "404", description = "Instance not found")
     public InstanceDetailResponse get(
+            @Parameter(description = "User ID for multi-tenant isolation", required = true)
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        ProcessInstance inst = engine.instanceRepository.findById(id);
-        if (inst == null) throw new RuntimeException("Not found: " + id);
+        ProcessInstance inst = com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
         return new InstanceDetailResponse(inst);
     }
 
@@ -106,7 +107,10 @@ public class InstanceController {
             content = @Content(schema = @Schema(implementation = HistoricActivity.class)))
     @ApiResponse(responseCode = "404", description = "Instance not found")
     public List<HistoricActivity> history(
+            @Parameter(description = "User ID for multi-tenant isolation", required = true)
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
+        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
         return engine.history(id);
     }
 
@@ -125,7 +129,10 @@ public class InstanceController {
             content = @Content(schema = @Schema(implementation = InstanceDetailResponse.class)))
     @ApiResponse(responseCode = "404", description = "Instance not found")
     public InstanceDetailResponse resume(
+            @Parameter(description = "User ID for multi-tenant isolation", required = true)
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
+        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
         engine.resume(id);
         return new InstanceDetailResponse(engine.instanceRepository.findById(id));
     }
@@ -135,8 +142,11 @@ public class InstanceController {
     @ApiResponse(responseCode = "200", description = "Instance terminated")
     @ApiResponse(responseCode = "404", description = "Instance not found")
     public void terminate(
+            @Parameter(description = "User ID for multi-tenant isolation", required = true)
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
+        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
         engine.terminate(id, body.getOrDefault("reason", "terminated by user"));
     }
 
@@ -146,9 +156,10 @@ public class InstanceController {
     @ApiResponse(responseCode = "404", description = "Instance not found")
     @ApiResponse(responseCode = "400", description = "Cannot delete a running instance")
     public void delete(
+            @Parameter(description = "User ID for multi-tenant isolation", required = true)
+            @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        var inst = engine.instanceRepository.findById(id);
-        if (inst == null) throw new RuntimeException("Not found: " + id);
+        var inst = com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
         if (inst.isRunning()) throw new RuntimeException("Cannot delete running instance");
         engine.instanceRepository.deleteById(id);
     }

@@ -69,7 +69,7 @@ class InstanceControllerTest {
         ctr.setComment("ok");
         taskCtrl.complete("user1", tasks.get(0).get("id").toString(), ctr);
 
-        var updated = instCtrl.get(inst.getId());
+        var updated = instCtrl.get("test-user", inst.getId());
         assertThat(updated.getStatus()).isEqualTo("COMPLETED");
     }
 }
