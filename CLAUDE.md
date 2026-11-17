@@ -34,6 +34,10 @@ cd workflow-engine-web && npm run dev
 
 # Frontend prod build
 cd workflow-engine-web && npm run build
+
+# E2E tests (Playwright) — requires backend first in memory+mock-ldap mode:
+#   java -jar workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar --spring.profiles.active=memory,mock-ldap
+cd workflow-engine-web && npm run test:e2e
 ```
 
 ## Module Architecture
@@ -66,6 +70,7 @@ Every node type has a `NodeRunner` implementation (`engine/runner/`). The interf
 - **ExclusiveGatewayRunner** — evaluates conditions, takes first match
 - **ParallelGatewayRunner** — fork: creates child executions; join: waits for all siblings, then reactivates parent
 - **InclusiveGatewayRunner** — evaluates conditions, forks matching branches in parallel
+- **CallActivityRunner** — spawns a child subprocess from a referenced deployed definition, with input/output variable mapping
 - **TimerRunner** — waits via delay queue, then advances
 
 ### Delay Queue & Recovery
@@ -114,6 +119,10 @@ All REST endpoints require `X-User-Id` header. Data is filtered by `_userId` var
 - **ProcessListener**: `onNodeEnter` / `onNodeLeave` callbacks, configured per-node via `listeners: [com.example.MyListener]`
 - **ConditionEvaluator**: Java class-based conditions (alternative to SpEL expressions)
 - **DynamicRouter**: Programmatic next-node selection for UserTask completion
+
+## Design Docs
+
+Design specs and implementation plans live in `docs/superpowers/specs/` (`*-design.md`) and `docs/superpowers/plans/` (`*-plan.md`) — e.g. `2026-07-18-call-activity-design.md`. `docs/roadmap.md` tracks feature roadmap; `docs/CHANGELOG.md` and the README version table record releases. When changing engine behavior, consult the matching design doc first.
 
 ## REST API Conventions
 

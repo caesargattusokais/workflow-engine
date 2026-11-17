@@ -12,3 +12,7 @@ target/
 /docker/ldap_config/
 /workflow-engine-web/node_modules/
 /workflow-engine-web/dist/
+
+# agent/tool artifacts
+.archify/
+.workbuddy/
