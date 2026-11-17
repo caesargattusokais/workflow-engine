@@ -16,3 +16,5 @@ target/
 # agent/tool artifacts
 .archify/
 .workbuddy/
+# local-only secrets override
+application-local.yml
