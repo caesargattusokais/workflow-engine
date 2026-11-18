@@ -76,4 +76,42 @@ class SpelExpressionEvaluatorTest {
         boolean result = evaluator.evaluateToBoolean("val < 0", Map.of("val", "-10"));
         assertThat(result).isTrue();
     }
+
+    @Test
+    void doesNotCorruptStringLiteralMatchingVariableName() {
+        // A variable named "running" must not corrupt the literal in status == 'running'
+        boolean result = evaluator.evaluateToBoolean(
+                "status == 'running'", Map.of("status", "running", "running", false));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void replacesVariableAdjacentToLiteral() {
+        boolean result = evaluator.evaluateToBoolean(
+                "status == 'x' and running", Map.of("status", "x", "running", true));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void noPartialVariableMatch() {
+        // Variable "day" must not replace the "days" prefix
+        boolean result = evaluator.evaluateToBoolean(
+                "days > 3", Map.of("day", 999, "days", 5));
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void preservesLeadingZeroStrings() {
+        // "0123" looks numeric but is an order/case number — must stay a string
+        Map<String, Object> normalized = SpelExpressionEvaluator.normalizeVariables(Map.of("code", "0123"));
+        assertThat(normalized.get("code")).isEqualTo("0123");
+    }
+
+    @Test
+    void cachedExpressionsStayConsistent() {
+        // Same expression evaluated repeatedly with different variables (cache path)
+        assertThat(evaluator.evaluateToBoolean("days > 3", Map.of("days", 5))).isTrue();
+        assertThat(evaluator.evaluateToBoolean("days > 3", Map.of("days", 1))).isFalse();
+        assertThat(evaluator.evaluateToBoolean("days > 3", Map.of("days", 10))).isTrue();
+    }
 }
