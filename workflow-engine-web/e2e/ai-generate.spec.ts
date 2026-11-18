@@ -44,7 +44,7 @@ test.describe('Designer — AI flow generation', () => {
 
   test('AI config page shows status and saves settings (effective immediately)', async ({ page }) => {
     // Open the config modal via the ⚙ button (title = AI 模型配置 / AI Model Configuration)
-    const gear = page.locator('button[title*="配置"], button[title*="Configuration"]');
+    const gear = page.locator('header button:has-text("⚙")');
     await expect(gear).toBeVisible();
     await gear.click();
 
@@ -72,7 +72,7 @@ test.describe('Designer — AI flow generation', () => {
   });
 
   test('AI config test button reports connectivity result', async ({ page }) => {
-    await page.locator('button[title*="配置"], button[title*="Configuration"]').click();
+    await page.locator('header button:has-text("⚙")').click();
     const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');
     await expect(modal).toBeVisible();
 

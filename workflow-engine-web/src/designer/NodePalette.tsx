@@ -20,7 +20,7 @@ export default function NodePalette() {
   };
 
   return (
-    <div className="w-36 bg-gray-800 border-r border-gray-700 p-2 flex flex-col gap-1">
+    <div className="w-36 shrink-0 bg-gray-800 border-r border-gray-700 p-2 flex flex-col gap-1">
       <div className="text-xs text-gray-500 text-center mb-2">{t.designer.dragHint}</div>
       {items.map(item => (
         <div key={item.type}

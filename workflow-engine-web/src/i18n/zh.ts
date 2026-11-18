@@ -1,5 +1,5 @@
 const zh = {
-  app: { designer: '设计器', monitor: '监控', dashboard: '看板' },
+  app: { designer: '设计器', monitor: '监控', dashboard: '看板', settings: 'AI 设置', settingsConfigured: 'AI 已配置', settingsNotConfigured: 'AI 未配置，点击设置' },
   designer: {
     draftList: '草稿列表',
     import: '导入',

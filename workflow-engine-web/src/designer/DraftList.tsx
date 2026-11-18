@@ -14,7 +14,7 @@ interface Draft {
 /** Left sidebar: draft list with infinite scroll, toolbar and context menu. */
 export default function DraftList({ drafts, activeId, instanceSummary,
     draftHasMore, draftLoading, draftPage,
-    onSwitch, onNew, onImport, onLoadTemplates, onAiGenerate, onOpenAiConfig, onLoadMore, onLoadPage,
+    onSwitch, onNew, onImport, onLoadTemplates, onAiGenerate, onLoadMore, onLoadPage,
     onViewYaml, onDownloadYaml, onCopy, onRename, onDelete }: {
   drafts: Draft[];
   activeId: string | null;
@@ -27,7 +27,6 @@ export default function DraftList({ drafts, activeId, instanceSummary,
   onImport: () => void;
   onLoadTemplates: () => void;
   onAiGenerate: () => void;
-  onOpenAiConfig: () => void;
   onLoadMore: () => void;
   onLoadPage: (page: number) => void;
   onViewYaml: (draft: Draft) => void;
@@ -47,18 +46,13 @@ export default function DraftList({ drafts, activeId, instanceSummary,
   }, []);
 
   return (
-    <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
+    <div className="w-48 shrink-0 bg-gray-850 border-r border-gray-700 flex flex-col">
       <div className="p-2 border-b border-gray-700 flex items-center gap-1">
-        <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
+        <span className="text-xs text-gray-500 flex-1 min-w-0 truncate">{t.designer.draftList}</span>
         <button onClick={onAiGenerate}
           className="text-xs bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-1.5 py-0.5 rounded"
           title={t.designer.aiGenerateTitle}>
           ✦
-        </button>
-        <button onClick={onOpenAiConfig}
-          className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded"
-          title={t.designer.aiConfigTitle}>
-          ⚙
         </button>
         <button onClick={onLoadTemplates}
           className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title={t.designer.template}>

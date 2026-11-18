@@ -16,6 +16,10 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        // Pin the UI language: the app auto-detects from navigator.language,
+        // and without this Chromium inherits the OS locale (zh-CN on dev
+        // machines), breaking the English text selectors most specs rely on.
+        locale: 'en',
         baseURL: 'http://localhost:3000',
         storageState: 'e2e/.auth.json',
       },

@@ -6,7 +6,6 @@ import PropertyPanel from './PropertyPanel';
 import DraftList from './DraftList';
 import TemplateBrowser from './TemplateBrowser';
 import AiGenerateModal from './AiGenerateModal';
-import AiConfigModal from './AiConfigModal';
 import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary, generateFlow } from '../api/client';
 import { showToast } from '../api/toast';
 import { graphToYaml } from './graphToYaml';
@@ -45,7 +44,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [showAiGenerate, setShowAiGenerate] = useState(false);
-  const [showAiConfig, setShowAiConfig] = useState(false);
 
   const [instanceSummary, setInstanceSummary] = useState<Record<string, {running: number, total: number}>>({});
   const [draftPage, setDraftPage] = useState(1);
@@ -239,8 +237,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     }
   };
 
-  const handleAiConfigSaved = (msg: string) => setToast(msg);
-
   const handleNodeSelect = useCallback((node: Node | null) => setSelectedNode(node), []);
   const handleNodeChange = useCallback((updatedNode: Node) => {
     setNodes(nodes.map(n => n.id === updatedNode.id ? updatedNode : n));
@@ -407,7 +403,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           onImport={importYamlAction}
           onLoadTemplates={loadTemplates}
           onAiGenerate={() => setShowAiGenerate(true)}
-          onOpenAiConfig={() => setShowAiConfig(true)}
           onLoadMore={() => { if (draftHasMore && !draftLoading.current) loadDrafts(draftPage + 1); }}
           onLoadPage={loadDrafts}
           onViewYaml={showYamlFor}
@@ -436,11 +431,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       {/* AI Generate Modal */}
       {showAiGenerate && (
         <AiGenerateModal onGenerate={handleAiGenerate} onClose={() => setShowAiGenerate(false)} />
-      )}
-
-      {/* AI Config Modal */}
-      {showAiConfig && (
-        <AiConfigModal onClose={() => setShowAiConfig(false)} onSaved={handleAiConfigSaved} />
       )}
     </div>
   );
