@@ -55,7 +55,7 @@ public class DashboardController {
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Process instance ID") @PathVariable("instanceId") String instanceId) {
-        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, instanceId);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, instanceId);
         List<HistoricActivity> history = engine.history(instanceId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (int i = 0; i < history.size(); i++) {

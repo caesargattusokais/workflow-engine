@@ -1,4 +1,4 @@
-package com.github.wf.server.config;
+package com.github.wf.server.web;
 
 import com.github.wf.engine.WorkflowEngine;
 import com.github.wf.model.ProcessInstance;

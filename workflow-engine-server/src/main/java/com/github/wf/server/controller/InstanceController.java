@@ -83,7 +83,7 @@ public class InstanceController {
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        ProcessInstance inst = com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
+        ProcessInstance inst = com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
         return new InstanceDetailResponse(inst);
     }
 
@@ -110,7 +110,7 @@ public class InstanceController {
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
         return engine.history(id);
     }
 
@@ -132,7 +132,7 @@ public class InstanceController {
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
         engine.resume(id);
         return new InstanceDetailResponse(engine.instanceRepository.findById(id));
     }
@@ -146,7 +146,7 @@ public class InstanceController {
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
         engine.terminate(id, body.getOrDefault("reason", "terminated by user"));
     }
 
@@ -159,7 +159,7 @@ public class InstanceController {
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        var inst = com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
+        var inst = com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
         if (inst.isRunning()) throw new IllegalStateException("Cannot delete running instance");
         engine.instanceRepository.deleteById(id);
     }

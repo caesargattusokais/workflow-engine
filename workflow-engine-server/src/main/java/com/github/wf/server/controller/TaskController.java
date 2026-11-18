@@ -72,7 +72,7 @@ public class TaskController {
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody CompleteTaskRequest req) {
-        com.github.wf.server.config.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
         engine.completeTask(id, req.getVariables(), req.getComment());
     }
 
@@ -88,7 +88,7 @@ public class TaskController {
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @Parameter(description = "Completion comment")
             @RequestParam(value = "comment", defaultValue = "飞书审批通过") String comment) {
-        com.github.wf.server.config.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
         engine.completeTask(id, Map.of("source", "feishu"), comment);
         return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:green'>✓ 已通过</h2><p>审批完成</p></body></html>";
     }
@@ -102,7 +102,7 @@ public class TaskController {
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.config.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
         engine.rejectTask(id, body.getOrDefault("comment", ""));
     }
 
@@ -118,7 +118,7 @@ public class TaskController {
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @Parameter(description = "Rejection comment")
             @RequestParam(value = "comment", defaultValue = "飞书驳回") String comment) {
-        com.github.wf.server.config.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
         engine.rejectTask(id, comment);
         return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:red'>✗ 已驳回</h2><p>任务已驳回</p></body></html>";
     }
@@ -133,7 +133,7 @@ public class TaskController {
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.config.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
         engine.delegateTask(id, body.get("newAssignee"));
     }
 }
