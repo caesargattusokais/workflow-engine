@@ -142,6 +142,26 @@ public class JdbcInstanceRepository implements InstanceRepository {
         return c != null ? c : 0;
     }
 
+    /** SQL-level counts scoped to the owning user. */
+    @Override
+    public long count(String status, String userId) {
+        if (userId == null) return count(status);
+        boolean hasStatus = status != null && !status.isEmpty();
+        Long c = hasStatus
+            ? jdbc.queryForObject("SELECT COUNT(*) FROM process_instance WHERE user_id = ? AND status = ?", Long.class, userId, status)
+            : jdbc.queryForObject("SELECT COUNT(*) FROM process_instance WHERE user_id = ?", Long.class, userId);
+        return c != null ? c : 0;
+    }
+
+    /** SQL-level per-definition count scoped to the owning user. */
+    @Override
+    public long countByDefinitionId(String definitionId, String userId) {
+        if (userId == null) return countByDefinitionId(definitionId);
+        Long c = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM process_instance WHERE definition_id = ? AND user_id = ?", Long.class, definitionId, userId);
+        return c != null ? c : 0;
+    }
+
     @Override
     public com.github.wf.model.InstanceStats getStats() {
         var s = new com.github.wf.model.InstanceStats();
@@ -170,6 +190,34 @@ public class JdbcInstanceRepository implements InstanceRepository {
         return s;
     }
 
+    /** SQL-level aggregation scoped to the owning user (user_id column). */
+    @Override
+    public com.github.wf.model.InstanceStats getStats(String userId) {
+        if (userId == null) return getStats();
+        var s = new com.github.wf.model.InstanceStats();
+        jdbc.query("SELECT status, COUNT(*) c FROM process_instance WHERE user_id = ? GROUP BY status", (rs) -> {
+            String st = rs.getString("status"); long c = rs.getLong("c");
+            s.setTotal(s.getTotal() + c);
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
+                case RUNNING -> s.setRunning(c);
+                case COMPLETED -> s.setCompleted(c);
+                case SUSPENDED -> s.setSuspended(c);
+                case TERMINATED -> s.setTerminated(c);
+            }
+        }, userId);
+        Double avg = jdbc.queryForObject(
+            "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL AND user_id = ?",
+            Double.class, userId);
+        if (avg != null) s.setAvgDurationMs(avg);
+        jdbc.query("SELECT definition_id, status, COUNT(*) c FROM process_instance WHERE user_id = ? GROUP BY definition_id, status",
+            (rs) -> {
+                s.getByDefinition()
+                    .computeIfAbsent(rs.getString("definition_id"), k -> new java.util.LinkedHashMap<>())
+                    .put(rs.getString("status"), rs.getLong("c"));
+            }, userId);
+        return s;
+    }
+
     @Override
     public com.github.wf.model.InstanceStats getStatsByDefinition(String definitionId) {
         var s = new com.github.wf.model.InstanceStats();
@@ -186,6 +234,28 @@ public class JdbcInstanceRepository implements InstanceRepository {
         Double avg = jdbc.queryForObject(
             "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL AND definition_id = ?",
             Double.class, definitionId);
+        if (avg != null) s.setAvgDurationMs(avg);
+        return s;
+    }
+
+    /** SQL-level aggregation for one definition scoped to the owning user. */
+    @Override
+    public com.github.wf.model.InstanceStats getStatsByDefinition(String definitionId, String userId) {
+        if (userId == null) return getStatsByDefinition(definitionId);
+        var s = new com.github.wf.model.InstanceStats();
+        jdbc.query("SELECT status, COUNT(*) c FROM process_instance WHERE definition_id = ? AND user_id = ? GROUP BY status", (rs) -> {
+            String st = rs.getString("status"); long c = rs.getLong("c");
+            s.setTotal(s.getTotal() + c);
+            switch (com.github.wf.model.InstanceStatus.valueOf(st)) {
+                case RUNNING -> s.setRunning(c);
+                case COMPLETED -> s.setCompleted(c);
+                case SUSPENDED -> s.setSuspended(c);
+                case TERMINATED -> s.setTerminated(c);
+            }
+        }, definitionId, userId);
+        Double avg = jdbc.queryForObject(
+            "SELECT AVG(completed_at - created_at) FROM process_instance WHERE completed_at IS NOT NULL AND definition_id = ? AND user_id = ?",
+            Double.class, definitionId, userId);
         if (avg != null) s.setAvgDurationMs(avg);
         return s;
     }
@@ -219,6 +289,28 @@ public class JdbcInstanceRepository implements InstanceRepository {
         return result;
     }
 
+    /** SQL-level per-definition counts scoped to the owning user. */
+    @Override
+    public Map<String, Map<String, Long>> getSummary(String userId) {
+        if (userId == null) return getSummary();
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        jdbc.query("SELECT definition_id, status, COUNT(*) c FROM process_instance WHERE user_id = ? GROUP BY definition_id, status",
+            (rs) -> {
+                String defId = rs.getString("definition_id");
+                String st = rs.getString("status");
+                long c = rs.getLong("c");
+                result.computeIfAbsent(defId, k -> {
+                    var m = new LinkedHashMap<String, Long>();
+                    m.put("running", 0L); m.put("total", 0L);
+                    return m;
+                });
+                var m = result.get(defId);
+                m.put("total", m.get("total") + c);
+                if ("RUNNING".equals(st)) m.put("running", m.get("running") + c);
+            }, userId);
+        return result;
+    }
+
     @Override
     public void deleteById(String id) {
         instances.remove(id);
@@ -230,9 +322,9 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     private void writeToDb(ProcessInstance instance) {
         int updated = jdbc.update(
-            "UPDATE process_instance SET status=?, variables_json=?, active_node_ids_json=?, " +
+            "UPDATE process_instance SET status=?, user_id=?, variables_json=?, active_node_ids_json=?, " +
             "parent_instance_id=?, parent_execution_id=?, completed_at=? WHERE id=?",
-            instance.getStatus().name(), gson.toJson(instance.getVariables()),
+            instance.getStatus().name(), userIdOf(instance), gson.toJson(instance.getVariables()),
             gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
             instance.getParentInstanceId(),
             instance.getParentExecutionId(),
@@ -241,17 +333,23 @@ public class JdbcInstanceRepository implements InstanceRepository {
         if (updated == 0) {
             jdbc.update(
                 "INSERT INTO process_instance (id, definition_id, definition_version, status, " +
-                "variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
+                "user_id, variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
                 "created_at, completed_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
-                instance.getStatus().name(), gson.toJson(instance.getVariables()),
+                instance.getStatus().name(), userIdOf(instance), gson.toJson(instance.getVariables()),
                 gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
                 instance.getParentInstanceId(),
                 instance.getParentExecutionId(),
                 instance.getCreatedAt().toEpochMilli(),
                 instance.getCompletedAt() != null ? instance.getCompletedAt().toEpochMilli() : null);
         }
+    }
+
+    /** Owner extracted from the {@code _userId} variable — the SQL-filterable copy of it. */
+    static String userIdOf(ProcessInstance instance) {
+        Object uid = instance.getVariable("_userId");
+        return uid != null ? uid.toString() : null;
     }
 
     // ── Execution ────────────────────────

@@ -5,6 +5,9 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * Creates secondary indexes on the workflow tables at startup.
  *
@@ -22,6 +25,7 @@ public final class DbIndexInitializer {
         // process_instance — list by definition, status filter, dashboard aggregates
         "CREATE INDEX idx_pi_def_status_created ON process_instance (definition_id, status, created_at)",
         "CREATE INDEX idx_pi_status ON process_instance (status)",
+        "CREATE INDEX idx_pi_user_status ON process_instance (user_id, status)",
         // execution — instance detail view, recover() pending scan
         "CREATE INDEX idx_exec_instance ON execution (instance_id)",
         "CREATE INDEX idx_exec_status_retry ON execution (status, retry_state)",
@@ -47,6 +51,7 @@ public final class DbIndexInitializer {
      */
     private static final String[][] COLUMN_DDL = {
         // table, column, definition
+        {"process_instance", "user_id",             "VARCHAR(64) NULL"},
         {"process_instance", "definition_version",  "INT NOT NULL DEFAULT 0"},
         {"process_instance", "active_node_ids_json","TEXT"},
         {"process_instance", "parent_instance_id",  "VARCHAR(64) NULL"},
@@ -66,6 +71,7 @@ public final class DbIndexInitializer {
 
     public static void createIndexes(JdbcTemplate jdbc) {
         migrateColumns(jdbc);
+        backfillUserId(jdbc);
         for (String ddl : INDEX_DDL) {
             try {
                 jdbc.execute(ddl);
@@ -95,6 +101,35 @@ public final class DbIndexInitializer {
                     log.warn("Column migration skipped: " + alter + " — " + msg);
                 }
             }
+        }
+    }
+
+    /**
+     * Populate process_instance.user_id from the {@code _userId} entry stored in
+     * variables_json (rows written before the column existed). Done row-by-row
+     * with JSON parsed in Java so it stays portable across MySQL and H2.
+     */
+    private static void backfillUserId(JdbcTemplate jdbc) {
+        com.google.gson.Gson gson = new com.google.gson.Gson();
+        int updated = 0;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, variables_json FROM process_instance WHERE user_id IS NULL");
+        for (Map<String, Object> row : rows) {
+            try {
+                String json = (String) row.get("variables_json");
+                if (json == null) continue;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> vars = gson.fromJson(json, Map.class);
+                Object uid = vars != null ? vars.get("_userId") : null;
+                if (uid == null) continue;
+                updated += jdbc.update("UPDATE process_instance SET user_id = ? WHERE id = ?",
+                    uid.toString(), row.get("id"));
+            } catch (Exception e) {
+                log.warn("user_id backfill skipped for " + row.get("id") + " — " + e.getMessage());
+            }
+        }
+        if (updated > 0) {
+            log.info("user_id backfilled on " + updated + " rows");
         }
     }
 }

@@ -290,4 +290,61 @@ class JdbcInstanceRepositoryTest {
         assertThat(found.getStatus()).isEqualTo(InstanceStatus.RUNNING);
         assertThat(found.getVariable("key")).isEqualTo("val");
     }
+
+    // ── User-scoped stats / counts (SQL-level) ──
+
+    @Test
+    void userIdColumnWrittenOnSave() {
+        ProcessInstance inst = new ProcessInstance("inst-u1", "wf-test", 1, Map.of("_userId", "alice"));
+        repo.save(inst);
+
+        var jdbc = new JdbcTemplate(db);
+        String uid = jdbc.queryForObject(
+            "SELECT user_id FROM process_instance WHERE id = 'inst-u1'", String.class);
+        assertThat(uid).isEqualTo("alice");
+    }
+
+    @Test
+    void userScopedStatsCountOnlyOwnInstances() {
+        repo.save(new ProcessInstance("inst-a1", "wf-1", 1, Map.of("_userId", "alice")));
+        repo.save(new ProcessInstance("inst-a2", "wf-2", 1, Map.of("_userId", "alice")));
+        repo.save(new ProcessInstance("inst-b1", "wf-1", 1, Map.of("_userId", "bob")));
+
+        var aliceStats = repo.getStats("alice");
+        assertThat(aliceStats.getTotal()).isEqualTo(2);
+        assertThat(aliceStats.getRunning()).isEqualTo(2);
+        assertThat(aliceStats.getByDefinition()).containsOnlyKeys("wf-1", "wf-2");
+
+        var bobStats = repo.getStats("bob");
+        assertThat(bobStats.getTotal()).isEqualTo(1);
+        assertThat(bobStats.getByDefinition()).containsOnlyKeys("wf-1");
+
+        // Unscoped sees all
+        assertThat(repo.getStats().getTotal()).isEqualTo(3);
+    }
+
+    @Test
+    void userScopedCounts() {
+        repo.save(new ProcessInstance("inst-c1", "wf-1", 1, Map.of("_userId", "alice")));
+        repo.save(new ProcessInstance("inst-c2", "wf-2", 1, Map.of("_userId", "bob")));
+
+        assertThat(repo.count(null, "alice")).isEqualTo(1);
+        assertThat(repo.count("RUNNING", "alice")).isEqualTo(1);
+        assertThat(repo.count("COMPLETED", "alice")).isEqualTo(0);
+        assertThat(repo.countByDefinitionId("wf-2", "bob")).isEqualTo(1);
+        assertThat(repo.countByDefinitionId("wf-2", "alice")).isEqualTo(0);
+    }
+
+    @Test
+    void userScopedSummary() {
+        repo.save(new ProcessInstance("inst-d1", "wf-1", 1, Map.of("_userId", "alice")));
+        repo.save(new ProcessInstance("inst-d2", "wf-1", 1, Map.of("_userId", "bob")));
+
+        Map<String, Map<String, Long>> alice = repo.getSummary("alice");
+        assertThat(alice).containsOnlyKeys("wf-1");
+        assertThat(alice.get("wf-1").get("total")).isEqualTo(1L);
+
+        Map<String, Map<String, Long>> all = repo.getSummary();
+        assertThat(all.get("wf-1").get("total")).isEqualTo(2L);
+    }
 }

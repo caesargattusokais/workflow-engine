@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS process_instance (
   definition_id VARCHAR(255) NOT NULL,
   definition_version INT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'RUNNING',
+  user_id VARCHAR(64) NULL,
   variables_json MEDIUMTEXT,
   active_node_ids_json TEXT,
   parent_instance_id VARCHAR(64) NULL,
