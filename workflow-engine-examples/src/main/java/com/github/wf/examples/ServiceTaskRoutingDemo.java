@@ -142,7 +142,10 @@ public class ServiceTaskRoutingDemo {
 
         var inst2 = engine.start("suspend-demo", Map.of());
         System.out.println("状态应为 SUSPENDED: " + inst2.getStatus());
-        System.out.println("挂起原因: " + inst2.getVariable("_suspendReason"));
+        Object reason = inst2.getVariables().entrySet().stream()
+                .filter(en -> en.getKey().endsWith(com.github.wf.engine.InternalVars.SUSPEND_REASON_SUFFIX))
+                .map(Map.Entry::getValue).findFirst().orElse(null);
+        System.out.println("挂起原因: " + reason);
 
         // Fix the handler and resume
         engine.registerServiceHandler("com.demo.BrokenHandler", vars -> {

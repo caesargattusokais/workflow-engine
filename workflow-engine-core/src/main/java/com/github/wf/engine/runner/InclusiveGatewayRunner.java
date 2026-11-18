@@ -33,7 +33,8 @@ public class InclusiveGatewayRunner implements NodeRunner {
         for (Transition t : outgoing) {
             boolean match;
             if (t.isConditional()) {
-                match = evaluateCondition(t.getCondition(), variables, context);
+                match = com.github.wf.engine.ConditionResolver.evaluate(
+                        t.getCondition(), variables, context.getExpressionEvaluator());
             } else if (t.isDefault()) {
                 match = (forked == 0);
             } else {
@@ -105,20 +106,5 @@ public class InclusiveGatewayRunner implements NodeRunner {
             repo.updateExecution(exec);
         }
         return true;
-    }
-
-    private boolean evaluateCondition(Condition condition, Map<String, Object> variables,
-                                       ExecutionContext context) {
-        if (condition.getType() == ConditionType.EXPRESSION) {
-            return context.getExpressionEvaluator().evaluateToBoolean(condition.getExpr(), variables);
-        } else {
-            try {
-                Class<?> clazz = Class.forName(condition.getClassName());
-                ConditionEvaluator evaluator = (ConditionEvaluator) clazz.getDeclaredConstructor().newInstance();
-                return evaluator.evaluate(variables);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot evaluate condition: " + condition.getClassName(), e);
-            }
-        }
     }
 }

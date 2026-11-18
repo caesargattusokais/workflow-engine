@@ -12,7 +12,7 @@ public class Execution {
     private ExecutionStatus status;
     private int retryAttempt = 0;
     private long nextRetryAt = 0;    // epoch millis; 0 = no pending retry
-    private String retryState = null; // null = normal; "SUSPENDED" = suspend instance
+    private String retryState = null; // null = normal; legal values: RetryState enum names
 
     public Execution(String id, String instanceId, String currentNodeId, String parentExecutionId) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -53,4 +53,11 @@ public class Execution {
     public void setNextRetryAt(long nextRetryAt) { this.nextRetryAt = nextRetryAt; }
     public String getRetryState() { return retryState; }
     public void setRetryState(String retryState) { this.retryState = retryState; }
+
+    /** True when the execution is suspended (failed permanently, waiting for resume). */
+    public boolean isSuspended() { return RetryState.SUSPENDED.name().equals(retryState); }
+    /** True when a fired timer is waiting for a daemon wake-up. */
+    public boolean isTimerPending() { return RetryState.TIMER_PENDING.name().equals(retryState); }
+    /** True when a service-task retry is waiting for a daemon wake-up. */
+    public boolean isRetryPending() { return RetryState.RETRY_PENDING.name().equals(retryState); }
 }

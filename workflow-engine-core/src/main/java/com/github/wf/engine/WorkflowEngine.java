@@ -230,10 +230,10 @@ public class WorkflowEngine {
             // Reactivate pending executions BEFORE the loop (only from daemon wake-ups)
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
-                if (exec.isWaiting() && ("RETRY_PENDING".equals(exec.getRetryState()) || "TIMER_PENDING".equals(exec.getRetryState()))) {
+                if (exec.isWaiting() && (exec.isRetryPending() || exec.isTimerPending())) {
                     // Signal boundary timer expiry before reactivating, so UserTaskRunner can detect it
-                    if ("TIMER_PENDING".equals(exec.getRetryState())) {
-                        String timerKey = exec.getCurrentNodeId() + "_boundaryTimerFired";
+                    if (exec.isTimerPending()) {
+                        String timerKey = InternalVars.boundaryTimerFiredKey(exec.getCurrentNodeId());
                         instance.setVariable(timerKey, true);
                         instanceRepository.update(instance);
                     }
@@ -275,7 +275,7 @@ public class WorkflowEngine {
                                 invokeListeners(node, instanceId, instance.getVariables(), true);
 
                                 // Check if runner signaled suspension
-                                if ("SUSPENDED".equals(exec.getRetryState())) {
+                                if (exec.isSuspended()) {
                                     if (!exec.isChild()) {
                                         // Main execution — suspend instance immediately
                                         instance = instanceRepository.findById(instanceId);
@@ -291,7 +291,7 @@ public class WorkflowEngine {
                                             .filter(s -> !s.isCompleted())
                                             .toList();
                                     boolean allSuspended = !remaining.isEmpty() && remaining.stream()
-                                            .allMatch(s -> "SUSPENDED".equals(s.getRetryState()));
+                                            .allMatch(Execution::isSuspended);
                                     if (allSuspended) {
                                         instance = instanceRepository.findById(instanceId);
                                         instance.setStatus(InstanceStatus.SUSPENDED);
@@ -305,12 +305,12 @@ public class WorkflowEngine {
                         } catch (Exception e) {
                             log.error("Error running node " + node.getId() + " — suspending execution", e);
                             // Suspend the failed execution instead of leaving it in an inconsistent state
-                            exec.setRetryState("SUSPENDED");
+                            exec.setRetryState(RetryState.SUSPENDED.name());
                             exec.setStatus(ExecutionStatus.WAITING);
                             instanceRepository.updateExecution(exec);
                             // Set suspend reason on the instance
-                            instance.setVariable(node.getId() + "_suspendReason", e.getMessage());
-                            instance.setVariable(node.getId() + "_suspendException", e.getClass().getName());
+                            instance.setVariable(InternalVars.suspendReasonKey(node.getId()), e.getMessage());
+                            instance.setVariable(InternalVars.suspendExceptionKey(node.getId()), e.getClass().getName());
                             instanceRepository.update(instance);
                             // If this is the root execution, suspend the entire instance
                             if (!exec.isChild()) {
@@ -397,7 +397,7 @@ public class WorkflowEngine {
                 // Clear any pending timer/retry state — user completed manually
                 log.info("Clearing retry state for node=" + exec.getCurrentNodeId());
                 exec.setRetryState(null);
-                instance.removeVariable(task.getNodeId() + "_boundaryTimerFired");
+                instance.removeVariable(InternalVars.boundaryTimerFiredKey(task.getNodeId()));
                 instanceRepository.update(instance);
 
                 // Check for dynamic router
@@ -410,33 +410,9 @@ public class WorkflowEngine {
                     } else {
                         // Route via outgoing transitions: direct → conditional (evaluated) → default
                         List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
-                        com.github.wf.model.Transition picked = null;
-                        com.github.wf.model.Transition defaultTrans = null;
-
-                        // 1. Prefer direct edge
-                        for (com.github.wf.model.Transition t : outgoing) {
-                            if (t.isDirect()) { picked = t; break; }
-                        }
-
-                        // 2. Evaluate conditional edges (skip timeout/result/exception)
-                        if (picked == null) {
-                            for (com.github.wf.model.Transition t : outgoing) {
-                                if (t.isConditional()) {
-                                    if (evaluateCondition(t.getCondition(), instance.getVariables())) {
-                                        picked = t;
-                                        break;
-                                    }
-                                } else if (t.isDefault()) {
-                                    defaultTrans = t; // remember, use only as fallback
-                                }
-                            }
-                        }
-
-                        // 3. Fall back to default
-                        if (picked == null && defaultTrans != null) {
-                            picked = defaultTrans;
-                        }
-
+                        com.github.wf.model.Transition picked = TransitionSelector.select(outgoing,
+                                c -> ConditionResolver.evaluate(c, instance.getVariables(), expressionEvaluator),
+                                true);
                         if (picked != null) exec.setCurrentNodeId(picked.getTo());
                     }
                 } else {
@@ -553,14 +529,19 @@ public class WorkflowEngine {
             }
 
             instance.setStatus(InstanceStatus.RUNNING);
-            instance.setVariable("_suspendReason", null);
-            instance.setVariable("_suspendException", null);
+            // Clean up ALL engine-internal suspend keys (per-node and legacy global spellings)
+            for (String key : instance.getVariables().keySet().toArray(new String[0])) {
+                if (key.endsWith(InternalVars.SUSPEND_REASON_SUFFIX)
+                        || key.endsWith(InternalVars.SUSPEND_EXCEPTION_SUFFIX)) {
+                    instance.removeVariable(key);
+                }
+            }
             instanceRepository.update(instance);
 
             // Find the suspended execution and reactivate it
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
-                if (exec.isWaiting() && "SUSPENDED".equals(exec.getRetryState())) {
+                if (exec.isWaiting() && exec.isSuspended()) {
                     exec.setRetryState(null);
                     exec.setRetryAttempt(0);
                     exec.setNextRetryAt(0);
@@ -588,25 +569,6 @@ public class WorkflowEngine {
             return router.nextNode(instanceId, currentNodeId, variables);
         } catch (Exception e) {
             throw new RuntimeException("Cannot invoke DynamicRouter: " + routerClass, e);
-        }
-    }
-
-    /**
-     * Evaluate a Condition using either SpEL expression or Java class.
-     */
-    private boolean evaluateCondition(com.github.wf.model.Condition condition, Map<String, Object> variables) {
-        if (condition == null) return false;
-        if (condition.getType() == com.github.wf.model.ConditionType.EXPRESSION) {
-            return expressionEvaluator.evaluateToBoolean(condition.getExpr(), variables);
-        } else {
-            try {
-                Class<?> clazz = Class.forName(condition.getClassName());
-                com.github.wf.ext.ConditionEvaluator evaluator =
-                        (com.github.wf.ext.ConditionEvaluator) clazz.getDeclaredConstructor().newInstance();
-                return evaluator.evaluate(variables);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot evaluate condition: " + condition.getClassName(), e);
-            }
         }
     }
 }

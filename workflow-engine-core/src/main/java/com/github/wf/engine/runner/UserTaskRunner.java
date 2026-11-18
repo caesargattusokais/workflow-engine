@@ -66,7 +66,7 @@ public class UserTaskRunner implements NodeRunner {
         Map<String, Object> variables = context.getVariables();
 
         // Check if re-entering after boundary timer timeout
-        String timerKey = node.getId() + "_boundaryTimerFired";
+        String timerKey = com.github.wf.engine.InternalVars.boundaryTimerFiredKey(node.getId());
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
         if (Boolean.TRUE.equals(instance.getVariable(timerKey))) {
             log.info("Boundary timer fired for node=" + node.getId() + " instance=" + context.getInstanceId());
@@ -193,7 +193,7 @@ public class UserTaskRunner implements NodeRunner {
                     log.info("Scheduling boundary timer for node=" + node.getId() + " delay=" + delayMs + "ms");
                     // Note: timerKey is NOT set here — it will be set by trigger() when the timer actually fires
                     scheduler.accept(exec.getInstanceId(), delayMs);
-                    exec.setRetryState("TIMER_PENDING");
+                    exec.setRetryState(com.github.wf.engine.RetryState.TIMER_PENDING.name());
                 }
             } catch (Exception e) {
                 // Invalid duration format — skip boundary timer

@@ -87,7 +87,7 @@ public class ServiceTaskRunner implements NodeRunner {
             for (Transition t : context.getDefinition().getOutgoingTransitions(node.getId())) {
                 if (!t.isResult()) continue;
                 if (t.getCondition() != null) {
-                    if (evaluateCondition(t.getCondition(), variables, context)) {
+                    if (com.github.wf.engine.ConditionResolver.evaluate(t.getCondition(), variables, context.getExpressionEvaluator())) {
                         exec.setCurrentNodeId(t.getTo());
                         matched = true;
                         break;
@@ -104,7 +104,7 @@ public class ServiceTaskRunner implements NodeRunner {
             if (!matched) {
                 List<RoutingRule> resultRoutes = serviceTask.getResultRouting();
                 for (RoutingRule rule : resultRoutes) {
-                    boolean match = rule.isDefault() || evaluateCondition(rule.getCondition(), variables, context);
+                    boolean match = rule.isDefault() || com.github.wf.engine.ConditionResolver.evaluate(rule.getCondition(), variables, context.getExpressionEvaluator());
                     if (match) {
                         exec.setCurrentNodeId(rule.getTo());
                         matched = true;
@@ -144,7 +144,7 @@ public class ServiceTaskRunner implements NodeRunner {
                         log.info("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");
                     }
                     exec.setStatus(ExecutionStatus.WAITING);
-                    exec.setRetryState("RETRY_PENDING");
+                    exec.setRetryState(com.github.wf.engine.RetryState.RETRY_PENDING.name());
                     repo.updateExecution(exec);
                     return true;
                 }
@@ -159,7 +159,7 @@ public class ServiceTaskRunner implements NodeRunner {
                         exec.setRetryAttempt(0);
                         exec.setRetryState(null);
                         return true;
-                    } else if (evaluateCondition(t.getCondition(), variables, context)) {
+                    } else if (com.github.wf.engine.ConditionResolver.evaluate(t.getCondition(), variables, context.getExpressionEvaluator())) {
                         exec.setCurrentNodeId(t.getTo());
                         exec.setRetryAttempt(0);
                         exec.setRetryState(null);
@@ -176,7 +176,7 @@ public class ServiceTaskRunner implements NodeRunner {
                     if (rule.isDefault()) {
                         match = true; // default — always matches
                     } else {
-                        match = evaluateCondition(rule.getCondition(), variables, context);
+                        match = com.github.wf.engine.ConditionResolver.evaluate(rule.getCondition(), variables, context.getExpressionEvaluator());
                     }
                     if (match) {
                         exec.setCurrentNodeId(rule.getTo());
@@ -188,14 +188,14 @@ public class ServiceTaskRunner implements NodeRunner {
             }
 
             // No exception route matched → SUSPEND the instance
-            exec.setRetryState("SUSPENDED");
+            exec.setRetryState(com.github.wf.engine.RetryState.SUSPENDED.name());
             exec.setStatus(ExecutionStatus.WAITING);
             exec.setRetryAttempt(0);
             repo.updateExecution(exec);
 
             // Set suspend reason in instance variables
-            instance.setVariable(ns+"suspendReason", ei.getMessage());
-            instance.setVariable(ns+"suspendException", ei.getType());
+            instance.setVariable(com.github.wf.engine.InternalVars.suspendReasonKey(node.getId()), ei.getMessage());
+            instance.setVariable(com.github.wf.engine.InternalVars.suspendExceptionKey(node.getId()), ei.getType());
             repo.update(instance);
 
             return true;
@@ -238,29 +238,10 @@ public class ServiceTaskRunner implements NodeRunner {
             return true; // retry all exceptions
         }
         for (Condition c : retryOn) {
-            if (evaluateCondition(c, variables, context)) {
+            if (com.github.wf.engine.ConditionResolver.evaluate(c, variables, context.getExpressionEvaluator())) {
                 return true;
             }
         }
         return false;
-    }
-
-    /**
-     * Evaluate a Condition using either SpEL expression or Java class.
-     */
-    private boolean evaluateCondition(Condition condition, Map<String, Object> variables,
-                                       ExecutionContext context) {
-        if (condition.getType() == ConditionType.EXPRESSION) {
-            return context.getExpressionEvaluator().evaluateToBoolean(condition.getExpr(), variables);
-        } else {
-            try {
-                Class<?> clazz = Class.forName(condition.getClassName());
-                com.github.wf.ext.ConditionEvaluator evaluator =
-                        (com.github.wf.ext.ConditionEvaluator) clazz.getDeclaredConstructor().newInstance();
-                return evaluator.evaluate(variables);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot evaluate condition: " + condition.getClassName(), e);
-            }
-        }
     }
 }

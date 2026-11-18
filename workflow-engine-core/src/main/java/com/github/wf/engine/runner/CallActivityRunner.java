@@ -42,14 +42,14 @@ public class CallActivityRunner implements NodeRunner {
             // execution ACTIVE, never reaching a terminal state.
             ProcessInstance inst = instanceRepository.findById(exec.getInstanceId());
             if (inst != null) {
-                inst.setVariable("_suspendReason",
+                inst.setVariable(com.github.wf.engine.InternalVars.SUSPEND_REASON_SUFFIX,
                     "CallActivity '" + node.getId() + "': definition not found: "
                     + caNode.getCalledId()
                     + (caNode.getCalledVersion() != null ? " v" + caNode.getCalledVersion() : ""));
-                inst.setVariable("_suspendException", "IllegalStateException");
+                inst.setVariable(com.github.wf.engine.InternalVars.SUSPEND_EXCEPTION_SUFFIX, "IllegalStateException");
                 instanceRepository.update(inst);
             }
-            exec.setRetryState("SUSPENDED");
+            exec.setRetryState(com.github.wf.engine.RetryState.SUSPENDED.name());
             exec.setStatus(ExecutionStatus.WAITING);
             exec.setRetryAttempt(0);
             instanceRepository.updateExecution(exec);

@@ -31,7 +31,7 @@ public class TimerRunner implements NodeRunner {
         Execution exec = context.getExecution();
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
 
-        String firedKey = node.getId() + "_timerFired";
+        String firedKey = com.github.wf.engine.InternalVars.timerFiredKey(node.getId());
         // If re-entering after daemon wake-up, advance immediately
         if (Boolean.TRUE.equals(instance.getVariable(firedKey))) {
             instance.removeVariable(firedKey);
@@ -60,7 +60,7 @@ public class TimerRunner implements NodeRunner {
             scheduler.accept(exec.getInstanceId(), delayMs);
         }
         exec.setStatus(ExecutionStatus.WAITING);
-        exec.setRetryState("TIMER_PENDING");
+        exec.setRetryState(com.github.wf.engine.RetryState.TIMER_PENDING.name());
         return true;
     }
 

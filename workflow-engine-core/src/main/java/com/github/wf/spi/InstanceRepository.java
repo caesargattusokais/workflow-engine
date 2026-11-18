@@ -107,8 +107,7 @@ public interface InstanceRepository {
         for (ProcessInstance i : findAll()) {
             if (!i.isRunning()) continue;
             for (Execution e : findActiveExecutions(i.getId())) {
-                if (e.isWaiting() && ("TIMER_PENDING".equals(e.getRetryState())
-                        || "RETRY_PENDING".equals(e.getRetryState()))) {
+                if (e.isWaiting() && (e.isTimerPending() || e.isRetryPending())) {
                     result.add(e);
                 }
             }
