@@ -86,7 +86,7 @@ public class InstanceStateDataService {
         try {
             var def = engine.processRepository.findLatestById(inst.getDefinitionId());
             if (def == null) return new GraphResponse(List.of(), List.of());
-            return DefinitionController.graphFromDef(def, null);
+            return com.github.wf.server.dto.DefinitionGraphMapper.fromDef(def, null);
         } catch (Exception e) {
             return new GraphResponse(List.of(), List.of());
         }

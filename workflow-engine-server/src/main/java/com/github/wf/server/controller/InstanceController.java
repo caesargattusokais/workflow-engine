@@ -160,7 +160,7 @@ public class InstanceController {
             @RequestHeader("X-User-Id") String userId,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
         var inst = com.github.wf.server.config.TenantGuard.requireOwnedInstance(engine, userId, id);
-        if (inst.isRunning()) throw new RuntimeException("Cannot delete running instance");
+        if (inst.isRunning()) throw new IllegalStateException("Cannot delete running instance");
         engine.instanceRepository.deleteById(id);
     }
 }

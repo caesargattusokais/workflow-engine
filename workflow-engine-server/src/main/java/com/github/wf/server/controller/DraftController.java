@@ -24,8 +24,8 @@ public class DraftController {
     }
 
     private void validateName(String userId, String name, String excludeId) {
-        if (name == null || name.isBlank()) throw new RuntimeException("草稿名称不能为空");
-        if (repo.nameExists(userId, name, excludeId)) throw new RuntimeException("草稿名称已存在: " + name);
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("草稿名称不能为空");
+        if (repo.nameExists(userId, name, excludeId)) throw new IllegalArgumentException("草稿名称已存在: " + name);
     }
 
     @GetMapping
