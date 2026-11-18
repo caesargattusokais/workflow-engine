@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Clients connect to /ws/monitor and receive lightweight change notifications:
  * {"type":"changed","instanceId":"xxx","status":"RUNNING","activeNodeIds":[...]}
  */
+@Component
 public class MonitorWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MonitorWebSocketHandler.class);

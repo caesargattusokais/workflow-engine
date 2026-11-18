@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.util.function.Consumer;
  * Pure WebSocket session manager — no engine dependency.
  * Manages per-instance session registry and broadcasts.
  */
+@Component
 public class InstanceWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(InstanceWebSocketHandler.class);

@@ -7,6 +7,7 @@ import com.github.wf.server.dto.GraphResponse;
 import com.github.wf.task.TaskQuery;
 import com.google.gson.Gson;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 
@@ -15,6 +16,7 @@ import java.util.*;
  * Uses ObjectProvider&lt;WorkflowEngine&gt; to avoid CGLIB proxy issues with
  * the engine's final fields (instanceRepository, etc.).
  */
+@Component
 public class InstanceStateDataService {
 
     private static final Gson gson = new Gson();
