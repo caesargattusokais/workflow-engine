@@ -41,7 +41,31 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
 
     /** Load running instances from Redis/DB — must be called after schema.sql has been executed */
     public void init() {
+        reconcileCache();
         loadFromRedis();
+    }
+
+    /**
+     * Remove cache entries whose DB row no longer exists (orphans left behind
+     * by crashed test runs, DB resets or pre-TTL deployments). Without this,
+     * {@link #findAll()} (Redis RUNNING ∪ DB) would count phantom instances
+     * and pollute stats/summary until the 7-day TTL expires.
+     */
+    private void reconcileCache() {
+        Set<String> keys = scanKeys(INST_PREFIX + "*");
+        int evicted = 0;
+        for (String key : keys) {
+            if (key.endsWith(EXEC_SET_SUFFIX)) continue;
+            String id = key.substring(INST_PREFIX.length());
+            Long rows = jdbc.queryForObject("SELECT COUNT(*) FROM process_instance WHERE id = ?", Long.class, id);
+            if (rows == null || rows == 0) {
+                evictInstance(id);
+                evicted++;
+            }
+        }
+        if (evicted > 0) {
+            System.out.println("[RedisJdbcInstanceRepository] reconcileCache: evicted " + evicted + " orphan cache entries");
+        }
     }
 
     // ── Startup recovery ──

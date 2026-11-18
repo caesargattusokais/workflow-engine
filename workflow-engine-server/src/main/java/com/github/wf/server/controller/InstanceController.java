@@ -57,10 +57,10 @@ public class InstanceController {
         long total;
         if (definitionId != null && !definitionId.isEmpty()) {
             all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size, status);
-            total = engine.instanceRepository.countByDefinitionId(definitionId);
+            total = engine.instanceRepository.countByDefinitionId(definitionId, userId);
         } else {
             all = engine.instanceRepository.findAllPaginated(page, size, status);
-            total = engine.instanceRepository.count(status);
+            total = engine.instanceRepository.count(status, userId);
         }
         var filtered = all.stream()
                 .filter(i -> userId.equals(i.getVariable("_userId")))
@@ -94,11 +94,8 @@ public class InstanceController {
     public Map<String, Map<String, Long>> summary(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId) {
-        Map<String, Map<String, Long>> full = engine.instanceRepository.getSummary();
-        // Filter by userId — only count instances belonging to this user
-        // getSummary is DB-level aggregation; we can't filter by _userId in SQL easily.
-        // For now return full summary; the _userId filter is best-effort on list endpoints.
-        return full;
+        Map<String, Map<String, Long>> scoped = engine.instanceRepository.getSummary(userId);
+        return scoped;
     }
 
     @GetMapping("/{id}/history")

@@ -35,15 +35,22 @@ public class DashboardController {
             @RequestParam(value = "definitionId", required = false) String definitionId) {
         Map<String, Object> result;
         if (definitionId != null && !definitionId.isEmpty()) {
-            result = engine.instanceRepository.getStatsByDefinition(definitionId).toMap();
+            result = engine.instanceRepository.getStatsByDefinition(definitionId, userId).toMap();
         } else {
-            result = engine.instanceRepository.getStats().toMap();
+            result = engine.instanceRepository.getStats(userId).toMap();
         }
-        // Add pending task count
+        // Add pending task count — scoped to instances owned by this user
         long pendingTasks = engine.queryTasks(
-                new com.github.wf.task.TaskQuery().status(com.github.wf.task.TaskStatus.PENDING)).size();
+                new com.github.wf.task.TaskQuery().status(com.github.wf.task.TaskStatus.PENDING)).stream()
+                .filter(t -> userId.equals(ownerOf(t.getInstanceId())))
+                .count();
         result.put("pendingTasks", pendingTasks);
         return result;
+    }
+
+    private String ownerOf(String instanceId) {
+        var inst = engine.instanceRepository.findById(instanceId);
+        return inst == null ? null : (String) inst.getVariable("_userId");
     }
 
     @GetMapping("/timeline/{instanceId}")

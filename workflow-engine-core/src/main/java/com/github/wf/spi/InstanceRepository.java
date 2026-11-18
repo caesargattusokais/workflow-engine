@@ -32,9 +32,26 @@ public interface InstanceRepository {
             .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
             .count();
     }
-    default InstanceStats getStats() {
+    /** Count optionally scoped to the owning user ({@code _userId} variable); {@code null} = all users. */
+    default long count(String status, String userId) {
+        return findAll().stream()
+            .filter(i -> userId == null || userId.equals(i.getVariable("_userId")))
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .count();
+    }
+    /** Count by definition, optionally scoped to the owning user; {@code null} = all users. */
+    default long countByDefinitionId(String definitionId, String userId) {
+        return findByDefinitionId(definitionId).stream()
+            .filter(i -> userId == null || userId.equals(i.getVariable("_userId")))
+            .count();
+    }
+    default InstanceStats getStats() { return getStats(null); }
+
+    /** Stats optionally scoped to the owning user ({@code _userId} variable); {@code null} = all users. */
+    default InstanceStats getStats(String userId) {
         InstanceStats s = new InstanceStats();
         for (ProcessInstance i : findAll()) {
+            if (userId != null && !userId.equals(i.getVariable("_userId"))) continue;
             s.setTotal(s.getTotal() + 1);
             switch (i.getStatus()) {
                 case RUNNING: s.setRunning(s.getRunning() + 1); break;
@@ -53,10 +70,14 @@ public interface InstanceRepository {
         return s;
     }
     /** Stats for a single definition — scoped to the user who owns the draft */
-    default InstanceStats getStatsByDefinition(String definitionId) {
+    default InstanceStats getStatsByDefinition(String definitionId) { return getStatsByDefinition(definitionId, null); }
+
+    /** Stats for a single definition, optionally scoped to the owning user; {@code null} = all users. */
+    default InstanceStats getStatsByDefinition(String definitionId, String userId) {
         InstanceStats s = new InstanceStats();
         for (ProcessInstance i : findAll()) {
             if (!definitionId.equals(i.getDefinitionId())) continue;
+            if (userId != null && !userId.equals(i.getVariable("_userId"))) continue;
             s.setTotal(s.getTotal() + 1);
             switch (i.getStatus()) {
                 case RUNNING: s.setRunning(s.getRunning() + 1); break;
@@ -74,9 +95,13 @@ public interface InstanceRepository {
     }
 
     /** Return per-definitionId counts: {defId: {running: N, total: N}} */
-    default Map<String, Map<String, Long>> getSummary() {
+    default Map<String, Map<String, Long>> getSummary() { return getSummary(null); }
+
+    /** Per-definitionId counts, optionally scoped to the owning user; {@code null} = all users. */
+    default Map<String, Map<String, Long>> getSummary(String userId) {
         Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
         for (ProcessInstance i : findAll()) {
+            if (userId != null && !userId.equals(i.getVariable("_userId"))) continue;
             result.computeIfAbsent(i.getDefinitionId(), k -> {
                 var m = new java.util.LinkedHashMap<String, Long>();
                 m.put("running", 0L); m.put("total", 0L);
