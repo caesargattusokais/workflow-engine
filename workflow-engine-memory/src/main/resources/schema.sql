@@ -74,3 +74,9 @@ CREATE TABLE IF NOT EXISTS historic_activity (
   timestamp BIGINT NOT NULL,
   comment TEXT NULL
 );
+
+CREATE TABLE IF NOT EXISTS app_setting (
+  config_key VARCHAR(128) PRIMARY KEY,
+  config_value VARCHAR(2048) NULL,
+  updated_at BIGINT NULL
+);

@@ -114,6 +114,32 @@ export async function generateFlow(prompt: string) {
   return apiPost('/ai/generate', { prompt });
 }
 
+export interface AiConfigView {
+  configured: boolean;
+  source: 'database' | 'environment' | 'none';
+  baseUrl?: string;
+  model?: string;
+  apiKeyMasked?: string | null;
+  hasApiKey?: boolean;
+}
+
+export async function getAiConfig(): Promise<AiConfigView> { return apiGet('/ai/config'); }
+export async function saveAiConfig(cfg: { baseUrl: string, apiKey: string, model: string }) {
+  return apiPut('/ai/config', cfg) as Promise<AiConfigView>;
+}
+export async function resetAiConfig() { return apiGetAfterDelete('/ai/config') as Promise<AiConfigView>; }
+export async function testAiConfig(cfg: { baseUrl?: string, apiKey?: string, model?: string }) {
+  return apiPost('/ai/config/test', cfg) as Promise<{ ok: boolean, message: string, latencyMs?: number }>;
+}
+
+/** DELETE that still parses the JSON response body (apiDelete returns void). */
+async function apiGetAfterDelete(path: string) {
+  const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw await parseError(res, path);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
 export async function fetchInstanceSummary() { return apiGet('/instances/summary'); }
 
 export { userId, authHeaders, apiGet, apiPost };

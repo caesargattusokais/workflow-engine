@@ -1,23 +1,35 @@
 package com.github.wf.server.ai;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import javax.sql.DataSource;
+
 /**
- * AI provider wiring. The bean is only created when {@code ai.base-url}
- * (env: AI_BASE_URL) is set — the rest of the app degrades gracefully to a
- * 409 on /api/ai/* when it is absent.
+ * AI provider wiring. A {@link DynamicAiClient} is always registered and
+ * initially pointed at whatever {@link AiSettingsService} resolves
+ * (page-configured DB values first, then AI_BASE_URL env defaults).
+ * Saving new settings from the configuration page re-points it at runtime
+ * — no restart needed. When nothing is configured, /api/ai/* degrades
+ * gracefully to a 409.
  */
 @Configuration
 public class AiConfig {
 
     @Bean
-    @ConditionalOnProperty("ai.base-url")
-    public AiClient aiClient(@Value("${ai.base-url}") String baseUrl,
+    public AiSettingsService aiSettingsService(ObjectProvider<DataSource> dataSource,
+            @Value("${ai.base-url:}") String baseUrl,
             @Value("${ai.api-key:}") String apiKey,
             @Value("${ai.model:deepseek-chat}") String model) {
-        return new OpenAiCompatibleAiClient(baseUrl, apiKey, model);
+        return new AiSettingsService(dataSource.getIfAvailable(), baseUrl, apiKey, model);
+    }
+
+    @Bean
+    public DynamicAiClient aiClient(AiSettingsService settings) {
+        DynamicAiClient client = new DynamicAiClient();
+        settings.effective().ifPresent(cfg -> client.setDelegate(cfg.newClient()));
+        return client;
     }
 }
