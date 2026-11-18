@@ -5,15 +5,20 @@ import com.github.wf.engine.Execution;
 import com.github.wf.model.*;
 import com.github.wf.spi.InstanceRepository;
 import com.google.gson.Gson;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
 /**
  * Redis-cached InstanceRepository with DB write-through.
- * Only RUNNING instances and their executions are cached in Redis.
+ * Only RUNNING instances and their non-completed executions are cached in Redis.
+ * Completed executions are evicted from Redis (kept in DB) — join logic reads
+ * siblings from DB via parent_execution_id, so nothing is lost.
  * Non-RUNNING instances are evicted from Redis and served from DB.
  */
 public class RedisJdbcInstanceRepository implements InstanceRepository {
@@ -25,6 +30,8 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     private static final String INST_PREFIX = "wf:instance:";
     private static final String EXEC_PREFIX = "wf:execution:";
     private static final String EXEC_SET_SUFFIX = ":execs";
+    /** Safety-net TTL — a RUNNING instance stuck forever must not leak cache keys. */
+    private static final Duration CACHE_TTL = Duration.ofDays(7);
 
     public RedisJdbcInstanceRepository(JdbcTemplate jdbc, StringRedisTemplate redis, Gson gson) {
         this.jdbc = jdbc;
@@ -39,8 +46,17 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
 
     // ── Startup recovery ──
 
+    /** SCAN-based key lookup — KEYS blocks the whole Redis keyspace. */
+    private Set<String> scanKeys(String pattern) {
+        Set<String> keys = new HashSet<>();
+        try (Cursor<String> cursor = redis.scan(ScanOptions.scanOptions().match(pattern).count(500).build())) {
+            while (cursor.hasNext()) keys.add(cursor.next());
+        }
+        return keys;
+    }
+
     private void loadFromRedis() {
-        Set<String> keys = redis.keys(INST_PREFIX + "*");
+        Set<String> keys = scanKeys(INST_PREFIX + "*");
         if (keys.isEmpty()) {
             // Cold start — load from DB
             loadRunning();
@@ -53,19 +69,10 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
                 String json = redis.opsForValue().get(key);
                 if (json == null) continue;
                 ProcessInstance inst = gson.fromJson(json, ProcessInstance.class);
-                if (inst.isRunning()) {
-                    // Load executions for this instance
-                    String instId = inst.getId();
-                    Set<String> execIds = redis.opsForSet().members(INST_PREFIX + instId + EXEC_SET_SUFFIX);
-                    if (execIds != null) {
-                        for (String eid : execIds) {
-                            String ej = redis.opsForValue().get(EXEC_PREFIX + eid);
-                            if (ej != null) {
-                                gson.fromJson(ej, Execution.class); // just load into Redis cache (already there)
-                            }
-                        }
-                    }
-                }
+                if (inst == null || !inst.isRunning()) continue;
+                // Execution JSON already lives in Redis — nothing to load here.
+                // The DB is written through on every mutation, so the cold-start
+                // DB fallback in findExecutionById is always consistent.
             } catch (Exception e) {
                 // Corrupt key — skip
             }
@@ -87,7 +94,7 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     // ── Cache helpers ──
 
     private void cacheInstance(ProcessInstance inst) {
-        redis.opsForValue().set(INST_PREFIX + inst.getId(), gson.toJson(inst));
+        redis.opsForValue().set(INST_PREFIX + inst.getId(), gson.toJson(inst), CACHE_TTL);
     }
 
     private void evictInstance(String instanceId) {
@@ -103,8 +110,15 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     }
 
     private void cacheExecution(Execution exec) {
-        redis.opsForValue().set(EXEC_PREFIX + exec.getId(), gson.toJson(exec));
+        redis.opsForValue().set(EXEC_PREFIX + exec.getId(), gson.toJson(exec), CACHE_TTL);
         redis.opsForSet().add(INST_PREFIX + exec.getInstanceId() + EXEC_SET_SUFFIX, exec.getId());
+        redis.expire(INST_PREFIX + exec.getInstanceId() + EXEC_SET_SUFFIX, CACHE_TTL);
+    }
+
+    /** Remove a completed execution from the cache (it remains queryable in DB). */
+    private void evictExecution(Execution exec) {
+        redis.delete(EXEC_PREFIX + exec.getId());
+        redis.opsForSet().remove(INST_PREFIX + exec.getInstanceId() + EXEC_SET_SUFFIX, exec.getId());
     }
 
     // ── ProcessInstance ──
@@ -148,16 +162,14 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
         Set<String> cachedIds = new HashSet<>();
         List<ProcessInstance> all = new ArrayList<>();
         // Add cached RUNNING instances
-        Set<String> instKeys = redis.keys(INST_PREFIX + "*");
-        if (instKeys != null) {
-            for (String key : instKeys) {
-                if (key.endsWith(EXEC_SET_SUFFIX)) continue;
-                String json = redis.opsForValue().get(key);
-                if (json != null) {
-                    ProcessInstance inst = gson.fromJson(json, ProcessInstance.class);
-                    all.add(inst);
-                    cachedIds.add(inst.getId());
-                }
+        Set<String> instKeys = scanKeys(INST_PREFIX + "*");
+        for (String key : instKeys) {
+            if (key.endsWith(EXEC_SET_SUFFIX)) continue;
+            String json = redis.opsForValue().get(key);
+            if (json != null) {
+                ProcessInstance inst = gson.fromJson(json, ProcessInstance.class);
+                all.add(inst);
+                cachedIds.add(inst.getId());
             }
         }
         // Add non-RUNNING from DB
@@ -334,42 +346,40 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     public List<Execution> findActiveExecutions(String instanceId) {
         Set<String> execIds = redis.opsForSet().members(INST_PREFIX + instanceId + EXEC_SET_SUFFIX);
         if (execIds == null || execIds.isEmpty()) return List.of();
+        // One MGET instead of one GET per execution
+        List<String> keys = new ArrayList<>(execIds.size());
+        for (String eid : execIds) keys.add(EXEC_PREFIX + eid);
+        List<String> jsons = redis.opsForValue().multiGet(keys);
         List<Execution> result = new ArrayList<>();
-        for (String eid : execIds) {
-            String json = redis.opsForValue().get(EXEC_PREFIX + eid);
-            if (json != null) {
-                Execution exec = gson.fromJson(json, Execution.class);
-                if (!exec.isCompleted()) result.add(exec);
-            }
+        if (jsons == null) return result;
+        for (int i = 0; i < jsons.size(); i++) {
+            String json = jsons.get(i);
+            if (json == null) continue;
+            Execution exec = gson.fromJson(json, Execution.class);
+            if (exec != null && !exec.isCompleted()) result.add(exec);
         }
         return result;
     }
 
     @Override
     public List<Execution> findExecutionsByParentId(String parentExecutionId) {
-        // Need to scan all executions — iterate over all instance exec sets
-        Set<String> instKeys = redis.keys(INST_PREFIX + "*");
-        if (instKeys == null) return List.of();
-        List<Execution> result = new ArrayList<>();
-        for (String key : instKeys) {
-            if (!key.endsWith(EXEC_SET_SUFFIX)) continue;
-            Set<String> execIds = redis.opsForSet().members(key);
-            if (execIds == null) continue;
-            for (String eid : execIds) {
-                String json = redis.opsForValue().get(EXEC_PREFIX + eid);
-                if (json != null) {
-                    Execution exec = gson.fromJson(json, Execution.class);
-                    if (parentExecutionId.equals(exec.getParentExecutionId())) result.add(exec);
-                }
-            }
-        }
-        return result;
+        // DB query — join logic must see completed siblings too, and completed
+        // executions are evicted from Redis. Uses idx_exec_parent.
+        return jdbc.query("SELECT * FROM execution WHERE parent_execution_id = ?",
+            (rs, rowNum) -> mapExecution(rs), parentExecutionId);
     }
 
     @Override
     public void updateExecution(Execution exec) {
-        cacheExecution(exec);
-        writeExecToDb(exec);
+        if (exec.isCompleted()) {
+            // DB first (source of truth), then evict from cache — the exec set
+            // only ever contains live executions, so it can't grow unbounded.
+            writeExecToDb(exec);
+            evictExecution(exec);
+        } else {
+            cacheExecution(exec);
+            writeExecToDb(exec);
+        }
     }
 
     @Override
