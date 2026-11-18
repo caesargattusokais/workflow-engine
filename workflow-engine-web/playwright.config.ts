@@ -28,7 +28,21 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'java -jar ../workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar --spring.profiles.active=memory,mock-ldap --server.port=8080',
+      // Stub OpenAI-compatible LLM used by the AI designer specs. Set
+      // STUB_REJECT_TEMPERATURE=1 to make it behave like an o-series / GPT-5
+      // model that rejects `temperature`, exercising the client fallback.
+      command: 'node ../docker/stub-llm.js',
+      port: 9999,
+      timeout: 15000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // Deliberately the in-memory profile: the specs assert engine behaviour,
+      // not persistence. Pointing them at a MySQL-backed server makes every
+      // write wait on binlog fsync and the suite times out.
+      command: 'java -jar ../workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar '
+        + '--spring.profiles.active=memory,mock-ldap --server.port=8080 '
+        + '--ai.base-url=http://127.0.0.1:9999/v1 --ai.api-key=stub --ai.model=stub-model',
       port: 8080,
       timeout: 30000,
       reuseExistingServer: !process.env.CI,

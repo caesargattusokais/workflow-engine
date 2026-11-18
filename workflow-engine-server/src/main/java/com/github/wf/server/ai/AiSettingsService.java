@@ -3,9 +3,20 @@ package com.github.wf.server.ai;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.ResourceAccessException;
 
 import javax.sql.DataSource;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.net.http.HttpTimeoutException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.UnresolvedAddressException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -37,13 +48,14 @@ public class AiSettingsService {
         this.envModel = trim(envModel);
     }
 
-    /** Effective configuration: page override first, then environment, else empty. */
+    /** Effective configuration: in-process override, then page override, then environment. */
     @SuppressWarnings("unchecked")
     public Optional<AiSettings> effective() {
-        if (jdbc == null) {
-            AiSettings m = memory.get();
-            return Optional.ofNullable(m != null ? m : fromEnv());
-        }
+        // An in-process value exists either because there is no datasource at
+        // all, or because a save could not be persisted (see save()).
+        AiSettings m = memory.get();
+        if (m != null) return Optional.of(m);
+        if (jdbc == null) return Optional.ofNullable(fromEnv());
         try {
             var rows = jdbc.queryForList(
                     "SELECT config_key, config_value FROM app_setting WHERE config_key IN (?, ?, ?)",
@@ -91,11 +103,21 @@ public class AiSettingsService {
             memory.set(saved);
             return saved;
         }
-        long now = System.currentTimeMillis();
-        upsert(KEY_BASE_URL, baseUrl, now);
-        upsert(KEY_API_KEY, key, now);
-        upsert(KEY_MODEL, model, now);
-        return saved;
+        try {
+            long now = System.currentTimeMillis();
+            upsert(KEY_BASE_URL, baseUrl, now);
+            upsert(KEY_API_KEY, key, now);
+            upsert(KEY_MODEL, model, now);
+            memory.set(null); // DB is the source of truth again
+            return saved;
+        } catch (Exception e) {
+            // The datasource exists but cannot be written — the memory profile
+            // still carries one, and its schema is never initialised. Keep the
+            // settings for this process rather than failing the save with a 500.
+            log.warn("AI settings could not be persisted, keeping them in memory only: {}", e.getMessage());
+            memory.set(saved);
+            return saved;
+        }
     }
 
     /** Remove page overrides — falls back to the environment defaults. */
@@ -124,11 +146,22 @@ public class AiSettingsService {
      * Returns null on success, or a human-readable failure reason.
      */
     public static String testConnection(String baseUrl, String apiKey, String model) {
+        String endpoint = OpenAiCompatibleAiClient.normalizeBaseUrl(baseUrl) + OpenAiCompatibleAiClient.CHAT_PATH;
         try {
             OpenAiCompatibleAiClient probe = new OpenAiCompatibleAiClient(baseUrl, apiKey, model);
             String reply = probe.complete("You are a connectivity probe.", "Reply with the single word: ok");
             if (reply == null || reply.isBlank()) return "provider returned empty content";
             return null;
+        } catch (OpenAiCompatibleAiClient.ProviderHttpException e) {
+            // Already carries the endpoint, the provider's own error message and
+            // a version-suffix hint — the root cause message would be poorer.
+            return e.getMessage();
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        } catch (ResourceAccessException e) {
+            // Transport failure. Spring's own message ends in ": null" because
+            // ConnectException carries no message — say what actually happened.
+            return "无法连接 POST " + endpoint + " — " + describeTransport(e.getMostSpecificCause());
         } catch (Exception e) {
             String msg = e.getMessage();
             Throwable root = e;
@@ -136,6 +169,43 @@ public class AiSettingsService {
             if (root != e && root.getMessage() != null) msg = root.getMessage();
             return msg != null ? msg : e.getClass().getSimpleName();
         }
+    }
+
+    /**
+     * Turn a low-level socket failure into something a user can act on. The
+     * JDK HttpClient does not hand back a plain {@code ConnectException} — a
+     * refused connection surfaces as {@code ClosedChannelException} a few links
+     * down the chain — so the whole chain is inspected, not just the leaf.
+     */
+    private static String describeTransport(Throwable root) {
+        List<Throwable> chain = new ArrayList<>();
+        for (Throwable t = root; t != null && !chain.contains(t); t = t.getCause()) {
+            chain.add(t);
+        }
+        for (Throwable t : chain) {
+            if (t instanceof ConnectException || t instanceof ClosedChannelException) {
+                return "连接被拒绝（服务未启动、端口不对或地址不可达）";
+            }
+            if (t instanceof HttpTimeoutException || t instanceof SocketTimeoutException
+                    || t instanceof TimeoutException) {
+                return "请求超时（连接 " + OpenAiCompatibleAiClient.CONNECT_TIMEOUT.toSeconds()
+                        + "s / 读取 " + OpenAiCompatibleAiClient.READ_TIMEOUT.toSeconds() + "s）";
+            }
+            if (t instanceof UnknownHostException || t instanceof UnresolvedAddressException) {
+                return "域名无法解析（DNS 查不到该主机，检查拼写或网络）";
+            }
+        }
+        for (Throwable t : chain) {
+            String m = t.getMessage();
+            if (m != null && m.toLowerCase(Locale.ROOT).contains("connection refused")) {
+                return "连接被拒绝（服务未启动、端口不对或地址不可达）";
+            }
+        }
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            String m = chain.get(i).getMessage();
+            if (m != null && !m.isBlank()) return m;
+        }
+        return root.getClass().getSimpleName();
     }
 
     /** Mask a secret for display: keep only the last 4 characters. */

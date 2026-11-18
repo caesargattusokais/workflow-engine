@@ -56,7 +56,7 @@ const zh = {
     aiGenerateFailed: 'AI 生成失败',
     aiConfigTitle: 'AI 模型配置',
     aiConfigBaseUrl: 'API 地址（Base URL）',
-    aiConfigBaseUrlHint: 'OpenAI 兼容端点，如 https://api.deepseek.com/v1',
+    aiConfigBaseUrlHint: 'OpenAI 兼容端点，需以版本段结尾，如 https://api.deepseek.com/v1',
     aiConfigApiKey: 'API Key',
     aiConfigApiKeyHint: '留空表示保留当前已保存的 Key',
     aiConfigModel: '模型',

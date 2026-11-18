@@ -58,7 +58,7 @@ const en: Translations = {
     aiGenerateFailed: 'AI generation failed',
     aiConfigTitle: 'AI Model Configuration',
     aiConfigBaseUrl: 'API Base URL',
-    aiConfigBaseUrlHint: 'OpenAI-compatible endpoint, e.g. https://api.deepseek.com/v1',
+    aiConfigBaseUrlHint: 'OpenAI-compatible endpoint ending with a version segment, e.g. https://api.deepseek.com/v1',
     aiConfigApiKey: 'API Key',
     aiConfigApiKeyHint: 'Leave empty to keep the currently saved key',
     aiConfigModel: 'Model',

@@ -83,7 +83,12 @@ public class AiConfigController {
         String error = AiSettingsService.testConnection(baseUrl, apiKey, model);
         long elapsed = System.currentTimeMillis() - start;
         out.put("ok", error == null);
-        out.put("message", error == null ? "连接成功（" + elapsed + " ms）" : error);
+        out.put("message", error == null
+                // Echo the URL that was actually called — makes a missing /v1
+                // (or a duplicated path) obvious even on the success path.
+                ? "连接成功（" + elapsed + " ms）→ POST "
+                        + OpenAiCompatibleAiClient.normalizeBaseUrl(baseUrl) + OpenAiCompatibleAiClient.CHAT_PATH
+                : error);
         out.put("latencyMs", elapsed);
         return out;
     }

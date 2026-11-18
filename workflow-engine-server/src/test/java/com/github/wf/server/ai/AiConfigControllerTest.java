@@ -72,6 +72,39 @@ class AiConfigControllerTest {
         assertThat(svc.effective()).isEmpty();
     }
 
+    /**
+     * The memory profile still carries the global MySQL datasource, but its
+     * schema is never initialised. Saving must not surface a 500 in that case.
+     */
+    @Test
+    void saveFallsBackToMemoryWhenSchemaIsUnusable() {
+        javax.sql.DataSource ds = new org.springframework.jdbc.datasource.SimpleDriverDataSource(
+                new org.h2.Driver(), "jdbc:h2:mem:" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        AiSettingsService svc = new AiSettingsService(ds, "", "", "");
+
+        AiSettings saved = svc.save("http://mem/v1", "k", "mem-model");
+
+        assertThat(saved.model()).isEqualTo("mem-model");
+        assertThat(svc.effective().orElseThrow().baseUrl()).isEqualTo("http://mem/v1");
+        svc.clear();
+        assertThat(svc.effective()).isEmpty();
+    }
+
+    @Test
+    void controllerSaveSucceedsWhenSchemaIsUnusable() {
+        javax.sql.DataSource ds = new org.springframework.jdbc.datasource.SimpleDriverDataSource(
+                new org.h2.Driver(), "jdbc:h2:mem:" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        AiSettingsService svc = new AiSettingsService(ds, "", "", "");
+        AiConfigController ctrl = new AiConfigController(svc, new DynamicAiClient());
+
+        Map<String, Object> out = ctrl.save(Map.of(
+                "baseUrl", "http://mem/v1", "apiKey", "k", "model", "mem-model"));
+
+        assertThat(out.get("baseUrl")).isEqualTo("http://mem/v1");
+        assertThat(out.get("model")).isEqualTo("mem-model");
+        assertThat(out.get("source")).isEqualTo("database");
+    }
+
     @Test
     void saveValidation() {
         AiSettingsService svc = new AiSettingsService(null, "", "", "");
@@ -120,7 +153,9 @@ class AiConfigControllerTest {
         Map<String, Object> out = ctrl.test(Map.of(
                 "baseUrl", "http://127.0.0.1:1/v1", "apiKey", "k", "model", "m"));
         assertThat(out.get("ok")).isEqualTo(false);
-        assertThat((String) out.get("message")).isNotBlank();
+        assertThat((String) out.get("message"))
+                .contains("无法连接")
+                .contains("/v1/chat/completions");
     }
 
     @Test
