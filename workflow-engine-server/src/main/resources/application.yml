@@ -80,17 +80,6 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
----
-spring:
-  config:
-    activate:
-      on-profile: memory
-
----
-spring:
-  config:
-    activate:
-      on-profile: redis
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -103,3 +92,8 @@ spring:
           max-active: 8
           max-idle: 8
           min-idle: 2
+---
+spring:
+  config:
+    activate:
+      on-profile: memory

@@ -63,6 +63,11 @@ public class RepositoryConfig {
     // ── Engine SPI: Redis L1 cache (redis profile) ──
 
     @Bean @Profile("redis")
+    public ProcessRepository processRepositoryRedis(DataSource dataSource) {
+        return new JdbcProcessRepository(new JdbcTemplate(dataSource));
+    }
+
+    @Bean @Profile("redis")
     public InstanceLockManager instanceLockManager(StringRedisTemplate redisTemplate) {
         return new RedisInstanceLockManager(redisTemplate);
     }
