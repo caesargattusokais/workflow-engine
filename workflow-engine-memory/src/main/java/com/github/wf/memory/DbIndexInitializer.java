@@ -37,7 +37,35 @@ public final class DbIndexInitializer {
 
     private DbIndexInitializer() {}
 
+    /**
+     * Column migrations for databases created by older versions of schema.sql.
+     * {@code CREATE TABLE IF NOT EXISTS} never alters pre-existing tables, so
+     * columns added in later releases (sub-process support, retry state, …)
+     * would be missing on an upgraded deployment. Each ALTER is executed
+     * independently and "duplicate column" errors are ignored, making this
+     * idempotent for both MySQL and H2.
+     */
+    private static final String[][] COLUMN_DDL = {
+        // table, column, definition
+        {"process_instance", "definition_version",  "INT NOT NULL DEFAULT 0"},
+        {"process_instance", "active_node_ids_json","TEXT"},
+        {"process_instance", "parent_instance_id",  "VARCHAR(64) NULL"},
+        {"process_instance", "parent_execution_id", "VARCHAR(64) NULL"},
+        {"execution",        "parent_execution_id", "VARCHAR(36) NULL"},
+        {"execution",        "retry_attempt",       "INT DEFAULT 0"},
+        {"execution",        "next_retry_at",       "BIGINT DEFAULT 0"},
+        {"execution",        "retry_state",         "VARCHAR(50) NULL"},
+        {"task",             "candidate_groups_json","TEXT"},
+        {"task",             "variables_json",      "MEDIUMTEXT"},
+        {"task",             "completed_at",        "BIGINT NULL"},
+        {"historic_activity","node_name",           "VARCHAR(255) NULL"},
+        {"historic_activity","node_type",           "VARCHAR(50) NULL"},
+        {"historic_activity","executor",            "VARCHAR(255) DEFAULT 'system'"},
+        {"historic_activity","comment",             "TEXT NULL"}
+    };
+
     public static void createIndexes(JdbcTemplate jdbc) {
+        migrateColumns(jdbc);
         for (String ddl : INDEX_DDL) {
             try {
                 jdbc.execute(ddl);
@@ -48,6 +76,23 @@ public final class DbIndexInitializer {
                     log.debug("Index already exists, skipped: " + ddl);
                 } else {
                     log.warn("Index creation skipped: " + ddl + " — " + msg);
+                }
+            }
+        }
+    }
+
+    private static void migrateColumns(JdbcTemplate jdbc) {
+        for (String[] col : COLUMN_DDL) {
+            String alter = "ALTER TABLE " + col[0] + " ADD COLUMN " + col[1] + " " + col[2];
+            try {
+                jdbc.execute(alter);
+                log.info("Column migration applied: " + alter);
+            } catch (DataAccessException e) {
+                String msg = e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : null;
+                if (msg != null && (msg.contains("Duplicate column") || msg.contains("already exists"))) {
+                    log.debug("Column already exists, skipped: " + col[0] + "." + col[1]);
+                } else {
+                    log.warn("Column migration skipped: " + alter + " — " + msg);
                 }
             }
         }
