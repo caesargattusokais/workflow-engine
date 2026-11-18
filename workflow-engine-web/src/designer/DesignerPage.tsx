@@ -3,6 +3,8 @@ import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/reac
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
+import DraftList from './DraftList';
+import TemplateBrowser from './TemplateBrowser';
 import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary } from '../api/client';
 import { showToast } from '../api/toast';
 import { graphToYaml } from './graphToYaml';
@@ -38,7 +40,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [showYaml, setShowYaml] = useState(false);
   const [deployedId, setDeployedId] = useState<string | null>(null);
   const [deployedInstanceId, setDeployedInstanceId] = useState<string | null>(null);
-  const [draftMenu, setDraftMenu] = useState<{x:number;y:number;draft:Draft}|null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
 
@@ -47,13 +48,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [draftHasMore, setDraftHasMore] = useState(true);
   const [draftLoadingState, setDraftLoadingState] = useState(false);
   const draftLoading = useRef(false);
-
-  // Close draft context menu on click outside
-  useEffect(() => {
-    const close = () => setDraftMenu(null);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, []);
 
   // Fetch instance summary for per-draft counts (lightweight, no pagination)
   useEffect(() => {
@@ -177,6 +171,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     URL.revokeObjectURL(url);
   };
 
+  const showYamlFor = (draft: Draft) => {
+    const d = draft.id === activeId ? { ...draft, nodes, edges } : draft;
+    const yaml = graphToYaml(d.nodes, d.edges, d.id, d.name);
+    setDeployedYaml(yaml);
+    setShowYaml(true);
+    setToast(`YAML for: ${draft.name}`);
+  };
+
   const importYamlAction = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -218,8 +220,6 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setToast(`Imported: ${name}`);
     } catch (e: any) { showToast('Import failed: ' + e.message, 'error'); }
   };
-
-  const switchDraft = (id: string) => setActiveId(id);
 
   const handleNodeSelect = useCallback((node: Node | null) => setSelectedNode(node), []);
   const handleNodeChange = useCallback((updatedNode: Node) => {
@@ -375,110 +375,25 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         </div>
       ) : (
       <div className="flex flex-1 overflow-hidden">
-        {/* Draft List Sidebar */}
-        <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
-          <div className="p-2 border-b border-gray-700 flex items-center gap-1">
-            <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
-            <button onClick={loadTemplates}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title={t.designer.template}>
-              T
-            </button>
-            <button onClick={importYamlAction}
-              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-1.5 py-0.5 rounded" title={t.designer.importYaml}>
-              {t.designer.import}
-            </button>
-            <button onClick={newDraft}
-              className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded">
-              {t.designer.newDraft}
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              if (el.scrollHeight - el.scrollTop - el.clientHeight < 50 && draftHasMore && !draftLoading.current) {
-                loadDrafts(draftPage + 1);
-              }
-            }}>
-            {drafts.map(d => (
-              <div key={d.id}
-                onClick={() => switchDraft(d.id)}
-                onContextMenu={(e) => { e.preventDefault(); setDraftMenu({x:e.clientX, y:e.clientY, draft:d}); }}
-                className={`px-2 py-1.5 cursor-pointer border-b border-gray-800 text-xs flex justify-between items-center group
-                  ${d.id === activeId ? 'bg-blue-600/30 border-l-2 border-l-blue-500' : 'hover:bg-gray-700'}`}>
-                <div className="truncate flex-1">
-                  <div className="text-gray-300 truncate">{d.name} <span className="text-[10px] text-gray-600">v{d.version || 1}</span></div>
-                  <div className="text-[10px] text-gray-600">
-                    {d.nodes.length} nodes
-                    {(() => {
-                      const s = instanceSummary[d.id];
-                      if (s && s.total > 0) {
-                        return <span className="ml-1">| <span className="text-green-500">{s.running || 0} running</span> / {s.total} total</span>;
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-                <div className="hidden group-hover:flex gap-0.5 ml-1">
-                  <button onClick={(e) => { e.stopPropagation(); renameDraft(d.id); }}
-                    className="text-gray-500 hover:text-gray-300 text-[10px]" title={t.designer.rename}>✎</button>
-                  <button onClick={(e) => { e.stopPropagation(); delDraft(d.id); }}
-                    className="text-gray-500 hover:text-red-400 text-[10px]" title={t.designer.delete}>✕</button>
-                </div>
-              </div>
-            ))}
-            {drafts.length === 0 && (
-              <div className="p-3 text-xs text-gray-600 text-center">
-                {t.designer.clickNew}
-              </div>
-            )}
-            {draftHasMore ? (
-              <button onClick={() => loadDrafts(draftPage + 1)}
-                disabled={draftLoadingState}
-                className="w-full text-center py-1.5 text-xs text-blue-400 hover:bg-gray-700 disabled:text-gray-600">
-                {draftLoadingState ? t.dashboard.loading : t.designer.loadMoreCount.replace('{n}', String(drafts.length))}
-              </button>
-            ) : (
-              drafts.length > 0 && <div className="text-center py-1 text-[10px] text-gray-600">{t.designer.totalDrafts.replace('{n}', String(drafts.length))}</div>
-            )}
-          </div>
-          {/* Draft context menu */}
-          {draftMenu && (
-            <div className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-xl py-1 min-w-[130px]"
-              style={{ left: draftMenu.x, top: draftMenu.y }} onClick={e => e.stopPropagation()}>
-              <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700">
-                {draftMenu.draft.name}
-              </div>
-              <button onClick={() => {
-                const d = draftMenu.draft.id === activeId ? { ...draftMenu.draft, nodes, edges } : draftMenu.draft;
-                const yaml = graphToYaml(d.nodes, d.edges, d.id, d.name);
-                setDeployedYaml(yaml);
-                setShowYaml(true);
-                setToast(`YAML for: ${draftMenu.draft.name}`);
-                setDraftMenu(null);
-              }}
-                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                {t.designer.viewYaml}
-              </button>
-              <button onClick={() => { setDraftMenu(null); downloadYaml(draftMenu.draft); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                {t.designer.downloadYaml}
-              </button>
-              <div className="border-t border-gray-700" />
-              <button onClick={() => { setDraftMenu(null); copyDraftAction(draftMenu.draft.id); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                {t.designer.copy}
-              </button>
-              <button onClick={() => { setDraftMenu(null); renameDraft(draftMenu.draft.id); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700">
-                {t.designer.rename}
-              </button>
-              <button onClick={() => { setDraftMenu(null); delDraft(draftMenu.draft.id); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700">
-                {t.designer.delete}
-              </button>
-            </div>
-          )}
-        </div>
+        <DraftList
+          drafts={drafts}
+          activeId={activeId}
+          instanceSummary={instanceSummary}
+          draftHasMore={draftHasMore}
+          draftLoading={draftLoadingState}
+          draftPage={draftPage}
+          onSwitch={setActiveId}
+          onNew={newDraft}
+          onImport={importYamlAction}
+          onLoadTemplates={loadTemplates}
+          onLoadMore={() => { if (draftHasMore && !draftLoading.current) loadDrafts(draftPage + 1); }}
+          onLoadPage={loadDrafts}
+          onViewYaml={showYamlFor}
+          onDownloadYaml={downloadYaml}
+          onCopy={copyDraftAction}
+          onRename={renameDraft}
+          onDelete={delDraft}
+        />
 
         <NodePalette />
         <FlowCanvas
@@ -493,31 +408,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
       {/* Template Browser Modal */}
       {showTemplates && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
-          onClick={() => setShowTemplates(false)}>
-          <div className="bg-gray-800 rounded-lg shadow-2xl w-[600px] max-h-[80vh] overflow-y-auto p-6"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg text-gray-200 font-bold">{t.designer.processTemplates}</h2>
-              <button onClick={() => setShowTemplates(false)}
-                className="text-gray-400 hover:text-white text-xl">&times;</button>
-            </div>
-            <div className="grid grid-cols-1 gap-3">
-              {templates.map((tpl: any) => (
-                <div key={tpl.file} className="bg-gray-750 border border-gray-600 rounded-lg p-4 hover:border-purple-500 transition-colors">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-gray-200 font-semibold">{tpl.name}</span>
-                    <button onClick={() => importTemplate(tpl.file)}
-                      className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1 rounded">
-                      {t.designer.useTemplate}
-                    </button>
-                  </div>
-                  <div className="text-xs text-gray-500">{tpl.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <TemplateBrowser templates={templates} onImport={importTemplate} onClose={() => setShowTemplates(false)} />
       )}
     </div>
   );

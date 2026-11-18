@@ -3,6 +3,8 @@ import type { Node, Edge } from '@xyflow/react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
+import InstanceDetailSidebar from './InstanceDetailSidebar';
+import { useInstanceSocket, useMonitorSocket } from './monitorSockets';
 import { listInstances, listDefinitions, queryTasks, completeTask, getDefinitionGraph, resumeInstance, terminateInstance, deleteInstance, startInstance, apiGet, apiPost, getInstance } from '../api/client';
 import { showToast } from '../api/toast';
 import { useT } from '../i18n';
@@ -149,132 +151,13 @@ export default function MonitorPage({ initialDefId, initialInstId }:
     }
   }, [defGroups, statusFilter, loadDefinitions]);
 
-  // ── WebSocket real-time updates ──
-  useEffect(() => {
-    if (!selectedId) return;
-    const instanceId = selectedId; // capture for the lifetime of this effect
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/ws/instance/${instanceId}`;
-    let ws: WebSocket | null = null;
-    let closed = false;
-
-    const connect = () => {
-      if (closed) return;
-      ws = new WebSocket(wsUrl);
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'snapshot' || msg.type === 'update') {
-            const inst = msg.instance;
-            // Guard: only process messages for the instance this effect was created for
-            if (!inst || inst.id !== instanceId) return;
-            setDefGroups(prev => prev.map(g => ({
-              ...g, instances: g.instances.map(i => i.id === inst.id ? { ...i, ...inst, status: inst.status, activeNodeIds: inst.activeNodeIds, variables: inst.variables } : i)
-            })));
-            if (msg.graph) {
-              const activeIds: string[] = inst.activeNodeIds || [];
-              setNodes(normalizeNodes(msg.graph.nodes, activeIds));
-              setEdges(msg.graph.edges || []);
-            } else {
-              const activeIds: string[] = inst.activeNodeIds || [];
-              setNodes(prev => {
-                // Only update styling if nodes belong to this instance (idempotent guard)
-                if (prev.length === 0) return prev;
-                return prev.map(n => ({
-                  ...n,
-                  data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
-                }));
-              });
-            }
-            setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
-            if (msg.history) setHistory(msg.history);
-            // Close WS when instance reaches terminal state — no more updates expected
-            if (inst.status === 'COMPLETED' || inst.status === 'TERMINATED') {
-              closed = true; ws?.close();
-            }
-          }
-        } catch {}
-      };
-      ws.onclose = () => {
-        // Auto-reconnect after 2s unless explicitly closed (instance changed or terminal)
-        if (!closed) setTimeout(connect, 2000);
-      };
-      ws.onerror = () => { ws?.close(); };
-    };
-    connect();
-
-    return () => { closed = true; ws?.close(); };
-  }, [selectedId]);
-
-  // ── Monitor global WebSocket — updates instance list in real time ──
-  useEffect(() => {
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/ws/monitor`;
-    let ws: WebSocket | null = null;
-    let closed = false;
-    let retryTimer: number | undefined;
-
-    const connect = () => {
-      if (closed) return;
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => console.log('[WS monitor] connected');
-      ws.onclose = (e) => {
-        console.log('[WS monitor] closed', e.code, e.reason);
-        // Auto-reconnect so the list keeps updating after backend restarts
-        if (!closed) retryTimer = window.setTimeout(connect, 2000);
-      };
-      ws.onerror = (e) => console.error('[WS monitor] error', e);
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'changed') {
-            console.log('[WS monitor]', msg.instanceId, msg.status, msg.definitionId);
-            setDefGroups(prev => {
-              let found = false;
-              const next = prev.map(g => ({
-                ...g,
-                instances: g.instances.map(i => i.id === msg.instanceId
-                  ? (found = true, { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] })
-                  : i)
-              }));
-              if (!found && msg.definitionId) {
-                getInstance(msg.instanceId).then(inst => {
-                  if (inst) {
-                    setDefGroups(prev2 => {
-                      const g = prev2.find(x => x.defId === msg.definitionId);
-                      if (g) {
-                        if (g.instances.some(i => i.id === inst.id)) return prev2; // already exists
-                        return prev2.map(x => x.defId === msg.definitionId
-                          ? { ...x, instances: [inst, ...x.instances] } : x);
-                      }
-                      return [...prev2, {
-                        defId: msg.definitionId, defName: inst.definitionId,
-                        instances: [inst], instPage: 1, instHasMore: false, instLoading: false
-                      }];
-                    });
-                  }
-                }).catch(e => console.error('[WS monitor] fetch error', e));
-              }
-              return found ? next : prev;
-            });
-          }
-        } catch {}
-      };
-    };
-    connect();
-
-    return () => {
-      closed = true;
-      if (retryTimer) window.clearTimeout(retryTimer);
-      ws?.close();
-    };
-  }, []);
-
-  // Flatten all instances for lookup
-  const allInstances = defGroups.flatMap(g => g.instances);
+  // ── WebSocket real-time updates (per-instance + global list) ──
 
   // Track latest load request to suppress stale responses
   const loadIdRef = useRef(0);
+  const allInstancesRef = useRef<any[]>([]);
+  const loadInstanceRef = useRef<(id: string) => void>(() => {});
+  const loadInstancesForDefRef = useRef<(defId: string, page: number) => void>(() => {});
 
   const loadInstance = useCallback(async (id: string) => {
     const loadId = ++loadIdRef.current;
@@ -316,6 +199,63 @@ export default function MonitorPage({ initialDefId, initialInstId }:
       if (loadId === loadIdRef.current) setHistory([]);
     }
   }, []);
+  loadInstanceRef.current = loadInstance;
+  loadInstancesForDefRef.current = loadInstancesForDef;
+
+  useInstanceSocket(selectedId, (msg) => {
+    const inst = msg.instance;
+    setDefGroups(prev => prev.map(g => ({
+      ...g, instances: g.instances.map(i => i.id === inst.id ? { ...i, ...inst, status: inst.status, activeNodeIds: inst.activeNodeIds, variables: inst.variables } : i)
+    })));
+    if (msg.graph) {
+      const activeIds: string[] = inst.activeNodeIds || [];
+      setNodes(normalizeNodes(msg.graph.nodes, activeIds));
+      setEdges(msg.graph.edges || []);
+    } else {
+      const activeIds: string[] = inst.activeNodeIds || [];
+      setNodes(prev => {
+        // Only update styling if nodes belong to this instance (idempotent guard)
+        if (prev.length === 0) return prev;
+        return prev.map(n => ({
+          ...n,
+          data: { ...n.data, active: activeIds.includes(n.id), status: activeIds.includes(n.id) ? 'active' : 'done' }
+        }));
+      });
+    }
+    setTasks((msg.tasks || []).filter((t: any) => t.status === 'PENDING'));
+    if (msg.history) setHistory(msg.history);
+  });
+
+  useMonitorSocket((msg) => {
+    setDefGroups(prev => {
+      let found = false;
+      const next = prev.map(g => ({
+        ...g,
+        instances: g.instances.map(i => i.id === msg.instanceId
+          ? (found = true, { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] })
+          : i)
+      }));
+      if (!found && msg.definitionId) {
+        getInstance(msg.instanceId).then(inst => {
+          if (inst) {
+            setDefGroups(prev2 => {
+              const g = prev2.find(x => x.defId === msg.definitionId);
+              if (g) {
+                if (g.instances.some(i => i.id === inst.id)) return prev2; // already exists
+                return prev2.map(x => x.defId === msg.definitionId
+                  ? { ...x, instances: [inst, ...x.instances] } : x);
+              }
+              return [...prev2, {
+                defId: msg.definitionId, defName: inst.definitionId,
+                instances: [inst], instPage: 1, instHasMore: false, instLoading: false
+              }];
+            });
+          }
+        }).catch(e => console.error('[WS monitor] fetch error', e));
+      }
+      return found ? next : prev;
+    });
+  });
 
   // Auto-select deployed instance when navigating from designer
   const autoSelectConsumed = useRef(false);
@@ -342,6 +282,51 @@ export default function MonitorPage({ initialDefId, initialInstId }:
     loadInstance(initialInstId);
   }, [initialDefId, initialInstId, defGroups, loadInstance]);
 
+  // ── Shared instance actions (used by list + detail bar) ──
+  const refreshDef = useCallback((defId: string) => {
+    loadInstancesForDefRef.current(defId, 1);
+  }, []);
+
+  const doTerminate = useCallback(async (id: string) => {
+    try {
+      await terminateInstance(id);
+      const inst = allInstancesRef.current.find(i => i.id === id);
+      if (inst) refreshDef(inst.definitionId);
+    } catch (e: any) { showToast(e.message || 'Failed to terminate instance', 'error'); }
+    loadInstanceRef.current(id);
+  }, [refreshDef]);
+
+  const doResume = useCallback(async (id: string) => {
+    try {
+      await resumeInstance(id);
+      const inst = allInstancesRef.current.find(i => i.id === id);
+      if (inst) refreshDef(inst.definitionId);
+    } catch (e: any) { showToast(e.message || 'Failed to resume instance', 'error'); }
+    loadInstanceRef.current(id);
+  }, [refreshDef]);
+
+  const doDelete = useCallback(async (id: string) => {
+    try {
+      await deleteInstance(id);
+      const inst = allInstancesRef.current.find(i => i.id === id);
+      if (inst) refreshDef(inst.definitionId);
+    } catch (e: any) { showToast(e.message || 'Failed to delete instance', 'error'); }
+    setSelectedId(null);
+  }, [refreshDef]);
+
+  const doRestart = useCallback(async (id: string) => {
+    const inst = allInstancesRef.current.find(i => i.id === id);
+    if (!inst) return;
+    try {
+      await startInstance(inst.definitionId, inst.variables || {});
+      refreshDef(inst.definitionId);
+    } catch (e: any) { showToast(e.message || 'Failed to restart instance', 'error'); }
+  }, [refreshDef]);
+
+  // Keep a ref to the flattened instance list for the async action callbacks
+  const allInstances = defGroups.flatMap(g => g.instances);
+  allInstancesRef.current = allInstances;
+
   const handleComplete = async (taskId: string) => {
     try {
       await completeTask(taskId);
@@ -352,30 +337,6 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   const handleReject = async (taskId: string) => {
     try { await apiPost(`/tasks/${taskId}/reject`, { comment: 'rejected' }); } catch (e: any) { showToast(e.message, 'error'); }
     if (selectedId) loadInstance(selectedId);
-  };
-
-  const handleResume = async () => {
-    if (!selectedId) return;
-    try {
-      await resumeInstance(selectedId);
-      const inst = allInstances.find(i => i.id === selectedId);
-      if (inst) loadInstancesForDef(inst.definitionId, 1);
-    } catch (e: any) { showToast(e.message || 'Failed to resume instance', 'error'); }
-    loadInstance(selectedId);
-  };
-
-  const handleTerminate = async () => {
-    if (!selectedId) return;
-    try {
-      await terminateInstance(selectedId);
-      const inst = allInstances.find(i => i.id === selectedId);
-      if (inst) loadInstancesForDef(inst.definitionId, 1);
-    } catch (e: any) { showToast(e.message || 'Failed to terminate instance', 'error'); }
-    loadInstance(selectedId);
-  };
-
-  const refreshDef = async (defId: string) => {
-    loadInstancesForDef(defId, 1);
   };
 
   const [startDefId, setStartDefId] = useState('');
@@ -429,37 +390,10 @@ export default function MonitorPage({ initialDefId, initialInstId }:
           groups={defGroups}
           selectedId={selectedId}
           onSelect={loadInstance}
-          onTerminate={async (id) => {
-            try {
-              await terminateInstance(id);
-              const inst = allInstances.find(i => i.id === id);
-              if (inst) refreshDef(inst.definitionId);
-            } catch (e: any) { showToast(e.message || 'Failed to terminate instance', 'error'); }
-          }}
-          onResume={async (id) => {
-            try {
-              await resumeInstance(id);
-              const inst = allInstances.find(i => i.id === id);
-              if (inst) refreshDef(inst.definitionId);
-            } catch (e: any) { showToast(e.message || 'Failed to resume instance', 'error'); }
-            loadInstance(id);
-          }}
-          onDelete={async (id) => {
-            try {
-              await deleteInstance(id);
-              const inst = allInstances.find(i => i.id === id);
-              if (inst) refreshDef(inst.definitionId);
-            } catch (e: any) { showToast(e.message || 'Failed to delete instance', 'error'); }
-            setSelectedId(null);
-          }}
-          onRestart={async (id) => {
-            const inst = allInstances.find(i => i.id === id);
-            if (!inst) return;
-            try {
-              await startInstance(inst.definitionId, inst.variables || {});
-              refreshDef(inst.definitionId);
-            } catch (e: any) { showToast(e.message || 'Failed to restart instance', 'error'); }
-          }}
+          onTerminate={doTerminate}
+          onResume={doResume}
+          onDelete={doDelete}
+          onRestart={doRestart}
           onLoadInstances={(defId) => {
             const g = defGroups.find(d => d.defId === defId);
             if (g && g.instHasMore && !g.instLoading) loadInstancesForDef(defId, g.instPage + 1);
@@ -492,10 +426,10 @@ export default function MonitorPage({ initialDefId, initialInstId }:
               <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {statusLabel(selectedInst.status)}</span>
               <div className="flex-1" />
               {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
-                <button onClick={handleTerminate} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">{t.monitor.terminate}</button>
+                <button onClick={() => doTerminate(selectedId!)} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">{t.monitor.terminate}</button>
               )}
               {selectedInst.status === 'SUSPENDED' && (
-                <button onClick={handleResume} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">{t.monitor.resume}</button>
+                <button onClick={() => doResume(selectedId!)} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">{t.monitor.resume}</button>
               )}
             </div>
           )}
@@ -503,38 +437,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         </div>
         {/* Detail sidebar */}
         {selectedInst && (
-          <div className="w-56 bg-gray-800 border-l border-gray-700 p-3 text-xs overflow-y-auto">
-            <div className="text-gray-400 font-semibold mb-2">Instance Detail</div>
-            <div className="text-gray-500 mb-1">ID: <span className="text-gray-300">{selectedInst.id.substring(0,8)}</span></div>
-            <div className="text-gray-500 mb-1">Def: <span className="text-gray-300">{selectedInst.definitionId}</span> <span className="text-gray-600">v{selectedInst.definitionVersion||0}</span></div>
-            <div className="mb-2">
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold
-                ${selectedInst.status==='RUNNING'?'bg-green-900 text-green-400':
-                  selectedInst.status==='COMPLETED'?'bg-blue-900 text-blue-400':
-                  selectedInst.status==='SUSPENDED'?'bg-yellow-900 text-yellow-400':'bg-red-900 text-red-400'}`}>
-                {statusLabel(selectedInst.status)}
-              </span>
-            </div>
-            <div className="text-gray-400 font-semibold mt-3 mb-1">Active Nodes</div>
-            {selectedInst.activeNodeIds?.length > 0 ? selectedInst.activeNodeIds.map((nid: string) => (
-              <div key={nid} className="text-blue-400 mb-0.5">● {nodeNames[nid] || nid}</div>
-            )) : <div className="text-gray-600">none</div>}
-            <div className="text-gray-400 font-semibold mt-3 mb-1">{t.designer.variables}</div>
-            {Object.keys(selectedInst.variables || {}).length > 0
-              ? Object.entries(selectedInst.variables||{}).map(([k,v]) => (
-                <div key={k} className="text-gray-500 mb-0.5">
-                  <code className="text-blue-400">{k}</code> = <span className="text-gray-300">{String(v)}</span>
-                </div>
-              ))
-              : <div className="text-gray-600">none</div>}
-            <div className="text-gray-400 font-semibold mt-3 mb-1">{t.monitor.history} ({history.length})</div>
-            {history.slice(-10).reverse().map((h:any,i:number) => (
-              <div key={i} className="mb-1 pl-2 border-l border-gray-700">
-                <div className="text-gray-300">{nodeNames[h.nodeId] || h.nodeId}</div>
-                <div className="text-[10px] text-gray-500">{h.action} · {h.executor}</div>
-              </div>
-            ))}
-          </div>
+          <InstanceDetailSidebar inst={selectedInst} nodeNames={nodeNames} history={history} />
         )}
       </div>
     </div>
