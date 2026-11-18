@@ -279,12 +279,12 @@ function layoutNodes(nodes: Node[], edges: Edge[]) {
     layerGroups.get(l)!.push(n);
   }
 
-  // Position nodes: layer → X, even spread → Y
-  for (const [, layerNodes] of layerGroups) {
+  // Position nodes: layer → X (topological distance), index → Y (centered spread)
+  for (const [layer, layerNodes] of layerGroups) {
     const totalHeight = (layerNodes.length - 1) * NODE_GAP;
     layerNodes.forEach((n, i) => {
       n.position = {
-        x: START_X + i * LAYER_GAP,
+        x: START_X + layer * LAYER_GAP,
         y: START_Y + i * NODE_GAP - totalHeight / 2,
       };
     });

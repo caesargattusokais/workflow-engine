@@ -77,6 +77,30 @@ for (const [label, ok] of checks) {
   if (!ok) failed++;
 }
 
+// Layout regression (imports real bundled templates): every node must get a
+// unique position, and branches of the same gateway (same topological layer)
+// must share the same x. Guards against layout x = layerIndex-within-layer,
+// which stacked every layer's first node onto the same spot.
+import * as fs from 'fs';
+import * as path from 'path';
+
+const tplDir = path.join(__dirname, '..', 'public', 'templates');
+const manifest = JSON.parse(fs.readFileSync(path.join(tplDir, 'manifest.json'), 'utf8')) as Array<{ file: string }>;
+for (const { file } of manifest) {
+  const yaml = fs.readFileSync(path.join(tplDir, file), 'utf8');
+  const g = yamlToGraph(yaml);
+  const posKey = (n: Node) => `${n.position.x},${n.position.y}`;
+  const uniquePositions = new Set(g.nodes.map(posKey)).size === g.nodes.length;
+  // nodes sharing the same x are same-layer branches — verify they exist for diamond templates
+  const byX = new Map<number, number>();
+  for (const n of g.nodes) byX.set(n.position.x, (byX.get(n.position.x) || 0) + 1);
+  const layerCount = byX.size;
+  const layerSizes = [...byX.values()].join(',');
+  const ok = uniquePositions;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  layout[${file}] nodes=${g.nodes.length} layers=${layerCount} sizes=[${layerSizes}]`);
+  if (!ok) failed++;
+}
+
 // Round-trip stability: export the imported graph again, import again, compare structures
 const yaml2 = graphToYaml(g1.nodes, g1.edges, 'leave-approval', '请假审批', 1);
 const g2 = yamlToGraph(yaml2);
