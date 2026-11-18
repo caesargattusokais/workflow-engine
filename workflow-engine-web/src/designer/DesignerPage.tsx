@@ -5,7 +5,8 @@ import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
 import DraftList from './DraftList';
 import TemplateBrowser from './TemplateBrowser';
-import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary } from '../api/client';
+import AiGenerateModal from './AiGenerateModal';
+import { deployDefinition, listDrafts, createDraft, updateDraft, deleteDraft as removeDraft, getDraft, startInstance, copyDraft, importDraft, fetchInstanceSummary, generateFlow } from '../api/client';
 import { showToast } from '../api/toast';
 import { graphToYaml } from './graphToYaml';
 import { yamlToGraph } from './yamlToGraph';
@@ -42,6 +43,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [deployedInstanceId, setDeployedInstanceId] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const [instanceSummary, setInstanceSummary] = useState<Record<string, {running: number, total: number}>>({});
   const [draftPage, setDraftPage] = useState(1);
@@ -221,6 +223,20 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     } catch (e: any) { showToast('Import failed: ' + e.message, 'error'); }
   };
 
+  const handleAiGenerate = async (prompt: string) => {
+    try {
+      const r: any = await generateFlow(prompt);
+      const { name, nodes: genNodes, edges: genEdges } = yamlToGraph(r.yaml);
+      const d = await importDraft(r.name || name, genNodes, genEdges);
+      setDrafts(prev => [...prev, { ...d, nodes: genNodes, edges: genEdges }]);
+      setActiveId(d.id);
+      setShowAiGenerate(false);
+      setToast(`AI: ${r.name || name} (${r.nodeCount ?? genNodes.length} nodes)`);
+    } catch (e: any) {
+      showToast(e.message || t.designer.aiGenerateFailed, 'error');
+    }
+  };
+
   const handleNodeSelect = useCallback((node: Node | null) => setSelectedNode(node), []);
   const handleNodeChange = useCallback((updatedNode: Node) => {
     setNodes(nodes.map(n => n.id === updatedNode.id ? updatedNode : n));
@@ -386,6 +402,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           onNew={newDraft}
           onImport={importYamlAction}
           onLoadTemplates={loadTemplates}
+          onAiGenerate={() => setShowAiGenerate(true)}
           onLoadMore={() => { if (draftHasMore && !draftLoading.current) loadDrafts(draftPage + 1); }}
           onLoadPage={loadDrafts}
           onViewYaml={showYamlFor}
@@ -409,6 +426,11 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       {/* Template Browser Modal */}
       {showTemplates && (
         <TemplateBrowser templates={templates} onImport={importTemplate} onClose={() => setShowTemplates(false)} />
+      )}
+
+      {/* AI Generate Modal */}
+      {showAiGenerate && (
+        <AiGenerateModal onGenerate={handleAiGenerate} onClose={() => setShowAiGenerate(false)} />
       )}
     </div>
   );

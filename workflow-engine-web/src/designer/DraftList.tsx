@@ -14,7 +14,7 @@ interface Draft {
 /** Left sidebar: draft list with infinite scroll, toolbar and context menu. */
 export default function DraftList({ drafts, activeId, instanceSummary,
     draftHasMore, draftLoading, draftPage,
-    onSwitch, onNew, onImport, onLoadTemplates, onLoadMore, onLoadPage,
+    onSwitch, onNew, onImport, onLoadTemplates, onAiGenerate, onLoadMore, onLoadPage,
     onViewYaml, onDownloadYaml, onCopy, onRename, onDelete }: {
   drafts: Draft[];
   activeId: string | null;
@@ -26,6 +26,7 @@ export default function DraftList({ drafts, activeId, instanceSummary,
   onNew: () => void;
   onImport: () => void;
   onLoadTemplates: () => void;
+  onAiGenerate: () => void;
   onLoadMore: () => void;
   onLoadPage: (page: number) => void;
   onViewYaml: (draft: Draft) => void;
@@ -48,6 +49,11 @@ export default function DraftList({ drafts, activeId, instanceSummary,
     <div className="w-40 bg-gray-850 border-r border-gray-700 flex flex-col">
       <div className="p-2 border-b border-gray-700 flex items-center gap-1">
         <span className="text-xs text-gray-500 flex-1">{t.designer.draftList}</span>
+        <button onClick={onAiGenerate}
+          className="text-xs bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-1.5 py-0.5 rounded"
+          title={t.designer.aiGenerateTitle}>
+          ✦
+        </button>
         <button onClick={onLoadTemplates}
           className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-1.5 py-0.5 rounded" title={t.designer.template}>
           T

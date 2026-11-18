@@ -1,0 +1,11 @@
+# Local dev override — enables the AI flow-generation endpoint against a
+# stub/replacement LLM. Compose merges this file automatically.
+#   AI_BASE_URL : any OpenAI-compatible endpoint root (…/v1)
+#   AI_API_KEY  : provider key (stub value works against stub-llm.js)
+#   AI_MODEL    : model id
+services:
+  app:
+    environment:
+      - AI_BASE_URL=${AI_BASE_URL:-http://host.docker.internal:9999/v1}
+      - AI_API_KEY=${AI_API_KEY:-stub}
+      - AI_MODEL=${AI_MODEL:-stub-model}

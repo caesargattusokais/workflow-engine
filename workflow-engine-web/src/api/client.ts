@@ -110,6 +110,10 @@ export async function importDraft(name: string, nodes: unknown[], edges: unknown
   return apiPost('/drafts/import', { name, nodes, edges });
 }
 
+export async function generateFlow(prompt: string) {
+  return apiPost('/ai/generate', { prompt });
+}
+
 export async function fetchInstanceSummary() { return apiGet('/instances/summary'); }
 
 export { userId, authHeaders, apiGet, apiPost };
