@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useT } from '../i18n';
+import { listOrgTree } from '../api/client';
 
 interface OrgNode {
   uid: string;
@@ -23,8 +24,10 @@ let treePromise: Promise<OrgNode[]> | null = null;
 function fetchTree(): Promise<OrgNode[]> {
   if (treeCache) return Promise.resolve(treeCache);
   if (treePromise) return treePromise;
-  treePromise = fetch('/api/org/tree').then(r => r.json()).then(data => {
-    treeCache = (data || []) as OrgNode[];
+  treePromise = listOrgTree().then(data => {
+    // Defensive: never cache a non-array (error objects are truthy and would
+    // crash tree.map — this once black-screened the whole designer).
+    treeCache = Array.isArray(data) ? (data as OrgNode[]) : [];
     return treeCache;
   }).catch(() => {
     treePromise = null;

@@ -85,6 +85,8 @@ export async function completeTask(taskId: string, vars?: Record<string,unknown>
 
 export async function listDefinitions(page = 1, size = 10) { return apiGet(`/definitions?page=${page}&size=${size}`); }
 
+export async function listOrgTree() { return apiGet('/org/tree'); }
+
 export async function deployDefinition(yaml: string, positions?: Record<string, {x:number;y:number}>) {
   return apiPost('/definitions', { yaml, positions });
 }
