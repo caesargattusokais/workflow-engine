@@ -74,13 +74,17 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   }, []);
 
   // ── Load instances for a specific definition ──
+  // Per-definition load counters — stale responses never overwrite fresh ones
+  const defLoadIdRef = useRef<Record<string, number>>({});
   const loadInstancesForDef = useCallback(async (defId: string, page: number) => {
+    const loadId = (defLoadIdRef.current[defId] = (defLoadIdRef.current[defId] || 0) + 1);
     setDefGroups(prev => prev.map(g => {
       if (g.defId !== defId || g.instLoading) return g;
       return { ...g, instLoading: true };
     }));
     try {
       const r: any = await listInstances(page, 10, defId, statusFilter || undefined);
+      if (defLoadIdRef.current[defId] !== loadId) return; // stale response
       const list = r.items || r;
       setDefGroups(prev => prev.map(g => {
         if (g.defId !== defId) return g;
@@ -88,6 +92,7 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         return { ...g, instances: merged, instPage: page, instHasMore: list.length >= 10, instLoading: false };
       }));
     } catch (e: any) {
+      if (defLoadIdRef.current[defId] !== loadId) return; // stale error
       showToast(e.message || 'Failed to load instances', 'error');
       setDefGroups(prev => prev.map(g => g.defId === defId ? { ...g, instLoading: false } : g));
     }
@@ -105,18 +110,34 @@ export default function MonitorPage({ initialDefId, initialInstId }:
     }
   }, [defGroups, loadInstancesForDef]);
 
-  // Load all definitions for the start dropdown (once)
+  // Load ALL definitions for the start dropdown — paginate until exhausted
   useEffect(() => {
-    listDefinitions(1, 10).then((r: any) => setAllDefs(r.items || r)).catch(e => showToast(e.message, 'error'));
+    let cancelled = false;
+    (async () => {
+      try {
+        const collected: any[] = [];
+        for (let page = 1; ; page++) {
+          const r: any = await listDefinitions(page, 50);
+          const list = r.items || r;
+          collected.push(...list);
+          if (list.length < 50 || cancelled) break;
+        }
+        if (!cancelled) setAllDefs(collected);
+      } catch (e: any) { if (!cancelled) showToast(e.message, 'error'); }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Manual refresh: reload definitions page 1, then refresh instances for all loaded defs
+  const refreshIdRef = useRef(0);
   const refreshAll = useCallback(() => {
+    const refreshId = ++refreshIdRef.current;
     // Reload first page of definitions to catch new ones
     loadDefinitions(1);
     // Refresh instances for all currently loaded definitions (including empty ones)
     for (const g of defGroups) {
       listInstances(1, 10, g.defId, statusFilter || undefined).then((r: any) => {
+        if (refreshIdRef.current !== refreshId) return; // stale refresh — drop
         const fresh = r.items || r;
         setDefGroups(prev => prev.map(pg => {
           if (pg.defId !== g.defId) return pg;
@@ -189,47 +210,64 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}/ws/monitor`;
-    const ws = new WebSocket(wsUrl);
-    ws.onopen = () => console.log('[WS monitor] connected');
-    ws.onclose = (e) => console.log('[WS monitor] closed', e.code, e.reason);
-    ws.onerror = (e) => console.error('[WS monitor] error', e);
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'changed') {
-          console.log('[WS monitor]', msg.instanceId, msg.status, msg.definitionId);
-          setDefGroups(prev => {
-            let found = false;
-            const next = prev.map(g => ({
-              ...g,
-              instances: g.instances.map(i => i.id === msg.instanceId
-                ? (found = true, { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] })
-                : i)
-            }));
-            if (!found && msg.definitionId) {
-              getInstance(msg.instanceId).then(inst => {
-                if (inst) {
-                  setDefGroups(prev2 => {
-                    const g = prev2.find(x => x.defId === msg.definitionId);
-                    if (g) {
-                      if (g.instances.some(i => i.id === inst.id)) return prev2; // already exists
-                      return prev2.map(x => x.defId === msg.definitionId
-                        ? { ...x, instances: [inst, ...x.instances] } : x);
-                    }
-                    return [...prev2, {
-                      defId: msg.definitionId, defName: inst.definitionId,
-                      instances: [inst], instPage: 1, instHasMore: false, instLoading: false
-                    }];
-                  });
-                }
-              }).catch(e => console.error('[WS monitor] fetch error', e));
-            }
-            return found ? next : prev;
-          });
-        }
-      } catch {}
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retryTimer: number | undefined;
+
+    const connect = () => {
+      if (closed) return;
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => console.log('[WS monitor] connected');
+      ws.onclose = (e) => {
+        console.log('[WS monitor] closed', e.code, e.reason);
+        // Auto-reconnect so the list keeps updating after backend restarts
+        if (!closed) retryTimer = window.setTimeout(connect, 2000);
+      };
+      ws.onerror = (e) => console.error('[WS monitor] error', e);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'changed') {
+            console.log('[WS monitor]', msg.instanceId, msg.status, msg.definitionId);
+            setDefGroups(prev => {
+              let found = false;
+              const next = prev.map(g => ({
+                ...g,
+                instances: g.instances.map(i => i.id === msg.instanceId
+                  ? (found = true, { ...i, status: msg.status, activeNodeIds: msg.activeNodeIds || [] })
+                  : i)
+              }));
+              if (!found && msg.definitionId) {
+                getInstance(msg.instanceId).then(inst => {
+                  if (inst) {
+                    setDefGroups(prev2 => {
+                      const g = prev2.find(x => x.defId === msg.definitionId);
+                      if (g) {
+                        if (g.instances.some(i => i.id === inst.id)) return prev2; // already exists
+                        return prev2.map(x => x.defId === msg.definitionId
+                          ? { ...x, instances: [inst, ...x.instances] } : x);
+                      }
+                      return [...prev2, {
+                        defId: msg.definitionId, defName: inst.definitionId,
+                        instances: [inst], instPage: 1, instHasMore: false, instLoading: false
+                      }];
+                    });
+                  }
+                }).catch(e => console.error('[WS monitor] fetch error', e));
+              }
+              return found ? next : prev;
+            });
+          }
+        } catch {}
+      };
     };
-    return () => ws.close();
+    connect();
+
+    return () => {
+      closed = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      ws?.close();
+    };
   }, []);
 
   // Flatten all instances for lookup
@@ -305,7 +343,9 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   }, [initialDefId, initialInstId, defGroups, loadInstance]);
 
   const handleComplete = async (taskId: string) => {
-    await completeTask(taskId);
+    try {
+      await completeTask(taskId);
+    } catch (e: any) { showToast(e.message || 'Failed to complete task', 'error'); }
     if (selectedId) loadInstance(selectedId);
   };
 
@@ -316,17 +356,21 @@ export default function MonitorPage({ initialDefId, initialInstId }:
 
   const handleResume = async () => {
     if (!selectedId) return;
-    await resumeInstance(selectedId);
-    const inst = allInstances.find(i => i.id === selectedId);
-    if (inst) loadInstancesForDef(inst.definitionId, 1);
+    try {
+      await resumeInstance(selectedId);
+      const inst = allInstances.find(i => i.id === selectedId);
+      if (inst) loadInstancesForDef(inst.definitionId, 1);
+    } catch (e: any) { showToast(e.message || 'Failed to resume instance', 'error'); }
     loadInstance(selectedId);
   };
 
   const handleTerminate = async () => {
     if (!selectedId) return;
-    await terminateInstance(selectedId);
-    const inst = allInstances.find(i => i.id === selectedId);
-    if (inst) loadInstancesForDef(inst.definitionId, 1);
+    try {
+      await terminateInstance(selectedId);
+      const inst = allInstances.find(i => i.id === selectedId);
+      if (inst) loadInstancesForDef(inst.definitionId, 1);
+    } catch (e: any) { showToast(e.message || 'Failed to terminate instance', 'error'); }
     loadInstance(selectedId);
   };
 
@@ -386,25 +430,35 @@ export default function MonitorPage({ initialDefId, initialInstId }:
           selectedId={selectedId}
           onSelect={loadInstance}
           onTerminate={async (id) => {
-            await terminateInstance(id);
-            const inst = allInstances.find(i => i.id === id);
-            if (inst) refreshDef(inst.definitionId);
+            try {
+              await terminateInstance(id);
+              const inst = allInstances.find(i => i.id === id);
+              if (inst) refreshDef(inst.definitionId);
+            } catch (e: any) { showToast(e.message || 'Failed to terminate instance', 'error'); }
           }}
           onResume={async (id) => {
-            await resumeInstance(id);
-            const inst = allInstances.find(i => i.id === id);
-            if (inst) refreshDef(inst.definitionId);
+            try {
+              await resumeInstance(id);
+              const inst = allInstances.find(i => i.id === id);
+              if (inst) refreshDef(inst.definitionId);
+            } catch (e: any) { showToast(e.message || 'Failed to resume instance', 'error'); }
             loadInstance(id);
           }}
           onDelete={async (id) => {
-            await deleteInstance(id);
-            const inst = allInstances.find(i => i.id === id);
-            if (inst) refreshDef(inst.definitionId);
+            try {
+              await deleteInstance(id);
+              const inst = allInstances.find(i => i.id === id);
+              if (inst) refreshDef(inst.definitionId);
+            } catch (e: any) { showToast(e.message || 'Failed to delete instance', 'error'); }
             setSelectedId(null);
           }}
           onRestart={async (id) => {
             const inst = allInstances.find(i => i.id === id);
-            if (inst) { await startInstance(inst.definitionId, inst.variables || {}); refreshDef(inst.definitionId); }
+            if (!inst) return;
+            try {
+              await startInstance(inst.definitionId, inst.variables || {});
+              refreshDef(inst.definitionId);
+            } catch (e: any) { showToast(e.message || 'Failed to restart instance', 'error'); }
           }}
           onLoadInstances={(defId) => {
             const g = defGroups.find(d => d.defId === defId);
@@ -416,9 +470,11 @@ export default function MonitorPage({ initialDefId, initialInstId }:
           onRefresh={refreshAll}
           statusFilter={statusFilter}
           onStatusChange={(s) => {
+            const statusId = ++refreshIdRef.current;
             setStatusFilter(s);
             for (const g of defGroups) {
               listInstances(1, 10, g.defId, s || undefined).then((r: any) => {
+                if (refreshIdRef.current !== statusId) return; // stale — a newer filter/refresh won
                 const list = r.items || r;
                 setDefGroups(prev => prev.map(pg => pg.defId === g.defId
                   ? { ...pg, instances: list, instPage: 1, instHasMore: list.length >= 10 }

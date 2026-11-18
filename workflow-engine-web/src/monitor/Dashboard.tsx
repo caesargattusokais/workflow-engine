@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiGet, listInstances, listDrafts } from '../api/client';
 import { showToast } from '../api/toast';
 import { useT } from '../i18n';
@@ -56,12 +56,18 @@ export default function Dashboard() {
     } catch (e: any) { showToast(e.message || 'Failed to load instances', 'error'); } finally { setInstLoading(false); }
   }, []);
 
+  const timelineLoadIdRef = useRef(0);
   const loadTimeline = async (instId: string) => {
+    const loadId = ++timelineLoadIdRef.current;
     setSelectedInstId(instId);
     try {
       const data = await apiGet(`/dashboard/timeline/${instId}`);
+      if (timelineLoadIdRef.current !== loadId) return; // stale — another instance was picked
       setTimeline(data);
-    } catch (e: any) { showToast(e.message, 'error'); setTimeline(null); }
+    } catch (e: any) {
+      if (timelineLoadIdRef.current !== loadId) return;
+      showToast(e.message, 'error'); setTimeline(null);
+    }
   };
 
   return (

@@ -1,75 +1,214 @@
 import type { Node, Edge } from '@xyflow/react';
+import { parse as yamlParse } from 'yaml';
 
 /**
  * Parse a workflow YAML string back into ReactFlow nodes and edges.
  * Inverse of graphToYaml — used for YAML import.
+ *
+ * Uses the `yaml` library (full YAML support), so nested structures such as
+ * gateway conditions, HTTP headers/body, retry config and CallActivity
+ * mappings round-trip correctly.
  */
 export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges: Edge[] } {
-  const lines = yaml.split('\n');
-  let name = 'Imported';
+  const doc = yamlParse(yaml) as Record<string, unknown> | null;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  let nodeIdCounter = 0;
 
-  let section: 'header' | 'nodes' | 'transitions' = 'header';
-  let current: Record<string, unknown> | null = null;
+  if (!doc || typeof doc !== 'object') return { name: 'Imported', nodes, edges };
 
-  // Flush the current item (node or edge) before starting a new one
-  function flush() {
-    if (!current) return;
-    if (section === 'nodes') {
-      flushNode(current, nodes, ++nodeIdCounter);
-    } else if (section === 'transitions') {
-      flushEdge(current, edges);
+  const name = (typeof doc.name === 'string' && doc.name) || (typeof doc.id === 'string' ? doc.id : 'Imported');
+  const rawNodes = Array.isArray(doc.nodes) ? doc.nodes : [];
+  const rawTransitions = Array.isArray(doc.transitions) ? doc.transitions : [];
+
+  let nodeCounter = 0;
+  let edgeCounter = 0;
+
+  for (const raw of rawNodes) {
+    if (!raw || typeof raw !== 'object') continue;
+    const cur = raw as Record<string, unknown>;
+    const id = (typeof cur.id === 'string' && cur.id) || `node_${++nodeCounter}`;
+    const type = (typeof cur.type === 'string' && cur.type) || 'userTask';
+    const nameVal = typeof cur.name === 'string' ? cur.name : undefined;
+
+    const node: Node = {
+      id,
+      type,
+      position: { x: 0, y: 0 }, // positioned later by layoutNodes()
+      data: { name: nameVal || type } as Record<string, unknown>,
+    };
+    const data = node.data as Record<string, unknown>;
+
+    // Simple scalar properties
+    for (const prop of ['assignee', 'handlerClass', 'dynamicRouter'] as const) {
+      if (cur[prop] !== undefined && cur[prop] !== null) data[prop] = cur[prop];
     }
-    current = null;
+    if (cur.httpMode === true) data.httpMode = true;
+    if (typeof cur.url === 'string') data.url = cur.url;
+    if (typeof cur.method === 'string') data.method = cur.method;
+    if (typeof cur.body === 'string') data.body = cur.body;
+    if (typeof cur.boundaryTimer === 'string') data.boundaryTimer = cur.boundaryTimer;
+    if (typeof cur.duration === 'string') data.duration = cur.duration;
+    if (typeof cur.until === 'string') data.deadline = cur.until;
+    if (Array.isArray(cur.candidateGroups)) data.candidateGroups = cur.candidateGroups.map(String);
+
+    // HTTP headers map → headerEntries [{key, value}]
+    const headers = cur.headers;
+    if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
+      data.headerEntries = Object.entries(headers as Record<string, unknown>)
+        .map(([key, value]) => ({ key, value: String(value) }));
+    }
+
+    // Body JSON string → paramEntries [{key, value}] (export rebuilds body from these)
+    if (typeof cur.body === 'string') {
+      try {
+        const parsed = JSON.parse(cur.body);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          data.paramEntries = Object.entries(parsed as Record<string, unknown>)
+            .map(([key, value]) => ({ key, value: String(value) }));
+        }
+      } catch {
+        // Non-JSON body — keep the raw string in data.body only.
+      }
+    }
+
+    // ServiceTask GET/DELETE query string → paramEntries
+    if (type === 'serviceTask' && typeof cur.url === 'string') {
+      const method = (typeof cur.method === 'string' && cur.method) || 'POST';
+      if (['GET', 'DELETE'].includes(method)) {
+        const { url, params } = splitQueryParams(cur.url);
+        data.url = url;
+        if (params.length > 0 && !data.paramEntries) data.paramEntries = params;
+      }
+    }
+
+    // Gateway conditions (node-level branches) → data.conditions + visual edges
+    if (Array.isArray(cur.conditions)) {
+      const conditions = cur.conditions.filter(isRoutingItem).map(c => ({
+        expr: typeof (c as Record<string, unknown>).expr === 'string' ? (c as Record<string, unknown>).expr as string : '',
+        to: String((c as Record<string, unknown>).to ?? ''),
+        isDefault: (c as Record<string, unknown>).default === true,
+      }));
+      if (conditions.length > 0) {
+        data.conditions = conditions;
+        for (const c of conditions) {
+          if (!c.to) continue;
+          edges.push(makeEdge(`edge_${id}_${c.to}_cond${++edgeCounter}`, id, c.to,
+            { edgeType: c.isDefault ? 'default' : 'conditional', ...(c.isDefault ? { isDefault: true } : c.expr ? { expr: c.expr } : {}) }));
+        }
+      }
+    }
+
+    // Retry config — nested retry: {maxAttempts, ...} (also accept legacy flat keys)
+    const retry = cur.retry as Record<string, unknown> | undefined;
+    const maxAttempts = (retry ? retry.maxAttempts : cur.maxAttempts);
+    const delayMs = (retry ? retry.delayMs : cur.delayMs);
+    const backoff = (retry ? retry.backoffMultiplier : cur.backoffMultiplier);
+    if (typeof maxAttempts === 'number') data.retryMaxAttempts = maxAttempts;
+    if (typeof delayMs === 'number') data.retryDelayMs = delayMs;
+    if (typeof backoff === 'number') data.retryBackoff = backoff;
+    if (retry && Array.isArray(retry.retryOn)) {
+      data.retryOn = retry.retryOn.filter(isRoutingItem)
+        .map(r => ({ expr: String((r as Record<string, unknown>).expr ?? '') }));
+    }
+
+    // Result / exception routing → data.resultRoutes / data.exceptionRoutes
+    if (Array.isArray(cur.resultRouting)) {
+      data.resultRoutes = cur.resultRouting.filter(isRoutingItem).map(toRouteItem);
+    }
+    if (Array.isArray(cur.exceptionRouting)) {
+      data.exceptionRoutes = cur.exceptionRouting.filter(isRoutingItem).map(toRouteItem);
+    }
+
+    // CallActivity
+    if (type === 'callActivity') {
+      if (cur.calledId !== undefined) data.calledId = cur.calledId;
+      if (cur.calledVersion !== undefined && cur.calledVersion !== null) data.calledVersion = cur.calledVersion;
+      if (cur.async === true) data.async = true;
+      if (Array.isArray(cur.inputMapping)) data.inputMapping = cur.inputMapping.filter(isMappingItem).map(toMappingItem);
+      if (Array.isArray(cur.outputMapping)) data.outputMapping = cur.outputMapping.filter(isMappingItem).map(toMappingItem);
+    }
+
+    nodes.push(node);
   }
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const indent = line.search(/\S/);
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+  // Transitions → edges (skip targets already covered by node-level conditions)
+  const conditionTargets = new Set(
+    nodes.flatMap(n => ((n.data as Record<string, unknown>).conditions as Array<{ to?: string }> | undefined) || [])
+      .map(c => c.to).filter(Boolean) as string[]
+  );
 
-    // Top-level keys — flush previous item before switching sections
-    if (indent === 0) {
-      if (section === 'nodes' || section === 'transitions') flush();
-      if (trimmed.startsWith('id:') && section === 'header') {
-        name = trimmed.substring(3).trim();
-      } else if (trimmed === 'nodes:') {
-        section = 'nodes';
-      } else if (trimmed === 'transitions:') {
-        section = 'transitions';
-      }
-      continue;
-    }
+  for (const raw of rawTransitions) {
+    if (!raw || typeof raw !== 'object') continue;
+    const cur = raw as Record<string, unknown>;
+    const from = typeof cur.from === 'string' ? cur.from : undefined;
+    const to = typeof cur.to === 'string' ? cur.to : undefined;
+    if (!from || !to) continue;
 
-    // New list item (indent === 2, starts with "- ")
-    if (indent === 2 && trimmed.startsWith('- ')) {
-      flush(); // save previous item
+    const edgeType = (typeof cur.type === 'string' && cur.type) || 'direct';
+    const isDefault = cur.default === true;
+    const expr = typeof cur.expr === 'string' ? cur.expr : undefined;
+    const data: Record<string, unknown> = { edgeType };
+    if (isDefault) data.isDefault = true;
+    else if (expr) data.expr = expr;
 
-      if (section === 'nodes' && trimmed.startsWith('- id:')) {
-        current = { id: trimmed.substring(5).trim() };
-      } else if (section === 'transitions' && trimmed.startsWith('- from:')) {
-        current = { from: trimmed.substring(7).trim() };
-      }
-      continue;
-    }
-
-    // Nested property (indent >= 4) — add to current item
-    if (current && indent >= 4) {
-      const kv = parseYamlLine(trimmed);
-      if (kv) current[kv.key] = kv.value;
-    }
+    const dedupe = conditionTargets.has(to) && edgeType === 'conditional' ? `d${++edgeCounter}` : '';
+    edges.push(makeEdge(`edge_${from}_${to}_${dedupe || ++edgeCounter}`, from, to, data));
   }
-
-  // Flush the last item
-  flush();
 
   // Layout nodes based on flow topology
   layoutNodes(nodes, edges);
 
   return { name, nodes, edges };
+}
+
+function makeEdge(id: string, source: string, target: string, data: Record<string, unknown>): Edge {
+  return { id, source, target, type: 'smoothstep', data } as Edge;
+}
+
+interface RouteLike { expr?: string; to?: string; default?: boolean; }
+
+function isRoutingItem(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function toRouteItem(c: Record<string, unknown>) {
+  return {
+    expr: typeof c.expr === 'string' ? c.expr : '',
+    to: String(c.to ?? ''),
+    isDefault: c.default === true,
+  };
+}
+
+function isMappingItem(v: unknown): v is Record<string, unknown> {
+  return isRoutingItem(v);
+}
+
+function toMappingItem(m: Record<string, unknown>) {
+  return {
+    from: String(m.from ?? ''),
+    to: String(m.to ?? ''),
+    ...(typeof m.expr === 'string' && m.expr ? { expr: m.expr } : {}),
+  };
+}
+
+/** Split "?a=1&b=2" from a URL into param entries. */
+function splitQueryParams(url: string): { url: string; params: Array<{ key: string; value: string }> } {
+  const qIdx = url.indexOf('?');
+  if (qIdx < 0) return { url, params: [] };
+  const base = url.substring(0, qIdx);
+  const params: Array<{ key: string; value: string }> = [];
+  for (const pair of url.substring(qIdx + 1).split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const k = eq < 0 ? pair : pair.substring(0, eq);
+    const v = eq < 0 ? '' : pair.substring(eq + 1);
+    try {
+      params.push({ key: decodeURIComponent(k), value: decodeURIComponent(v) });
+    } catch {
+      params.push({ key: k, value: v });
+    }
+  }
+  return { url: base, params };
 }
 
 /** Layered graph layout: topological distance from start nodes → X, center-spread → Y */
@@ -141,91 +280,13 @@ function layoutNodes(nodes: Node[], edges: Edge[]) {
   }
 
   // Position nodes: layer → X, even spread → Y
-  for (const [layer, layerNodes] of layerGroups) {
+  for (const [, layerNodes] of layerGroups) {
     const totalHeight = (layerNodes.length - 1) * NODE_GAP;
     layerNodes.forEach((n, i) => {
       n.position = {
-        x: START_X + layer * LAYER_GAP,
+        x: START_X + i * LAYER_GAP,
         y: START_Y + i * NODE_GAP - totalHeight / 2,
       };
     });
   }
-}
-
-function parseYamlLine(trimmed: string): { key: string; value: unknown } | null {
-  const colon = trimmed.indexOf(':');
-  if (colon < 0) return null;
-  const key = trimmed.substring(0, colon).trim();
-  const raw = trimmed.substring(colon + 1).trim();
-  let value: unknown = raw;
-
-  // Unquote strings
-  if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-    value = raw.slice(1, -1);
-  } else if (raw === 'true') {
-    value = true;
-  } else if (raw === 'false') {
-    value = false;
-  } else if (/^-?\d+$/.test(raw)) {
-    value = parseInt(raw);
-  }
-
-  return { key, value };
-}
-
-function flushNode(cur: Record<string, unknown>, nodes: Node[], counter: number) {
-  const id = (cur.id as string) || `node_${counter}`;
-  const type = (cur.type as string) || 'userTask';
-  const name = cur.name as string | undefined;
-
-  const node: Node = {
-    id,
-    type,
-    position: { x: 0, y: 0 }, // positioned later by layoutNodes()
-    data: { name: name || type },
-  };
-
-  // Copy known properties to node data
-  for (const prop of ['assignee', 'handlerClass', 'url', 'method', 'duration',
-    'boundaryTimer', 'dynamicRouter']) {
-    if (cur[prop] !== undefined) (node.data as any)[prop] = cur[prop];
-  }
-  if (cur.httpMode) (node.data as any).httpMode = true;
-  if (cur.until) (node.data as any).deadline = cur.until;
-  if (Array.isArray(cur.candidateGroups)) (node.data as any).candidateGroups = cur.candidateGroups;
-
-  if (node.type === 'callActivity') {
-    if (cur.calledId) (node.data as any).calledId = cur.calledId;
-    if (cur.calledVersion) (node.data as any).calledVersion = cur.calledVersion;
-    if (cur.async) (node.data as any).async = true;
-    if (Array.isArray(cur.inputMapping)) (node.data as any).inputMapping = cur.inputMapping;
-    if (Array.isArray(cur.outputMapping)) (node.data as any).outputMapping = cur.outputMapping;
-  }
-
-  // retry config (nested under retry: in YAML, becomes flat keys in our simple parser)
-  if (typeof cur.maxAttempts === 'number') (node.data as any).retryMaxAttempts = cur.maxAttempts;
-  if (typeof cur.delayMs === 'number') (node.data as any).retryDelayMs = cur.delayMs;
-  if (typeof cur.backoffMultiplier === 'number') (node.data as any).retryBackoff = cur.backoffMultiplier;
-
-  nodes.push(node);
-}
-
-function flushEdge(cur: Record<string, unknown>, edges: Edge[]) {
-  const from = cur.from as string;
-  const to = cur.to as string;
-  if (!from || !to) return;
-
-  const edgeType = (cur.type as string) || 'direct';
-  const expr = cur.expr as string | undefined;
-  const isDefault = cur.default === true;
-
-  const edge: Edge = {
-    id: `edge_${from}_${to}_${Date.now()}`,
-    source: from,
-    target: to,
-    type: 'smoothstep',
-    data: { edgeType, ...(expr ? { expr } : {}), ...(isDefault ? { isDefault: true } : {}) },
-  };
-
-  edges.push(edge);
 }
