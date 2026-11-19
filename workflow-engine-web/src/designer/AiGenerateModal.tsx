@@ -37,7 +37,7 @@ export default function AiGenerateModal({ onGenerate, onClose }: {
           placeholder={t.designer.aiPromptPlaceholder}
           rows={5}
           autoFocus
-          className="w-full bg-gray-750 border border-gray-600 rounded p-3 text-sm text-gray-200
+          className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-sm text-gray-200
             placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-none" />
         <div className="flex items-center justify-between mt-4">
           <span className="text-xs text-gray-500">Ctrl + Enter</span>

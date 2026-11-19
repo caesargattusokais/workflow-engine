@@ -82,7 +82,11 @@ export default function AiConfigModal({ onClose, onSaved }: {
     }).catch(e => setError(e.message));
   }, []);
 
-  const inputCls = "w-full bg-gray-750 border border-gray-600 rounded p-2.5 text-sm text-gray-200 placeholder-gray-500 focus:border-purple-500 focus:outline-none";
+  // gray-750 is not a Tailwind colour (default ramp jumps 700 -> 800), so it
+  // was silently dropped and left light text on a white background. Use a
+  // real ramp step for every input, textarea and select in this modal.
+  const inputCls = "w-full bg-gray-700 border border-gray-600 rounded p-2.5 text-sm text-gray-200 placeholder-gray-500 focus:border-purple-500 focus:outline-none";
+  const optionCls = "bg-gray-700 text-gray-200";
 
   // ── connection tab ──────────────────────────────
   const connPayload = () => ({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), model: model.trim() });
@@ -228,8 +232,8 @@ export default function AiConfigModal({ onClose, onSaved }: {
               <div>
                 <label className="block text-xs text-gray-400 mb-1">{t.designer.aiConfigProvider}</label>
                 <select value={provider} onChange={e => chooseProvider(e.target.value)} className={inputCls}>
-                  {PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  <option value={CUSTOM_PROVIDER}>{t.designer.aiConfigProviderCustom}</option>
+                  {PROVIDERS.map(p => <option key={p.id} value={p.id} className={optionCls}>{p.label}</option>)}
+                  <option value={CUSTOM_PROVIDER} className={optionCls}>{t.designer.aiConfigProviderCustom}</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">{t.designer.aiConfigProviderHint}</p>
               </div>
