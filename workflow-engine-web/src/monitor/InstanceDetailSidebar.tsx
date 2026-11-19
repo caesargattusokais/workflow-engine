@@ -55,30 +55,11 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
           {statusLabel(inst.status)}
         </span>
       </div>
-      <div className="text-gray-400 font-semibold mt-3 mb-1">Active Nodes</div>
-      {inst.activeNodeIds?.length > 0 ? inst.activeNodeIds.map((nid: string) => (
-        <div key={nid} className="text-blue-400 mb-0.5">● {nodeNames[nid] || nid}</div>
-      )) : <div className="text-gray-600">none</div>}
-      <div className="text-gray-400 font-semibold mt-3 mb-1">{t.designer.variables}</div>
-      {Object.keys(inst.variables || {}).length > 0
-        ? Object.entries(inst.variables||{}).map(([k,v]) => (
-          <div key={k} className="text-gray-500 mb-0.5">
-            <code className="text-blue-400">{k}</code> = <span className="text-gray-300">{String(v)}</span>
-          </div>
-        ))
-        : <div className="text-gray-600">none</div>}
-      <div className="text-gray-400 font-semibold mt-3 mb-1">{t.monitor.history} ({history.length})</div>
-      {history.slice(-10).reverse().map((h:any,i:number) => (
-        <div key={i} className="mb-1 pl-2 border-l border-gray-700">
-          <div className="text-gray-300">{nodeNames[h.nodeId] || h.nodeId}</div>
-          <div className="text-[10px] text-gray-500">{h.action} · {h.executor}</div>
-        </div>
-      ))}
 
       {/* AI copilot: explain the current state and suggest recovery steps */}
-      <div className="border-t border-gray-700 mt-3 pt-2">
+      <div className="border border-purple-800 rounded p-2 mb-2">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-gray-400 font-semibold">✨ {t.monitor.aiCopilot}</span>
+          <span className="text-purple-300 font-semibold">✨ {t.monitor.aiCopilot}</span>
           <button
             onClick={analyze}
             disabled={analyzing}
@@ -122,6 +103,26 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
           </div>
         )}
       </div>
+
+      <div className="text-gray-400 font-semibold mt-3 mb-1">Active Nodes</div>
+      {inst.activeNodeIds?.length > 0 ? inst.activeNodeIds.map((nid: string) => (
+        <div key={nid} className="text-blue-400 mb-0.5">● {nodeNames[nid] || nid}</div>
+      )) : <div className="text-gray-600">none</div>}
+      <div className="text-gray-400 font-semibold mt-3 mb-1">{t.designer.variables}</div>
+      {Object.keys(inst.variables || {}).length > 0
+        ? Object.entries(inst.variables||{}).map(([k,v]) => (
+          <div key={k} className="text-gray-500 mb-0.5">
+            <code className="text-blue-400">{k}</code> = <span className="text-gray-300">{String(v)}</span>
+          </div>
+        ))
+        : <div className="text-gray-600">none</div>}
+      <div className="text-gray-400 font-semibold mt-3 mb-1">{t.monitor.history} ({history.length})</div>
+      {history.slice(-10).reverse().map((h:any,i:number) => (
+        <div key={i} className="mb-1 pl-2 border-l border-gray-700">
+          <div className="text-gray-300">{nodeNames[h.nodeId] || h.nodeId}</div>
+          <div className="text-[10px] text-gray-500">{h.action} · {h.executor}</div>
+        </div>
+      ))}
     </div>
   );
 }
