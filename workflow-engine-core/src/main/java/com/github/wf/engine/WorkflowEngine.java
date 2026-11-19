@@ -230,6 +230,23 @@ public class WorkflowEngine {
         return processRepository.findLatestById(instance.getDefinitionId());
     }
 
+    /**
+     * Form fields configured on the userTask for the given task, for the monitor
+     * UI to render a completion form. Returns an empty list for tasks whose node
+     * has no form configured (the common case).
+     */
+    public List<com.github.wf.model.node.FormField> getTaskFormFields(String taskId) {
+        Task task = taskRepository.findById(taskId);
+        if (task == null) return List.of();
+        ProcessInstance instance = instanceRepository.findById(task.getInstanceId());
+        if (instance == null) return List.of();
+        ProcessDefinition def = resolveDefinition(instance);
+        if (def == null) return List.of();
+        Node node = def.getNode(task.getNodeId());
+        if (node instanceof UserTask ut) return ut.getFormFields();
+        return List.of();
+    }
+
     public void trigger(String instanceId) {
         lockManager.lock(instanceId);
         try {
@@ -386,13 +403,30 @@ public class WorkflowEngine {
         // the lock (Redis locks are non-reentrant).
         lockManager.lock(instanceId);
         try {
+        ProcessInstance instance = instanceRepository.findById(instanceId);
+        ProcessDefinition def = resolveDefinition(instance);
+        Node node = def.getNode(task.getNodeId());
+
+        // Enforce userTask form: required fields must be supplied on completion.
+        if (node instanceof UserTask ut && !ut.getFormFields().isEmpty()) {
+            Map<String, Object> provided = variables != null ? variables : Map.of();
+            List<String> missing = new java.util.ArrayList<>();
+            for (var f : ut.getFormFields()) {
+                if (!f.isRequired()) continue;
+                Object v = provided.get(f.getKey());
+                if (v == null || (v instanceof String s && s.isBlank())) {
+                    missing.add(f.getLabel() != null && !f.getLabel().isBlank() ? f.getLabel() : f.getKey());
+                }
+            }
+            if (!missing.isEmpty()) {
+                throw new IllegalArgumentException("Missing required form fields: " + String.join(", ", missing));
+            }
+        }
+
         task.setStatus(TaskStatus.COMPLETED);
         task.setVariables(variables);
         taskRepository.update(task);
 
-        ProcessInstance instance = instanceRepository.findById(instanceId);
-        ProcessDefinition def = resolveDefinition(instance);
-        Node node = def.getNode(task.getNodeId());
         instanceRepository.saveHistoricActivity(
                 HistoricActivity.taskCompleted(instance.getId(), node.getId(),
                         node.getName(), node.getType(), task.getAssignee(), comment));

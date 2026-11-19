@@ -1,0 +1,55 @@
+id: ai-expense-claim
+name: 'AI 智能报销审批'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: apply
+    type: userTask
+    name: 提交报销单
+    assignee: "${applicant}"
+    formFields:
+      - key: amountText
+        label: 报销说明
+        type: textarea
+        required: true
+        placeholder: "例如：差旅费一共 2300 元，含机票和酒店"
+  - id: extract
+    type: aiTask
+    name: AI 识别发票
+    mode: extract
+    prompt: "从报销说明中提取金额(amount)和费用类型(category)，只返回JSON。报销说明：${amountText}"
+  - id: gateway
+    type: exclusiveGateway
+    name: 金额判断
+  - id: manager
+    type: userTask
+    name: 经理审批
+    assignee: manager
+  - id: finance
+    type: userTask
+    name: 财务审批
+    assignee: finance
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: apply
+  - from: apply
+    to: extract
+  - from: extract
+    to: gateway
+  - from: gateway
+    to: manager
+    type: conditional
+    expr: "extract_amount <= 1000"
+  - from: gateway
+    to: finance
+    type: conditional
+    expr: "extract_amount > 1000"
+  - from: manager
+    to: end
+  - from: finance
+    to: end

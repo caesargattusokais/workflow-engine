@@ -29,6 +29,29 @@ public class NodeYaml {
     public boolean async;
     public List<VariableMappingYaml> inputMapping;
     public List<VariableMappingYaml> outputMapping;
+    public List<FormFieldYaml> formFields; // userTask completion form
+
+    /** A field in a userTask completion form. */
+    public static class FormFieldYaml {
+        public String key;
+        public String label;
+        public String type;       // text | textarea | number | select | date
+        public boolean required;
+        public List<String> options;
+        public String placeholder;
+    }
+
+    /** Convert DSL form fields to model objects (null-safe). */
+    public static List<com.github.wf.model.node.FormField> buildFormFields(List<FormFieldYaml> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<com.github.wf.model.node.FormField> out = new java.util.ArrayList<>();
+        for (FormFieldYaml f : raw) {
+            if (f == null || f.key == null || f.key.isBlank()) continue;
+            out.add(new com.github.wf.model.node.FormField(
+                    f.key, f.label, f.type, f.required, f.options, f.placeholder));
+        }
+        return out;
+    }
 
     // AI_TASK fields
     public String mode;       // summary | extract | classify

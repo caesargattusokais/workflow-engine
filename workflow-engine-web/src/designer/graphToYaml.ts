@@ -62,6 +62,19 @@ export function graphToYaml(nodes: Node[], edges: Edge[], defId: string, defName
     if (node.type === 'userTask') {
       if (data.assignee) n.assignee = data.assignee as string;
       if (data.boundaryTimer) n.boundaryTimer = String(data.boundaryTimer);
+      const formFields = data.formFields as Array<Record<string, unknown>> | undefined;
+      if (formFields && formFields.length > 0) {
+        n.formFields = formFields
+          .filter(f => f && f.key)
+          .map(f => ({
+            key: String(f.key),
+            label: f.label ? String(f.label) : undefined,
+            type: f.type ? String(f.type) : 'text',
+            required: Boolean(f.required),
+            ...(Array.isArray(f.options) && f.options.length > 0 ? { options: (f.options as unknown[]).map(String) } : {}),
+            ...(f.placeholder ? { placeholder: String(f.placeholder) } : {}),
+          }));
+      }
     }
 
     // UserTask / ServiceTask HTTP mode (shared fields)

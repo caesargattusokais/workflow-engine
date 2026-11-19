@@ -14,6 +14,7 @@ public class UserTask extends Node {
     private final String method;
     private final Map<String, String> headers;
     private final String body;
+    private final List<FormField> formFields;
 
     /** Backward-compatible constructor (non-HTTP mode) */
     public UserTask(String id, String name, String assignee,
@@ -21,15 +22,27 @@ public class UserTask extends Node {
                     String boundaryTimer,
                     List<String> listeners) {
         this(id, name, assignee, candidateGroups, dynamicRouter, boundaryTimer,
-                false, null, null, null, null, listeners);
+                false, null, null, null, null, null, listeners);
     }
 
-    /** Full constructor with HTTP callback support */
+    /** Backward-compatible constructor with HTTP callback support */
     public UserTask(String id, String name, String assignee,
                     List<String> candidateGroups, String dynamicRouter,
                     String boundaryTimer,
                     boolean httpMode, String url, String method,
                     Map<String, String> headers, String body,
+                    List<String> listeners) {
+        this(id, name, assignee, candidateGroups, dynamicRouter, boundaryTimer,
+                httpMode, url, method, headers, body, null, listeners);
+    }
+
+    /** Full constructor with form fields (task completion form). */
+    public UserTask(String id, String name, String assignee,
+                    List<String> candidateGroups, String dynamicRouter,
+                    String boundaryTimer,
+                    boolean httpMode, String url, String method,
+                    Map<String, String> headers, String body,
+                    List<FormField> formFields,
                     List<String> listeners) {
         super(id, name, NodeType.USER_TASK, listeners);
         this.assignee = assignee;
@@ -41,6 +54,7 @@ public class UserTask extends Node {
         this.method = method != null ? method : "POST";
         this.headers = headers != null ? Collections.unmodifiableMap(headers) : Map.of();
         this.body = body;
+        this.formFields = formFields != null ? List.copyOf(formFields) : List.of();
     }
 
     public String getAssignee() { return assignee; }
@@ -52,4 +66,5 @@ public class UserTask extends Node {
     public String getMethod() { return method; }
     public Map<String, String> getHeaders() { return headers; }
     public String getBody() { return body; }
+    public List<FormField> getFormFields() { return formFields; }
 }

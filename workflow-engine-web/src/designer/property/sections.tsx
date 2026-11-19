@@ -34,6 +34,67 @@ export function StartEventSection({ node, updateData }: SectionProps) {
   );
 }
 
+// ── UserTask completion form fields ──
+interface FormFieldItem {
+  key: string; label: string; type: string;
+  required: boolean; options: string[]; placeholder: string;
+}
+
+const FORM_FIELD_TYPES = ['text', 'textarea', 'number', 'select', 'date'];
+
+export function FormFieldsEditor({ node, updateData }: SectionProps) {
+  const { t } = useT();
+  const fields = (node.data.formFields as FormFieldItem[]) || [];
+  const setFields = (v: FormFieldItem[]) => updateData('formFields', v);
+  const add = () => setFields([...fields, { key: '', label: '', type: 'text', required: false, options: [], placeholder: '' }]);
+  const remove = (i: number) => setFields(fields.filter((_, idx) => idx !== i));
+  const patch = (i: number, p: Partial<FormFieldItem>) =>
+    setFields(fields.map((f, idx) => idx === i ? { ...f, ...p } : f));
+
+  return (
+    <div className="border-t border-cyan-500/50 pt-2 mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-cyan-400 text-xs font-semibold">{t.props.formFields}</span>
+        <button onClick={add} className="text-xs text-cyan-400 hover:text-cyan-300">{t.props.addField}</button>
+      </div>
+      <div className="text-[10px] text-gray-500 mb-2">{t.props.formFieldsHint}</div>
+      {fields.length === 0 && <div className="text-[10px] text-gray-600 mb-1">{t.props.noFields}</div>}
+      {fields.map((f, i) => (
+        <div key={i} className="bg-gray-750/60 rounded p-2 mb-2 border border-gray-700">
+          <div className="flex gap-1 mb-1">
+            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+              value={f.key || ''} placeholder={t.props.fieldKeyPlaceholder}
+              onChange={ev => patch(i, { key: ev.target.value })} />
+            <select className="w-24 bg-gray-700 rounded px-1 py-1 text-white text-xs"
+              value={f.type || 'text'} onChange={ev => patch(i, { type: ev.target.value })}>
+              {FORM_FIELD_TYPES.map(tp => <option key={tp} value={tp}>{tp}</option>)}
+            </select>
+            <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
+          </div>
+          <div className="flex gap-1 mb-1">
+            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+              value={f.label || ''} placeholder={t.props.fieldLabelPlaceholder}
+              onChange={ev => patch(i, { label: ev.target.value })} />
+            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+              value={f.placeholder || ''} placeholder={t.props.fieldPlaceholderPlaceholder}
+              onChange={ev => patch(i, { placeholder: ev.target.value })} />
+          </div>
+          {f.type === 'select' && (
+            <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1"
+              value={(f.options || []).join(', ')} placeholder={t.props.fieldOptionsPlaceholder}
+              onChange={ev => patch(i, { options: ev.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+          )}
+          <label className="flex items-center gap-1 text-xs text-gray-400">
+            <input type="checkbox" checked={Boolean(f.required)}
+              onChange={ev => patch(i, { required: ev.target.checked })} />
+            {t.props.fieldRequired}
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── UserTask ────────────────────────
 export function UserTaskSection({ node, updateData }: SectionProps) {
   const { t } = useT();
@@ -63,6 +124,7 @@ export function UserTaskSection({ node, updateData }: SectionProps) {
             <OrgTreePicker values={(node.data.candidateGroups as string[]) || []}
               onChangeMulti={v => updateData('candidateGroups', v)} multi />
           </label>
+          <FormFieldsEditor node={node} updateData={updateData} />
         </>
       ) : (
         <HttpCallbackFields node={node} updateData={updateData}

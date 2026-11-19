@@ -21,25 +21,22 @@ test.describe('Designer — Canvas & Nodes', () => {
     { type: 'aiTask', label: /AI Task|AI 任务/ },
   ];
 
-  for (const { type, label } of nodeTypes) {
+  for (const { type } of nodeTypes) {
     test(`drag ${type} to canvas`, async ({ page }) => {
-      // Find the node in the palette
       const paletteItem = page.locator(`[data-type="${type}"]`).first();
-      if (await paletteItem.isVisible()) {
-        const canvas = page.locator('.react-flow');
-        const canvasBox = await canvas.boundingBox();
-        if (canvasBox) {
-          const palBox = await paletteItem.boundingBox();
-          if (palBox) {
-            await page.mouse.move(palBox.x + palBox.width / 2, palBox.y + palBox.height / 2);
-            await page.mouse.down();
-            await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2, { steps: 10 });
-            await page.mouse.up();
-            // Node should appear on canvas
-            await page.waitForTimeout(500);
-          }
-        }
-      }
+      await expect(paletteItem).toBeVisible();
+      const canvas = page.locator('.react-flow');
+      const before = await page.locator('.react-flow__node').count();
+      const canvasBox = await canvas.boundingBox();
+      const palBox = await paletteItem.boundingBox();
+      expect(canvasBox, 'canvas must be visible').not.toBeNull();
+      expect(palBox, 'palette item must be visible').not.toBeNull();
+      await page.mouse.move(palBox!.x + palBox!.width / 2, palBox!.y + palBox!.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2, { steps: 10 });
+      await page.mouse.up();
+      // A drag that silently does nothing must fail — no more vacuous passes.
+      await expect(page.locator('.react-flow__node')).toHaveCount(before + 1);
     });
   }
 

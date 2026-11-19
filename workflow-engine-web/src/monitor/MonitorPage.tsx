@@ -327,9 +327,9 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   const allInstances = defGroups.flatMap(g => g.instances);
   allInstancesRef.current = allInstances;
 
-  const handleComplete = async (taskId: string) => {
+  const handleComplete = async (taskId: string, vars: Record<string, unknown>, comment: string) => {
     try {
-      await completeTask(taskId);
+      await completeTask(taskId, vars, comment);
     } catch (e: any) { showToast(e.message || 'Failed to complete task', 'error'); }
     if (selectedId) loadInstance(selectedId);
   };

@@ -76,7 +76,10 @@ http.createServer((req, res) => {
       const userText = (messages.find(m => m.role === 'user') || {}).content || '';
       content = /7|long|超过|以上|总监/i.test(userText) ? 'LONG' : 'SHORT';
     } else if (system.includes('extract structured data')) {
-      content = '{"category":"EXPENSE","amount":100}';
+      const userText = (messages.find(m => m.role === 'user') || {}).content || '';
+      const m = userText.match(/(\d+(?:\.\d+)?)/);
+      const amount = m ? Number(m[1]) : 100;
+      content = JSON.stringify({ category: 'EXPENSE', amount });
     } else if (system.includes('summarise the given content')) {
       content = 'stub summary';
     } else {

@@ -59,6 +59,7 @@ public class TaskController {
             m.put("candidateGroups", t.getCandidateGroups());
             m.put("variables", t.getVariables());
             m.put("createdAt", t.getCreatedAt());
+            m.put("formFields", engine.getTaskFormFields(t.getId()));
             return m;
         }).toList();
     }

@@ -50,6 +50,16 @@ export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges:
     if (typeof cur.duration === 'string') data.duration = cur.duration;
     if (typeof cur.until === 'string') data.deadline = cur.until;
     if (Array.isArray(cur.candidateGroups)) data.candidateGroups = cur.candidateGroups.map(String);
+    if (Array.isArray(cur.formFields)) {
+      data.formFields = (cur.formFields as Record<string, unknown>[]).map(f => ({
+        key: String(f.key ?? ''),
+        label: f.label != null ? String(f.label) : '',
+        type: f.type != null ? String(f.type) : 'text',
+        required: Boolean(f.required),
+        options: Array.isArray(f.options) ? f.options.map(String) : [],
+        placeholder: f.placeholder != null ? String(f.placeholder) : '',
+      }));
+    }
 
     // HTTP headers map → headerEntries [{key, value}]
     const headers = cur.headers;

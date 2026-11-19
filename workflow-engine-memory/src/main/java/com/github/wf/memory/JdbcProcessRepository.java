@@ -137,7 +137,8 @@ public class JdbcProcessRepository implements ProcessRepository {
                 (List<String>) d.get("candidateGroups"), (String) d.get("dynamicRouter"),
                 (String) d.get("boundaryTimer"), Boolean.TRUE.equals(d.get("httpMode")),
                 (String) d.get("url"), (String) d.get("method"),
-                (Map<String, String>) d.get("headers"), (String) d.get("body"), listeners);
+                (Map<String, String>) d.get("headers"), (String) d.get("body"),
+                deserializeFormFields((List<Map<String, Object>>) d.get("formFields")), listeners);
             case "SERVICE_TASK": {
                 com.github.wf.model.RetryConfig rc = null;
                 if (d.get("retryMaxAttempts") != null) {
@@ -198,7 +199,7 @@ public class JdbcProcessRepository implements ProcessRepository {
             Map<String, Object> d = new LinkedHashMap<>();
             d.put("id", n.getId()); d.put("name", n.getName());
             d.put("type", n.getType().name()); d.put("listeners", n.getListeners());
-            if (n instanceof UserTask ut) { d.put("assignee", ut.getAssignee()); d.put("candidateGroups", ut.getCandidateGroups()); d.put("dynamicRouter", ut.getDynamicRouter()); d.put("boundaryTimer", ut.getBoundaryTimer()); d.put("httpMode", ut.isHttpTask()); d.put("url", ut.getUrl()); d.put("method", ut.getMethod()); d.put("headers", ut.getHeaders()); d.put("body", ut.getBody()); }
+            if (n instanceof UserTask ut) { d.put("assignee", ut.getAssignee()); d.put("candidateGroups", ut.getCandidateGroups()); d.put("dynamicRouter", ut.getDynamicRouter()); d.put("boundaryTimer", ut.getBoundaryTimer()); d.put("httpMode", ut.isHttpTask()); d.put("url", ut.getUrl()); d.put("method", ut.getMethod()); d.put("headers", ut.getHeaders()); d.put("body", ut.getBody()); d.put("formFields", serializeFormFields(ut.getFormFields())); }
             else if (n instanceof ServiceTask st) { d.put("handlerClass", st.getHandlerClass()); d.put("httpMode", st.isHttpTask()); d.put("url", st.getUrl()); d.put("method", st.getMethod()); d.put("headers", st.getHeaders()); d.put("body", st.getBody()); if (st.getRetryConfig() != null) { d.put("retryMaxAttempts", st.getRetryConfig().getMaxAttempts()); d.put("retryDelayMs", st.getRetryConfig().getDelayMs()); d.put("retryBackoff", st.getRetryConfig().getBackoffMultiplier()); d.put("retryOn", serializeConditions(st.getRetryConfig().getRetryOn())); } d.put("resultRouting", serializeRoutes(st.getResultRouting())); d.put("exceptionRouting", serializeRoutes(st.getExceptionRouting())); }
             else if (n instanceof TimerNode tn) { d.put("duration", tn.getDuration()); d.put("deadline", tn.getDeadline()); }
             else if (n instanceof CallActivityNode ca) { d.put("calledId", ca.getCalledId()); d.put("calledVersion", ca.getCalledVersion()); d.put("async", ca.isAsync()); d.put("inputMapping", serializeMappings(ca.getInputMapping())); d.put("outputMapping", serializeMappings(ca.getOutputMapping())); }
@@ -215,6 +216,39 @@ public class JdbcProcessRepository implements ProcessRepository {
             m.put(e.getKey(), d);
         }
         return m;
+    }
+
+    // -- UserTask form fields --
+
+    private static List<Map<String, Object>> serializeFormFields(List<com.github.wf.model.node.FormField> fields) {
+        if (fields == null || fields.isEmpty()) return List.of();
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (var f : fields) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("key", f.getKey());
+            m.put("label", f.getLabel());
+            m.put("type", f.getType());
+            m.put("required", f.isRequired());
+            m.put("options", f.getOptions());
+            m.put("placeholder", f.getPlaceholder());
+            list.add(m);
+        }
+        return list;
+    }
+
+    private static List<com.github.wf.model.node.FormField> deserializeFormFields(List<Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<com.github.wf.model.node.FormField> list = new ArrayList<>();
+        for (var m : raw) {
+            list.add(new com.github.wf.model.node.FormField(
+                    (String) m.get("key"),
+                    (String) m.get("label"),
+                    (String) m.get("type"),
+                    Boolean.TRUE.equals(m.get("required")),
+                    (List<String>) m.get("options"),
+                    (String) m.get("placeholder")));
+        }
+        return list;
     }
 
     // -- Routing/Condition helpers --

@@ -265,4 +265,27 @@ class JdbcProcessRepositoryTest {
         assertThat(restored.getOptions()).containsExactly("SHORT", "LONG");
         assertThat(restored.getRetryConfig().getMaxAttempts()).isEqualTo(3);
     }
+
+    @Test
+    void userTaskFormFieldsSurviveJdbcRoundTrip() {
+        var field1 = new com.github.wf.model.node.FormField("amountText", "报销说明", "textarea", true, List.of(), "请输入金额");
+        var field2 = new com.github.wf.model.node.FormField("category", "类型", "select", false, List.of("差旅", "办公"), null);
+        UserTask task = new UserTask("apply", "提交报销单", "applicant", List.of(), null, null,
+                false, null, null, Map.of(), null, List.of(field1, field2), List.of());
+        ProcessDefinition def = new ProcessDefinition("wf-form", "表单", 1,
+                List.of(new StartEvent("start"), task, new EndEvent("end")),
+                List.of(Transition.direct("start", "apply"), Transition.direct("apply", "end")));
+        repo.save(def);
+
+        ProcessDefinition loaded = repo.findById("wf-form");
+        UserTask restored = (UserTask) loaded.getNode("apply");
+        assertThat(restored.getFormFields()).hasSize(2);
+        assertThat(restored.getFormFields().get(0).getKey()).isEqualTo("amountText");
+        assertThat(restored.getFormFields().get(0).getLabel()).isEqualTo("报销说明");
+        assertThat(restored.getFormFields().get(0).getType()).isEqualTo("textarea");
+        assertThat(restored.getFormFields().get(0).isRequired()).isTrue();
+        assertThat(restored.getFormFields().get(0).getPlaceholder()).isEqualTo("请输入金额");
+        assertThat(restored.getFormFields().get(1).getOptions()).containsExactly("差旅", "办公");
+        assertThat(restored.getFormFields().get(1).isRequired()).isFalse();
+    }
 }

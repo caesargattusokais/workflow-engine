@@ -85,6 +85,7 @@ public final class DefinitionGraphMapper {
                 data.put("httpMode", ut.isHttpTask());
                 data.put("url", ut.getUrl());
                 data.put("method", ut.getMethod());
+                data.put("formFields", ut.getFormFields());
             } else if (n instanceof ServiceTask st) {
                 data.put("handlerClass", st.getHandlerClass());
                 data.put("httpMode", st.isHttpTask());
