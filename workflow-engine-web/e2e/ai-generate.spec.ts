@@ -116,6 +116,31 @@ test.describe('Designer — AI flow generation', () => {
     expect(reset.temperature).toBeCloseTo(0.2, 1);
   });
 
+  test('provider preset fills endpoint and model, manual edits fall back to custom', async ({ page }) => {
+    await page.locator('header button:has-text("⚙")').click();
+    const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');
+    await expect(modal).toBeVisible();
+    await modal.locator('button:has-text("服务连接"), button:has-text("Connection")').click();
+
+    const preset = modal.locator('select');
+    await expect(preset).toBeVisible();
+
+    // Selecting a provider fills both the endpoint and a sensible default model.
+    await preset.selectOption('deepseek');
+    await expect(modal.locator('input').first()).toHaveValue('https://api.deepseek.com/v1');
+    await expect(modal.locator('input').nth(2)).toHaveValue('deepseek-chat');
+
+    // A local provider is flagged as keyless.
+    await preset.selectOption('ollama');
+    await expect(modal.locator('input').first()).toHaveValue('http://localhost:11434/v1');
+    await expect(modal.locator('input').nth(2)).toHaveValue('llama3.1');
+    await expect(modal.locator('label:has-text("本地服务无需 Key"), label:has-text("need no key")')).toBeVisible();
+
+    // Editing the endpoint by hand switches the dropdown back to custom.
+    await modal.locator('input').first().fill('http://localhost:1234/v1');
+    await expect(preset).toHaveValue('__custom__');
+  });
+
   test('AI config test button reports connectivity result', async ({ page }) => {
     await page.locator('header button:has-text("⚙")').click();
     const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');

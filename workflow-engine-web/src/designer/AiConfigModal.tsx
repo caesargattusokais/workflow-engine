@@ -7,6 +7,34 @@ import {
 
 type Tab = 'connection' | 'generation' | 'knowledge';
 
+type ProviderPreset = {
+  id: string;
+  label: string;
+  baseUrl: string;
+  model: string;
+  keyless?: boolean;
+};
+
+/** OpenAI-compatible providers. Anthropic/Azure need their own protocol and
+ *  are intentionally absent here — the AiClient SPI leaves room to add them. */
+const PROVIDERS: ProviderPreset[] = [
+  { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  { id: 'qwen', label: 'Qwen · 通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  { id: 'kimi', label: 'Kimi · Moonshot', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { id: 'glm', label: 'GLM · 智谱', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+  { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  { id: 'ollama', label: 'Ollama · 本地', baseUrl: 'http://localhost:11434/v1', model: 'llama3.1', keyless: true },
+];
+
+const CUSTOM_PROVIDER = '__custom__';
+
+/** Reflect a stored baseUrl back into the dropdown, so reopening the modal
+ *  does not silently show "custom" for a known provider. */
+function detectProvider(baseUrl?: string): string {
+  const normalized = (baseUrl || '').trim().replace(/\/+$/, '');
+  return PROVIDERS.find(p => p.baseUrl === normalized)?.id || CUSTOM_PROVIDER;
+}
+
 /**
  * AI settings centre — connection (provider), generation (prompt + temperature),
  * and a placeholder for the future knowledge base. Saving either tab takes
@@ -21,6 +49,7 @@ export default function AiConfigModal({ onClose, onSaved }: {
 
   // connection tab state
   const [view, setView] = useState<AiConfigView | null>(null);
+  const [provider, setProvider] = useState<string>(CUSTOM_PROVIDER);
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
@@ -41,6 +70,7 @@ export default function AiConfigModal({ onClose, onSaved }: {
     getAiConfig().then(v => {
       setView(v);
       setBaseUrl(v.baseUrl || '');
+      setProvider(detectProvider(v.baseUrl));
       setModel(v.model || '');
     }).catch(e => setError(e.message));
     getAiGeneration().then(v => {
@@ -56,6 +86,17 @@ export default function AiConfigModal({ onClose, onSaved }: {
 
   // ── connection tab ──────────────────────────────
   const connPayload = () => ({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), model: model.trim() });
+
+  const chooseProvider = (id: string) => {
+    setProvider(id);
+    setTestResult(null); // a result for the previous endpoint is now stale
+    if (id === CUSTOM_PROVIDER) return; // keep whatever the user typed
+    const preset = PROVIDERS.find(p => p.id === id);
+    if (!preset) return;
+    setBaseUrl(preset.baseUrl);
+    setModel(preset.model);
+    if (preset.keyless) setApiKey('');
+  };
 
   const doTest = async () => {
     setTesting(true); setTestResult(null); setError(null);
@@ -92,7 +133,7 @@ export default function AiConfigModal({ onClose, onSaved }: {
     setBusy(true); setError(null);
     try {
       const v = await resetAiConfig();
-      setView(v); setBaseUrl(v.baseUrl || ''); setModel(v.model || ''); setApiKey('');
+      setView(v); setBaseUrl(v.baseUrl || ''); setProvider(detectProvider(v.baseUrl)); setModel(v.model || ''); setApiKey('');
       onSaved(t.designer.aiConfigResetDone);
       onClose();
     } catch (e: any) {
@@ -147,6 +188,8 @@ export default function AiConfigModal({ onClose, onSaved }: {
       : t.designer.aiConfigSourceNone)
     : '';
 
+  const keylessProvider = PROVIDERS.some(p => p.id === provider && p.keyless);
+
   const tabCls = (active: boolean) =>
     `px-3 py-1.5 text-sm rounded ${active ? 'bg-purple-600/30 text-purple-300' : 'text-gray-400 hover:text-gray-200'}`;
 
@@ -183,12 +226,26 @@ export default function AiConfigModal({ onClose, onSaved }: {
             )}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">{t.designer.aiConfigBaseUrl}</label>
-                <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
-                  placeholder={t.designer.aiConfigBaseUrlHint} className={inputCls} />
+                <label className="block text-xs text-gray-400 mb-1">{t.designer.aiConfigProvider}</label>
+                <select value={provider} onChange={e => chooseProvider(e.target.value)} className={inputCls}>
+                  {PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  <option value={CUSTOM_PROVIDER}>{t.designer.aiConfigProviderCustom}</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">{t.designer.aiConfigProviderHint}</p>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">{t.designer.aiConfigApiKey}</label>
+                <label className="block text-xs text-gray-400 mb-1">{t.designer.aiConfigBaseUrl}</label>
+                <input value={baseUrl} onChange={e => {
+                  setBaseUrl(e.target.value);
+                  setProvider(detectProvider(e.target.value));
+                  setTestResult(null);
+                }} placeholder={t.designer.aiConfigBaseUrlHint} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  {t.designer.aiConfigApiKey}
+                  {keylessProvider && <span className="ml-2 text-gray-500">({t.designer.aiConfigProviderKeyless})</span>}
+                </label>
                 <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
                   placeholder={view?.apiKeyMasked ? `${t.designer.aiConfigApiKeyHint}（${view.apiKeyMasked}）` : t.designer.aiConfigApiKeyHint}
                   className={inputCls} />
