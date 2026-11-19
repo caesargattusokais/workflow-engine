@@ -178,7 +178,7 @@ public class OpenAiCompatibleAiClient implements AiClient {
                     cause);
             this.status = cause.getStatusCode().value();
             this.responseBody = cause.getResponseBodyAsString();
-            this.reason = extractReason(this.responseBody);
+            this.reason = providerReason(this.responseBody);
         }
 
         int status() {
@@ -209,7 +209,7 @@ public class OpenAiCompatibleAiClient implements AiClient {
                     .append("HTTP ").append(status)
                     .append(" from POST ").append(endpoint)
                     .append(" (model=").append(model).append(")");
-            String reason = extractReason(body);
+            String reason = providerReason(body);
             if (reason != null) sb.append(" — ").append(reason);
             if (status == 404 && !hasVersionSuffix(endpoint)) {
                 sb.append(" 【提示】该 baseUrl 没有版本段，多数服务商要求末尾带 /v1（如 https://api.deepseek.com/v1）");
@@ -222,7 +222,7 @@ public class OpenAiCompatibleAiClient implements AiClient {
          * differ, but this is the one field nearly all of them agree on.
          */
         @SuppressWarnings("unchecked")
-        private static String extractReason(String body) {
+        static String providerReason(String body) {
             if (body == null || body.isBlank()) return null;
             try {
                 Map<String, Object> parsed = JSON.readValue(body, Map.class);

@@ -25,8 +25,9 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <snakeyaml.version>2.2</snakeyaml.version>
-        <spring.version>6.1.6</spring.version>
-        <spring-boot.version>3.3.0</spring-boot.version>
+        <spring.version>6.2.19</spring.version>
+        <spring-boot.version>3.5.15</spring-boot.version>
+        <spring-ai.version>1.1.8</spring-ai.version>
         <junit.version>5.10.2</junit.version>
         <assertj.version>3.25.3</assertj.version>
     </properties>
@@ -37,6 +38,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

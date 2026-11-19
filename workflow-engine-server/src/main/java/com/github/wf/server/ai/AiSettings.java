@@ -9,7 +9,7 @@ public record AiSettings(String baseUrl, String apiKey, String model, Source sou
 
     public enum Source { DATABASE, ENVIRONMENT }
 
-    public OpenAiCompatibleAiClient newClient() {
-        return new OpenAiCompatibleAiClient(baseUrl, apiKey == null ? "" : apiKey, model);
+    public SpringAiClient newClient() {
+        return new SpringAiClient(baseUrl, apiKey == null ? "" : apiKey, model);
     }
 }
