@@ -1,12 +1,37 @@
+import { useState } from 'react';
 import { useT } from '../i18n';
+import { diagnoseInstance, AiDiagnosis } from '../api/client';
 
-/** Right-hand detail sidebar for the selected instance. */
+const SEVERITY_STYLE: Record<string, string> = {
+  info: 'bg-blue-900 text-blue-300',
+  warning: 'bg-yellow-900 text-yellow-300',
+  error: 'bg-red-900 text-red-300',
+};
+
+/** Right-hand detail sidebar for the selected instance, with an AI copilot section. */
 export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
   inst: any;
   nodeNames: Record<string, string>;
   history: any[];
 }) {
   const { t } = useT();
+  const [diagnosis, setDiagnosis] = useState<AiDiagnosis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const analyze = async () => {
+    setAnalyzing(true);
+    setError(null);
+    try {
+      setDiagnosis(await diagnoseInstance(inst.id));
+    } catch (e: any) {
+      setDiagnosis(null);
+      setError(e?.message || String(e));
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const statusLabel = (s: string) => {
     const m: Record<string, string> = {
       RUNNING: t.monitor.running,
@@ -49,6 +74,54 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
           <div className="text-[10px] text-gray-500">{h.action} · {h.executor}</div>
         </div>
       ))}
+
+      {/* AI copilot: explain the current state and suggest recovery steps */}
+      <div className="border-t border-gray-700 mt-3 pt-2">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-gray-400 font-semibold">✨ {t.monitor.aiCopilot}</span>
+          <button
+            onClick={analyze}
+            disabled={analyzing}
+            className="px-2 py-0.5 rounded bg-purple-900 hover:bg-purple-800 disabled:opacity-50 text-purple-200 text-[10px]"
+          >
+            {analyzing ? t.monitor.aiAnalyzing : (diagnosis || error ? t.monitor.retry : t.monitor.aiCopilot)}
+          </button>
+        </div>
+        {analyzing && <div className="text-purple-400 animate-pulse">{t.monitor.aiAnalyzing}</div>}
+        {error && !analyzing && (
+          <div className="text-red-400 break-words">
+            <div className="font-semibold">{t.monitor.aiFailed}</div>
+            <div className="text-[10px]">{error}</div>
+          </div>
+        )}
+        {diagnosis && !analyzing && (
+          <div>
+            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold mb-1 ${SEVERITY_STYLE[diagnosis.severity] || SEVERITY_STYLE.info}`}>
+              {diagnosis.severity}
+            </span>
+            <div className="mb-1">
+              <div className="text-gray-500">{t.monitor.aiSummary}</div>
+              <div className="text-gray-200 whitespace-pre-wrap break-words">{diagnosis.summary}</div>
+            </div>
+            {diagnosis.cause && (
+              <div className="mb-1">
+                <div className="text-gray-500">{t.monitor.aiCause}</div>
+                <div className="text-gray-300 whitespace-pre-wrap break-words">{diagnosis.cause}</div>
+              </div>
+            )}
+            {diagnosis.suggestions?.length > 0 && (
+              <div>
+                <div className="text-gray-500">{t.monitor.aiSuggestions}</div>
+                <ul className="list-disc list-inside text-gray-300">
+                  {diagnosis.suggestions.map((s, i) => (
+                    <li key={i} className="break-words">{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

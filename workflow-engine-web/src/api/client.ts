@@ -155,4 +155,14 @@ async function apiGetAfterDelete(path: string) {
 
 export async function fetchInstanceSummary() { return apiGet('/instances/summary'); }
 
+export interface AiDiagnosis {
+  summary: string;
+  cause: string;
+  suggestions: string[];
+  severity: 'info' | 'warning' | 'error';
+}
+export async function diagnoseInstance(instanceId: string) {
+  return apiPost('/ai/diagnose', { instanceId }) as Promise<AiDiagnosis>;
+}
+
 export { userId, authHeaders, apiGet, apiPost };

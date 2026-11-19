@@ -82,6 +82,15 @@ http.createServer((req, res) => {
       content = JSON.stringify({ category: 'EXPENSE', amount });
     } else if (system.includes('summarise the given content')) {
       content = 'stub summary';
+    } else if (system.includes('"severity": "info|warning|error"')) {
+      // AI copilot diagnosis: deterministic structured JSON so the E2E can
+      // assert the parsed diagnosis without depending on a real model.
+      content = JSON.stringify({
+        summary: '实例正在等待人工审批',
+        cause: '当前活动节点为人工任务，suspendReasons 为空，无异常',
+        suggestions: ['催办或转派当前待办人', '如需干预可终止该实例'],
+        severity: 'info',
+      });
     } else {
       content = '```yaml\n' + YAML + '\n```';
     }

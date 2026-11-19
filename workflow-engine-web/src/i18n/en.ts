@@ -256,6 +256,13 @@ const en: Translations = {
     requiredFields: 'Please fill required fields',
     confirmTerminate: 'Terminate this instance?',
     confirmReject: 'Reject this task?',
+    aiCopilot: 'AI Copilot',
+    aiAnalyzing: 'Analyzing...',
+    aiSummary: 'Summary',
+    aiCause: 'Root cause',
+    aiSuggestions: 'Suggestions',
+    aiFailed: 'Diagnosis failed',
+    retry: 'Retry',
   },
 };
 

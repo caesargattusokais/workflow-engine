@@ -254,6 +254,13 @@ const zh = {
     requiredFields: '请填写必填字段',
     confirmTerminate: '确认终止该实例?',
     confirmReject: '确认驳回该任务?',
+    aiCopilot: 'AI 解读',
+    aiAnalyzing: 'AI 分析中...',
+    aiSummary: '摘要',
+    aiCause: '根因',
+    aiSuggestions: '建议',
+    aiFailed: '解读失败',
+    retry: '重试',
   },
 };
 
