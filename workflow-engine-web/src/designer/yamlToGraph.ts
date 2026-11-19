@@ -119,6 +119,14 @@ export function yamlToGraph(yaml: string): { name: string; nodes: Node[]; edges:
       data.exceptionRoutes = cur.exceptionRouting.filter(isRoutingItem).map(toRouteItem);
     }
 
+    // AI Task fields
+    if (type === 'aiTask') {
+      if (typeof cur.mode === 'string') data.mode = cur.mode;
+      if (typeof cur.prompt === 'string') data.prompt = cur.prompt;
+      if (typeof cur.outputVar === 'string') data.outputVar = cur.outputVar;
+      if (Array.isArray(cur.options)) data.options = cur.options.map(String);
+    }
+
     // CallActivity
     if (type === 'callActivity') {
       if (cur.calledId !== undefined) data.calledId = cur.calledId;

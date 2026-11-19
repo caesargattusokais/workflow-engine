@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { useT } from '../i18n';
 import { StartEventSection, UserTaskSection, ServiceTaskSection, GatewayConditionsSection,
-         TimerSection, CallActivitySection, OutgoingEdgesSection } from './property/sections';
+         TimerSection, CallActivitySection, AiTaskSection, OutgoingEdgesSection } from './property/sections';
 
 const NODE_TYPE_LABEL_KEYS: Record<string, keyof ReturnType<typeof useT>['t']['nodes']> = {
   exclusiveGateway: 'exclusiveGateway',
@@ -14,6 +14,7 @@ const NODE_TYPE_LABEL_KEYS: Record<string, keyof ReturnType<typeof useT>['t']['n
   endEvent: 'endEvent',
   timer: 'timer',
   callActivity: 'callActivity',
+  aiTask: 'aiTask',
 };
 
 export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onEdgesChange }: {
@@ -107,6 +108,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         )}
         {node.type === 'timer' && <TimerSection {...sectionProps} />}
         {node.type === 'callActivity' && <CallActivitySection {...sectionProps} />}
+        {node.type === 'aiTask' && <AiTaskSection {...sectionProps} />}
 
         {/* ── Outgoing Edges ── */}
         <OutgoingEdgesSection node={node} edges={edges}

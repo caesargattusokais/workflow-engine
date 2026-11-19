@@ -20,7 +20,7 @@ public final class AiFlowValidator {
     private static final Set<String> NODE_TYPES = Set.of(
             "startEvent", "endEvent", "userTask", "serviceTask",
             "exclusiveGateway", "parallelGateway", "inclusiveGateway",
-            "timer", "callActivity");
+            "timer", "callActivity", "aiTask");
 
     private AiFlowValidator() {}
 

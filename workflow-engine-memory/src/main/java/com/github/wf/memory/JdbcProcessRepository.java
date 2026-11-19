@@ -173,6 +173,20 @@ public class JdbcProcessRepository implements ProcessRepository {
                     deserializeMappings((List<Map<String, Object>>) d.get("outputMapping")),
                     listeners, Boolean.TRUE.equals(d.get("async")));
             }
+            case "AI_TASK": {
+                com.github.wf.model.RetryConfig rc = null;
+                Object max = d.get("retryMaxAttempts");
+                if (max != null) {
+                    rc = new com.github.wf.model.RetryConfig(
+                        ((Number) max).intValue(),
+                        d.get("retryDelayMs") != null ? ((Number) d.get("retryDelayMs")).longValue() : 1000L,
+                        d.get("retryBackoff") != null ? ((Number) d.get("retryBackoff")).doubleValue() : 2.0,
+                        deserializeConditions((List<Map<String, Object>>) d.get("retryOn")));
+                }
+                return new com.github.wf.model.node.AiTask(id, name,
+                    (String) d.get("mode"), (String) d.get("prompt"), (String) d.get("outputVar"),
+                    (List<String>) d.get("options"), rc, listeners);
+            }
             default: throw new IllegalArgumentException("Unknown: " + type);
         }
     }
@@ -188,6 +202,16 @@ public class JdbcProcessRepository implements ProcessRepository {
             else if (n instanceof ServiceTask st) { d.put("handlerClass", st.getHandlerClass()); d.put("httpMode", st.isHttpTask()); d.put("url", st.getUrl()); d.put("method", st.getMethod()); d.put("headers", st.getHeaders()); d.put("body", st.getBody()); if (st.getRetryConfig() != null) { d.put("retryMaxAttempts", st.getRetryConfig().getMaxAttempts()); d.put("retryDelayMs", st.getRetryConfig().getDelayMs()); d.put("retryBackoff", st.getRetryConfig().getBackoffMultiplier()); d.put("retryOn", serializeConditions(st.getRetryConfig().getRetryOn())); } d.put("resultRouting", serializeRoutes(st.getResultRouting())); d.put("exceptionRouting", serializeRoutes(st.getExceptionRouting())); }
             else if (n instanceof TimerNode tn) { d.put("duration", tn.getDuration()); d.put("deadline", tn.getDeadline()); }
             else if (n instanceof CallActivityNode ca) { d.put("calledId", ca.getCalledId()); d.put("calledVersion", ca.getCalledVersion()); d.put("async", ca.isAsync()); d.put("inputMapping", serializeMappings(ca.getInputMapping())); d.put("outputMapping", serializeMappings(ca.getOutputMapping())); }
+            else if (n instanceof com.github.wf.model.node.AiTask at) {
+                d.put("mode", at.getMode()); d.put("prompt", at.getPrompt());
+                d.put("outputVar", at.getOutputVar()); d.put("options", at.getOptions());
+                if (at.getRetryConfig() != null) {
+                    d.put("retryMaxAttempts", at.getRetryConfig().getMaxAttempts());
+                    d.put("retryDelayMs", at.getRetryConfig().getDelayMs());
+                    d.put("retryBackoff", at.getRetryConfig().getBackoffMultiplier());
+                    d.put("retryOn", serializeConditions(at.getRetryConfig().getRetryOn()));
+                }
+            }
             m.put(e.getKey(), d);
         }
         return m;

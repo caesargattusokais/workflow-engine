@@ -12,6 +12,7 @@ export default function NodePalette() {
     { type: 'inclusiveGateway', label: t.nodes.or, color: 'bg-purple-600', shape: 'rotate-45' },
     { type: 'timer', label: t.nodes.timer, color: 'bg-amber-600', shape: 'rounded-lg' },
     { type: 'callActivity', label: t.nodes.callActivity, color: 'bg-violet-700', shape: 'rounded-lg' },
+    { type: 'aiTask', label: t.nodes.aiTaskShort, color: 'bg-pink-600', shape: 'rounded-lg' },
   ];
 
   const onDragStart = (e: React.DragEvent, nodeType: string) => {
@@ -24,6 +25,7 @@ export default function NodePalette() {
       <div className="text-xs text-gray-500 text-center mb-2">{t.designer.dragHint}</div>
       {items.map(item => (
         <div key={item.type}
+          data-type={item.type}
           draggable
           onDragStart={(e) => onDragStart(e, item.type)}
           className="bg-gray-700 hover:bg-gray-600 rounded p-2 text-xs cursor-grab

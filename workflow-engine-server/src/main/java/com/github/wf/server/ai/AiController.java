@@ -116,7 +116,7 @@ public class AiController {
             nodes: 节点列表
             transitions: 连线列表
 
-            ## 节点类型（type 只能是以下 9 种）
+            ## 节点类型（type 只能是以下 10 种）
             startEvent    开始事件（必须恰好 1 个）
             endEvent      结束事件（至少 1 个）
             userTask      人工任务（assignee: 审批人或 "${变量}"；candidateGroups: 候选组列表；boundaryTimer: 超时如 "PT30M"）
@@ -126,6 +126,8 @@ public class AiController {
             inclusiveGateway  包容网关
             timer             定时器（duration: "PT1H" 或 until: "2026-01-01T09:00:00"）
             callActivity      子流程（calledId + calledVersion，inputMapping/outputMapping: [{from,to}]）
+            aiTask            AI 任务（mode: summary/extract/classify；prompt: 提示词可用 ${变量}；options: 分类候选列表；outputVar 可选）
+                              产出变量 <节点id>_text / <节点id>_result / <节点id>_category，可由网关 SpEL 条件消费
 
             ## 连线类型（transitions 每项）
             - from / to 必填，引用已存在的节点 id

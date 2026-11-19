@@ -110,6 +110,22 @@ export function graphToYaml(nodes: Node[], edges: Edge[], defId: string, defName
       if (er) n.exceptionRouting = er;
     }
 
+    if (node.type === 'aiTask') {
+      if (data.mode) n.mode = data.mode as string;
+      if (data.prompt) n.prompt = data.prompt as string;
+      if (data.outputVar) n.outputVar = data.outputVar as string;
+      if (Array.isArray(data.options) && data.options.length > 0) n.options = data.options;
+      // Retry for AI tasks — same shape as service tasks
+      const maxAttempts = data.retryMaxAttempts as number | undefined;
+      if (maxAttempts && maxAttempts > 1) {
+        n.retry = {
+          maxAttempts,
+          delayMs: (data.retryDelayMs as number) || 1000,
+          backoffMultiplier: (data.retryBackoff as number) || 2,
+        };
+      }
+    }
+
     if (node.type === 'callActivity') {
       if (data.calledId) n.calledId = data.calledId as string;
       if (data.calledVersion) n.calledVersion = data.calledVersion as number;

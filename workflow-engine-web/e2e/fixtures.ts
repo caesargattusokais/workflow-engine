@@ -348,6 +348,45 @@ transitions:
     to: end
   - from: dept-approve
     to: end`,
+
+  // AI_TASK in the runtime: classify into LONG/SHORT, route on <nodeId>_category.
+  // The E2E stub returns LONG when the user text contains a large number.
+  aiTaskClassify: `id: ai-task-classify
+name: AI Task Classify Test
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+  - id: classify
+    type: aiTask
+    name: AI 分类
+    mode: classify
+    prompt: "Classify leave request: days=\${days}"
+    options: [SHORT, LONG]
+  - id: manager
+    type: userTask
+    name: Manager Review
+    assignee: manager
+  - id: director
+    type: userTask
+    name: Director Review
+    assignee: director
+  - id: end
+    type: endEvent
+transitions:
+  - from: start
+    to: classify
+  - from: classify
+    to: director
+    type: result
+    expr: "classify_category == 'LONG'"
+  - from: classify
+    to: manager
+    type: result
+  - from: manager
+    to: end
+  - from: director
+    to: end`,
 };
 
 // Backward-compatible alias

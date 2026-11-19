@@ -9,5 +9,6 @@ public enum NodeType {
     PARALLEL_GATEWAY,
     INCLUSIVE_GATEWAY,
     TIMER,
-    CALL_ACTIVITY
+    CALL_ACTIVITY,
+    AI_TASK
 }

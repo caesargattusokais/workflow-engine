@@ -150,6 +150,51 @@ export function ServiceTaskSection({ node, updateData }: SectionProps) {
   );
 }
 
+// ── AI Task: mode / prompt / output / categories ──
+export function AiTaskSection({ node, updateData }: SectionProps) {
+  const { t } = useT();
+  const mode = (node.data.mode as string) || 'summary';
+  const options = (node.data.options as string[]) || [];
+  return (
+    <div className="border-t border-pink-500/50 pt-3 mt-2 space-y-3">
+      <div>
+        <label className="text-gray-400 text-xs">{t.props.aiMode}</label>
+        <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+          value={mode} onChange={e => updateData('mode', e.target.value)}>
+          <option value="summary" className="bg-gray-700">{t.props.aiModeSummary}</option>
+          <option value="extract" className="bg-gray-700">{t.props.aiModeExtract}</option>
+          <option value="classify" className="bg-gray-700">{t.props.aiModeClassify}</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-gray-400 text-xs">{t.props.aiPrompt}</label>
+        <textarea rows={5} spellCheck={false}
+          className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 resize-y"
+          value={(node.data.prompt as string) || ''}
+          onChange={e => updateData('prompt', e.target.value)}
+          placeholder={t.props.aiPromptHint} />
+      </div>
+      <div>
+        <label className="text-gray-400 text-xs">{t.props.aiOutputVar}</label>
+        <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+          value={(node.data.outputVar as string) || ''}
+          onChange={e => updateData('outputVar', e.target.value)}
+          placeholder={t.props.aiOutputVarHint} />
+      </div>
+      {mode === 'classify' && (
+        <div>
+          <label className="text-gray-400 text-xs">{t.props.aiCategories}</label>
+          <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+            value={options.join(', ')}
+            onChange={e => updateData('options', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+            placeholder={t.props.aiCategoriesHint} />
+          <p className="text-[10px] text-gray-500 mt-0.5">{t.props.aiCategoriesTip}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Gateway conditions (XOR / OR — one implementation, two color schemes) ──
 const GATEWAY_STYLES = {
   exclusive: {

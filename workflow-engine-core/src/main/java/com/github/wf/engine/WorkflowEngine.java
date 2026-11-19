@@ -68,6 +68,7 @@ public class WorkflowEngine {
         runners.put(NodeType.PARALLEL_GATEWAY, new ParallelGatewayRunner());
         runners.put(NodeType.INCLUSIVE_GATEWAY, new InclusiveGatewayRunner());
         runners.put(NodeType.TIMER, new TimerRunner(delayScheduler::schedule));
+        runners.put(NodeType.AI_TASK, new com.github.wf.engine.runner.AiTaskRunner(delayScheduler::schedule));
         runners.put(NodeType.CALL_ACTIVITY, new CallActivityRunner(
             processRepository, instanceRepository, this::deferTrigger));
     }
@@ -143,6 +144,17 @@ public class WorkflowEngine {
     public void registerServiceHandler(String className, ServiceTaskHandler handler) {
         ServiceTaskRunner runner = (ServiceTaskRunner) runners.get(NodeType.SERVICE_TASK);
         runner.registerHandler(className, handler);
+    }
+
+    /**
+     * Register the handler that backs every AI_TASK node. Takes precedence
+     * over ServiceLoader discovery, so the server can wire its configured
+     * model client in without any LLM dependency in the core.
+     */
+    public void registerAiHandler(com.github.wf.ext.AiTaskHandler handler) {
+        com.github.wf.engine.runner.AiTaskRunner runner =
+                (com.github.wf.engine.runner.AiTaskRunner) runners.get(NodeType.AI_TASK);
+        runner.registerHandler("default", handler);
     }
 
     public TaskQuery taskQuery() { return new TaskQuery(); }

@@ -30,6 +30,12 @@ public class NodeYaml {
     public List<VariableMappingYaml> inputMapping;
     public List<VariableMappingYaml> outputMapping;
 
+    // AI_TASK fields
+    public String mode;       // summary | extract | classify
+    public String prompt;     // user prompt, ${var} placeholders resolved at runtime
+    public String outputVar;  // optional global variable for the whole result
+    public List<String> options; // candidate categories for classify mode
+
     public static class VariableMappingYaml {
         public String from;
         public String to;

@@ -245,4 +245,24 @@ class JdbcProcessRepositoryTest {
         ProcessDefinition found = repo.findByIdAndVersion("wf-upsert", 1);
         assertThat(found.getName()).isEqualTo("Updated");
     }
+
+    @Test
+    void aiTaskSurvivesJdbcRoundTrip() {
+        RetryConfig retry = new RetryConfig(3, 250, 2.0, List.of());
+        AiTask ai = new AiTask("classify", "AI 分类", "classify", "Classify ${days}",
+                "analysis", List.of("SHORT", "LONG"), retry, List.of());
+        ProcessDefinition def = new ProcessDefinition("wf-ai-task", "AI", 1,
+                List.of(new StartEvent("start"), ai, new EndEvent("end")),
+                List.of(Transition.direct("start", "classify"), Transition.direct("classify", "end")));
+        repo.save(def);
+
+        ProcessDefinition loaded = repo.findById("wf-ai-task");
+        AiTask restored = (AiTask) loaded.getNode("classify");
+        assertThat(restored.getType()).isEqualTo(NodeType.AI_TASK);
+        assertThat(restored.getMode()).isEqualTo("classify");
+        assertThat(restored.getPrompt()).isEqualTo("Classify ${days}");
+        assertThat(restored.getOutputVar()).isEqualTo("analysis");
+        assertThat(restored.getOptions()).containsExactly("SHORT", "LONG");
+        assertThat(restored.getRetryConfig().getMaxAttempts()).isEqualTo(3);
+    }
 }

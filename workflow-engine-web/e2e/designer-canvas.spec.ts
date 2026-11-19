@@ -18,6 +18,7 @@ test.describe('Designer — Canvas & Nodes', () => {
     { type: 'inclusiveGateway', label: /OR|条件/ },
     { type: 'timer', label: /Timer|定时器/ },
     { type: 'callActivity', label: /Call Activity|调用活动/ },
+    { type: 'aiTask', label: /AI Task|AI 任务/ },
   ];
 
   for (const { type, label } of nodeTypes) {

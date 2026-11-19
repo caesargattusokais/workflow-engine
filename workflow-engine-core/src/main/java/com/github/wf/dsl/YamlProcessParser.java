@@ -156,6 +156,9 @@ public class YamlProcessParser implements ProcessParser {
             case "parallelGateway": return new ParallelGateway(ny.id, ny.name, listeners);
             case "inclusiveGateway": return new InclusiveGateway(ny.id, ny.name, listeners);
             case "timer": return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
+            case "aiTask":
+                return new com.github.wf.model.node.AiTask(ny.id, ny.name, ny.mode,
+                        ny.prompt, ny.outputVar, ny.options, buildRetryConfig(ny), listeners);
             case "callActivity":
                 List<VariableMapping> inMappings = new ArrayList<>();
                 if (ny.inputMapping != null) {

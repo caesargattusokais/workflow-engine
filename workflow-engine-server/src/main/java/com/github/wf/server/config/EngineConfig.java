@@ -50,7 +50,8 @@ public class EngineConfig {
             @Autowired(required = false) InstanceLockManager lockManager,
             @Autowired(required = false) OrgService orgService,
             @Autowired(required = false) DelayScheduler delayScheduler,
-            @Autowired(required = false) InstanceStateListener stateListener) {
+            @Autowired(required = false) InstanceStateListener stateListener,
+            @Autowired(required = false) com.github.wf.server.ai.DynamicAiClient aiClient) {
         var builder = WorkflowEngine.builder()
                 .processRepository(processRepository)
                 .instanceRepository(instanceRepository)
@@ -61,6 +62,11 @@ public class EngineConfig {
         if (delayScheduler != null) builder.delayScheduler(delayScheduler);
         WorkflowEngine engine = builder.build();
         if (stateListener != null) engine.addStateListener(stateListener);
+        // Bridge AI_TASK nodes to the dynamically configured client. The facade
+        // delegates on every call, so settings changes apply to running flows.
+        if (aiClient != null) {
+            engine.registerAiHandler(new com.github.wf.server.ai.ServerAiTaskHandler(aiClient));
+        }
         return engine;
     }
 

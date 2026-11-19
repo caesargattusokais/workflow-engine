@@ -69,6 +69,13 @@ public class JsonProcessParser implements ProcessParser {
         ny.duration = jo.has("duration") ? jo.get("duration").getAsString() : null;
         ny.until = jo.has("until") ? jo.get("until").getAsString() : null;
         ny.boundaryTimer = jo.has("boundaryTimer") ? jo.get("boundaryTimer").getAsString() : null;
+        ny.mode = jo.has("mode") ? jo.get("mode").getAsString() : null;
+        ny.prompt = jo.has("prompt") ? jo.get("prompt").getAsString() : null;
+        ny.outputVar = jo.has("outputVar") ? jo.get("outputVar").getAsString() : null;
+        if (jo.has("options") && jo.get("options").isJsonArray()) {
+            ny.options = new ArrayList<>();
+            for (JsonElement e : jo.getAsJsonArray("options")) ny.options.add(e.getAsString());
+        }
 
         ny.calledId = jo.has("calledId") ? jo.get("calledId").getAsString() : null;
         ny.calledVersion = jo.has("calledVersion") ? jo.get("calledVersion").getAsInt() : null;
@@ -222,6 +229,9 @@ public class JsonProcessParser implements ProcessParser {
                 return new InclusiveGateway(ny.id, ny.name, listeners);
             case "timer":
                 return new TimerNode(ny.id, ny.name, ny.duration, ny.until, listeners);
+            case "aiTask":
+                return new com.github.wf.model.node.AiTask(ny.id, ny.name, ny.mode,
+                        ny.prompt, ny.outputVar, ny.options, null, listeners);
             case "callActivity":
                 List<VariableMapping> inMappings = new ArrayList<>();
                 if (ny.inputMapping != null) {

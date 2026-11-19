@@ -208,4 +208,29 @@ test.describe('E2E Workflow Scenarios', () => {
     const updated = await api.getInstance(inst.id);
     expect(updated.status).toBe('COMPLETED');
   });
+
+  test('AI_TASK classification routes on the model result (LONG)', async ({ api }) => {
+    const def = await api.deploy(workflows.aiTaskClassify);
+    // Stub classifies any text containing 7 as LONG.
+    const inst = await api.startInstance(def.id, { days: 7 });
+
+    const directorTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'director' }, 10000);
+    expect(directorTasks.length).toBeGreaterThan(0);
+    const managerTasks = await api.listTasks({ instanceId: inst.id, assignee: 'manager' });
+    expect(managerTasks.length).toBe(0);
+    await api.completeTask(directorTasks[0].id);
+    expect((await api.getInstance(inst.id)).status).toBe('COMPLETED');
+  });
+
+  test('AI_TASK classification falls back to the default branch (SHORT)', async ({ api }) => {
+    const def = await api.deploy(workflows.aiTaskClassify);
+    const inst = await api.startInstance(def.id, { days: 1 });
+
+    const managerTasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'manager' }, 10000);
+    expect(managerTasks.length).toBeGreaterThan(0);
+    const directorTasks = await api.listTasks({ instanceId: inst.id, assignee: 'director' });
+    expect(directorTasks.length).toBe(0);
+    await api.completeTask(managerTasks[0].id);
+    expect((await api.getInstance(inst.id)).status).toBe('COMPLETED');
+  });
 });

@@ -67,10 +67,27 @@ http.createServer((req, res) => {
       return;
     }
 
+    // AI_TASK nodes use the same endpoint with a task-specific system prompt.
+    // Give deterministic answers so E2E can assert variable writes + routing.
+    const messages = payload.messages || [];
+    const system = (messages.find(m => m.role === 'system') || {}).content || '';
+    let content;
+    if (system.includes('classify text into exactly one category')) {
+      const userText = (messages.find(m => m.role === 'user') || {}).content || '';
+      content = /7|long|超过|以上|总监/i.test(userText) ? 'LONG' : 'SHORT';
+    } else if (system.includes('extract structured data')) {
+      content = '{"category":"EXPENSE","amount":100}';
+    } else if (system.includes('summarise the given content')) {
+      content = 'stub summary';
+    } else {
+      content = '```yaml\n' + YAML + '\n```';
+    }
+
     const data = JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: '```yaml\n' + YAML + '\n```' } }]
+      choices: [{ message: { role: 'assistant', content } }]
     });
-    console.log('ok: temperature ' + (Object.prototype.hasOwnProperty.call(payload, 'temperature') ? 'present' : 'absent'));
+    console.log('ok: ' + (content.length > 60 ? 'yaml' : 'task answer') +
+      ' / temperature ' + (Object.prototype.hasOwnProperty.call(payload, 'temperature') ? 'present' : 'absent'));
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) });
     res.end(data);
   });

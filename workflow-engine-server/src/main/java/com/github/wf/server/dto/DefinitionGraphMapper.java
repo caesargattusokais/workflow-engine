@@ -95,6 +95,11 @@ public final class DefinitionGraphMapper {
                     data.put("retryDelayMs", st.getRetryConfig().getDelayMs());
                     data.put("retryBackoff", st.getRetryConfig().getBackoffMultiplier());
                 }
+            } else if (n instanceof com.github.wf.model.node.AiTask at) {
+                data.put("mode", at.getMode());
+                data.put("prompt", at.getPrompt());
+                data.put("outputVar", at.getOutputVar());
+                data.put("options", at.getOptions());
             } else if (n instanceof TimerNode tn) {
                 data.put("duration", tn.getDuration());
                 data.put("deadline", tn.getDeadline());
@@ -157,7 +162,7 @@ public final class DefinitionGraphMapper {
             case USER_TASK -> "userTask"; case SERVICE_TASK -> "serviceTask";
             case EXCLUSIVE_GATEWAY -> "exclusiveGateway"; case PARALLEL_GATEWAY -> "parallelGateway";
             case INCLUSIVE_GATEWAY -> "inclusiveGateway"; case TIMER -> "timer";
-            case CALL_ACTIVITY -> "callActivity";
+            case CALL_ACTIVITY -> "callActivity"; case AI_TASK -> "aiTask";
         };
     }
 }

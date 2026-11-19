@@ -294,6 +294,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           if (rv.key) vars.push({ name: `${node.id}_${rv.key}`, source: `「${nodeName}」${label} → ${rv.type}` });
         }
       }
+      if (node.type === 'aiTask') {
+        const label = (node.data.mode as string) || 'AI';
+        const nodeName = (node.data.name as string) || node.id;
+        vars.push({ name: `${node.id}_text`, source: `「${nodeName}」AI · ${label} → 原始输出` });
+        vars.push({ name: `${node.id}_result`, source: `「${nodeName}」AI · ${label} → 完整结果` });
+        if (node.data.mode === 'classify') vars.push({ name: `${node.id}_category`, source: `「${nodeName}」AI 分类结果` });
+        if (node.data.outputVar) vars.push({ name: String(node.data.outputVar), source: `「${nodeName}」AI 输出变量` });
+      }
       if (node.type === 'userTask') {
         const m = ((node.data.assignee as string) || '').match(/\$\{(\w+)\}/);
         if (m && m[1]) vars.push({ name: m[1], source: 'Assignee' });

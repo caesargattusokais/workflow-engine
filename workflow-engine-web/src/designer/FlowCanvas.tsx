@@ -97,7 +97,8 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       id: `node_${++nodeIdCounter}`,
       type,
       position,
-      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '' }
+      data: { name: type, assignee: '', candidateGroups: [], handlerClass: '',
+              ...(type === 'aiTask' ? { mode: 'summary', prompt: '', options: [], outputVar: '' } : {}) }
     };
     setNodes([...nodes, newNode]);
   }, [nodes, setNodes, locked]);
@@ -262,6 +263,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               const srcType = srcNode?.type || '';
               const allowed: Record<string, string[]> = {
                 serviceTask: ['direct','result','exception'],
+                aiTask: ['direct','result','exception'],
                 userTask: ['direct','timeout'],
                 exclusiveGateway: ['conditional','default'],
                 parallelGateway: ['direct'],
