@@ -25,9 +25,17 @@ import java.util.Map;
 public class AiController {
 
     private final AiClient aiClient;
+    private final AiGenerationSettings generation;
 
-    public AiController(@Autowired(required = false) AiClient aiClient) {
+    /** Tests / embedding without generation settings: built-in defaults. */
+    public AiController(AiClient aiClient) {
+        this(aiClient, new AiGenerationSettings(null, null, null));
+    }
+
+    @Autowired
+    public AiController(AiClient aiClient, AiGenerationSettings generation) {
         this.aiClient = aiClient;
+        this.generation = generation;
     }
 
     @PostMapping("/generate")
@@ -44,7 +52,8 @@ public class AiController {
             throw new IllegalArgumentException("prompt is required");
         }
 
-        String raw = aiClient.complete(SYSTEM_PROMPT, prompt);
+        String systemPrompt = systemPrompt();
+        String raw = aiClient.complete(systemPrompt, prompt);
         String yaml = extractYaml(raw);
 
         List<String> errors = AiFlowValidator.validate(yaml);
@@ -54,7 +63,7 @@ public class AiController {
                     + "\n\n你上一次的输出存在以下问题，请修正后重新输出完整 YAML（只输出 YAML）：\n- "
                     + String.join("\n- ", errors)
                     + "\n\n上一次的输出：\n" + yaml;
-            String retryRaw = aiClient.complete(SYSTEM_PROMPT, retryPrompt);
+            String retryRaw = aiClient.complete(systemPrompt, retryPrompt);
             yaml = extractYaml(retryRaw);
             errors = AiFlowValidator.validate(yaml);
             if (!errors.isEmpty()) {
@@ -70,6 +79,12 @@ public class AiController {
         result.put("name", AiFlowValidator.extractName(yaml));
         result.put("nodeCount", AiFlowValidator.nodeCount(yaml));
         return result;
+    }
+
+    /** Effective system prompt: page/env override, else the built-in default. */
+    private String systemPrompt() {
+        String custom = generation.effective().systemPrompt();
+        return custom != null && !custom.isBlank() ? custom : DEFAULT_SYSTEM_PROMPT;
     }
 
     /** Strip markdown code fences the model may wrap the YAML in. */
@@ -91,7 +106,7 @@ public class AiController {
 
     // ── Prompt ────────────────────────────
 
-    static final String SYSTEM_PROMPT = """
+    static final String DEFAULT_SYSTEM_PROMPT = """
             你是资深工作流架构师。根据用户的自然语言描述，输出该工作流引擎可用的流程 YAML。只输出 YAML 本身，不要任何解释文字。
 
             ## 顶层结构

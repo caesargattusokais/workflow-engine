@@ -47,7 +47,13 @@ public class SpringAiClient implements AiClient {
     private final OpenAiChatModel withTemperature;
     private final OpenAiChatModel withoutTemperature;
 
+    static final double DEFAULT_TEMPERATURE = 0.2;
+
     public SpringAiClient(String baseUrl, String apiKey, String model) {
+        this(baseUrl, apiKey, model, DEFAULT_TEMPERATURE);
+    }
+
+    public SpringAiClient(String baseUrl, String apiKey, String model, double temperature) {
         this.baseUrl = OpenAiCompatibleAiClient.normalizeBaseUrl(baseUrl);
         if (this.baseUrl.isEmpty()) {
             throw new IllegalArgumentException("AI baseUrl is required");
@@ -57,7 +63,7 @@ public class SpringAiClient implements AiClient {
         this.apiKey = apiKey;
 
         OpenAiApi api = buildApi();
-        this.withTemperature = buildModel(api, 0.2);
+        this.withTemperature = buildModel(api, AiGenerationSettings.validateTemperature(temperature));
         this.withoutTemperature = buildModel(api, null);
     }
 

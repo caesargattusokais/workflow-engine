@@ -2,6 +2,7 @@ package com.github.wf.server.ai;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -20,10 +21,20 @@ public class AiConfigController {
 
     private final AiSettingsService settings;
     private final DynamicAiClient client;
+    private final AiClientWiring wiring;
 
+    /** Tests without generation settings: wiring defaults to the given delegate. */
     public AiConfigController(AiSettingsService settings, DynamicAiClient client) {
         this.settings = settings;
         this.client = client;
+        this.wiring = new AiClientWiring(settings, new AiGenerationSettings(null, null, null), client);
+    }
+
+    @Autowired
+    public AiConfigController(AiSettingsService settings, DynamicAiClient client, AiClientWiring wiring) {
+        this.settings = settings;
+        this.client = client;
+        this.wiring = wiring;
     }
 
     @GetMapping
@@ -49,7 +60,7 @@ public class AiConfigController {
     @Operation(summary = "Save AI configuration", description = "Takes effect immediately, no restart. Send apiKey empty to keep the existing key.")
     public Map<String, Object> save(@RequestBody Map<String, String> body) {
         AiSettings saved = settings.save(body.get("baseUrl"), body.get("apiKey"), body.get("model"));
-        client.setDelegate(saved.newClient());
+        wiring.repoint();
         return view();
     }
 
@@ -57,7 +68,7 @@ public class AiConfigController {
     @Operation(summary = "Reset AI configuration", description = "Removes page overrides and falls back to the AI_BASE_URL environment defaults.")
     public Map<String, Object> reset() {
         settings.clear();
-        client.setDelegate(settings.effective().map(AiSettings::newClient).orElse(null));
+        wiring.repoint();
         return view();
     }
 

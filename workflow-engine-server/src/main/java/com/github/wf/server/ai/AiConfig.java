@@ -27,9 +27,22 @@ public class AiConfig {
     }
 
     @Bean
+    public AiGenerationSettings aiGenerationSettings(ObjectProvider<DataSource> dataSource,
+            @Value("${ai.system-prompt:}") String systemPrompt,
+            @Value("${ai.temperature:}") String temperature) {
+        return new AiGenerationSettings(dataSource.getIfAvailable(), systemPrompt, temperature);
+    }
+
+    @Bean
     public DynamicAiClient aiClient(AiSettingsService settings) {
-        DynamicAiClient client = new DynamicAiClient();
-        settings.effective().ifPresent(cfg -> client.setDelegate(cfg.newClient()));
-        return client;
+        return new DynamicAiClient();
+    }
+
+    @Bean
+    public AiClientWiring aiClientWiring(AiSettingsService provider,
+            AiGenerationSettings generation, DynamicAiClient client) {
+        AiClientWiring wiring = new AiClientWiring(provider, generation, client);
+        wiring.repoint(); // initial delegate from the effective settings
+        return wiring;
     }
 }

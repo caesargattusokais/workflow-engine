@@ -10,6 +10,10 @@ public record AiSettings(String baseUrl, String apiKey, String model, Source sou
     public enum Source { DATABASE, ENVIRONMENT }
 
     public SpringAiClient newClient() {
-        return new SpringAiClient(baseUrl, apiKey == null ? "" : apiKey, model);
+        return newClient(SpringAiClient.DEFAULT_TEMPERATURE);
+    }
+
+    public SpringAiClient newClient(double temperature) {
+        return new SpringAiClient(baseUrl, apiKey == null ? "" : apiKey, model, temperature);
     }
 }

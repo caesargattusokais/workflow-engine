@@ -51,6 +51,9 @@ test.describe('Designer — AI flow generation', () => {
     const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');
     await expect(modal).toBeVisible();
 
+    // Modal opens on the Generation tab — switch to Connection
+    await modal.locator('button:has-text("服务连接"), button:has-text("Connection")').click();
+
     // Status chip reflects the backend's current config (stub is wired via env)
     await expect(modal.locator('span:has-text("✓"), span:has-text("✕")').first()).toBeVisible();
 
@@ -63,6 +66,7 @@ test.describe('Designer — AI flow generation', () => {
     // Modal closes on success (toast fires) — reopen and confirm source flipped to database
     await expect(modal).toBeHidden({ timeout: 10000 });
     await gear.click();
+    await modal.locator('button:has-text("服务连接"), button:has-text("Connection")').click();
     await expect(modal.locator('span:has-text("页面配置"), span:has-text("Page config")').first())
       .toBeVisible({ timeout: 10000 });
     // API key now shows masked instead of "not set"
@@ -71,10 +75,52 @@ test.describe('Designer — AI flow generation', () => {
     await expect(modal).toBeHidden({ timeout: 10000 });
   });
 
+  test('generation settings save a custom prompt and restore default', async ({ page }) => {
+    await page.locator('header button:has-text("⚙")').click();
+    const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');
+    await expect(modal).toBeVisible();
+
+    // Generation tab is the default; the built-in prompt is loaded into the textarea
+    const textarea = modal.locator('textarea');
+    await expect(textarea).toBeVisible();
+    // Prompt loads async from /api/ai/generation — wait until populated
+    await expect.poll(() => textarea.inputValue()).toContain('工作流架构师');
+    const builtInPrompt = await textarea.inputValue();
+    expect(builtInPrompt.length).toBeGreaterThan(100);
+
+    // Edit prompt + temperature and save
+    await textarea.fill('自定义提示词：只输出 start 和 end 两个节点');
+    const slider = modal.locator('input[type="range"]');
+    await slider.fill('0.6');
+    await modal.locator('button:has-text("保存生成设置"), button:has-text("Save generation")').click();
+    await expect(modal).toBeHidden({ timeout: 10000 });
+
+    // API reflects the saved values
+    const saved = await page.evaluate(async () => {
+      const res = await fetch('/api/ai/generation', { headers: { 'X-User-Id': 'e2e' } });
+      return res.json();
+    });
+    expect(saved.systemPrompt).toBe('自定义提示词：只输出 start 和 end 两个节点');
+    expect(saved.temperature).toBeCloseTo(0.6, 1);
+    expect(saved.isDefaultPrompt).toBe(false);
+
+    // Reset restores the built-in prompt
+    await page.locator('header button:has-text("⚙")').click();
+    await modal.locator('button:has-text("恢复默认生成设置"), button:has-text("Reset generation")').click();
+    await expect(modal).toBeHidden({ timeout: 10000 });
+    const reset = await page.evaluate(async () => {
+      const res = await fetch('/api/ai/generation', { headers: { 'X-User-Id': 'e2e' } });
+      return res.json();
+    });
+    expect(reset.isDefaultPrompt).toBe(true);
+    expect(reset.temperature).toBeCloseTo(0.2, 1);
+  });
+
   test('AI config test button reports connectivity result', async ({ page }) => {
     await page.locator('header button:has-text("⚙")').click();
     const modal = page.locator('.bg-gray-800.rounded-lg.shadow-2xl');
     await expect(modal).toBeVisible();
+    await modal.locator('button:has-text("服务连接"), button:has-text("Connection")').click();
 
     await modal.locator('input').first().fill('http://127.0.0.1:1/v1');
     await modal.locator('input').nth(2).fill('some-model');

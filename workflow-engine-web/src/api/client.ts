@@ -132,6 +132,19 @@ export async function testAiConfig(cfg: { baseUrl?: string, apiKey?: string, mod
   return apiPost('/ai/config/test', cfg) as Promise<{ ok: boolean, message: string, latencyMs?: number }>;
 }
 
+export interface AiGenerationView {
+  systemPrompt: string;
+  defaultPrompt: string;
+  temperature: number;
+  source: 'database' | 'environment' | 'default';
+  isDefaultPrompt: boolean;
+}
+export async function getAiGeneration(): Promise<AiGenerationView> { return apiGet('/ai/generation'); }
+export async function saveAiGeneration(cfg: { systemPrompt: string, temperature: number }) {
+  return apiPut('/ai/generation', cfg) as Promise<AiGenerationView>;
+}
+export async function resetAiGeneration() { return apiGetAfterDelete('/ai/generation') as Promise<AiGenerationView>; }
+
 /** DELETE that still parses the JSON response body (apiDelete returns void). */
 async function apiGetAfterDelete(path: string) {
   const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
