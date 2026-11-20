@@ -10,10 +10,13 @@ workflow-engine/
 ├── workflow-engine-memory/       # 内存 + JDBC 持久化实现
 ├── workflow-engine-mock-ldap/    # Mock LDAP 组织架构（测试用）
 ├── workflow-engine-server/       # Spring Boot REST API 服务
+├── workflow-engine-mcp/          # MCP server — 把引擎接入 Claude Code / Cursor 等 AI 客户端
 ├── workflow-engine-web/          # React 可视化设计器 + 监控面板
 ├── workflow-engine-examples/     # 使用示例
 └── docker/                       # Docker Compose（MySQL + LDAP）
 ```
+
+MCP server 见 `docs/mcp.md`。
 
 ## 快速开始
 

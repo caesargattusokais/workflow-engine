@@ -1,0 +1,29 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: workflow-engine-mcp
+  ai:
+    mcp:
+      server:
+        name: workflow-engine
+        version: 1.0.0
+        # Streamable HTTP transport (single /mcp endpoint, supported by
+        # Claude Code / Cursor and other modern MCP clients).
+        protocol: streamable
+        type: SYNC
+        enable-tool-change-notifications: false
+
+wf:
+  engine:
+    # Where the workflow-engine-server REST API lives.
+    base-url: ${WF_ENGINE_URL:http://localhost:8080/api}
+    # Identity the MCP server acts as inside the engine (X-User-Id header).
+    # Tenant filtering applies to this user exactly as to a human.
+    user: ${WF_MCP_USER:mcp-agent}
+
+logging:
+  level:
+    io.modelcontextprotocol: WARN
+    org.springframework.ai.mcp: WARN

@@ -18,6 +18,7 @@
         <module>workflow-engine-mock-ldap</module>
         <module>workflow-engine-examples</module>
         <module>workflow-engine-server</module>
+        <module>workflow-engine-mcp</module>
     </modules>
 
     <properties>
