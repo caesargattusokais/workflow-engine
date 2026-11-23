@@ -60,13 +60,13 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
     position: { x: n.position?.x ?? 200, y: n.position?.y ?? 50 },
     data: n.data || {},
     style: n.data?.active
-      ? { border: '2px solid #3b82f6', boxShadow: '0 0 12px rgba(59,130,246,0.5)' }
+      ? { border: '2px solid #5e6ad2', boxShadow: '0 0 16px rgba(94,106,210,0.45)' }
       : n.data?.status === 'done' ? { opacity: 0.4 } : {}
   })), [nodes]);
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#1a1a2e' }}>
+      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#141821' }}>
         <div className="text-center">
           <div className="text-red-400 text-sm mb-2">Failed to load flow</div>
           <div className="text-gray-500 text-xs">{error}</div>
@@ -77,14 +77,14 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
 
   if (!nodes || nodes.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#1a1a2e' }}>
+      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#141821' }}>
         <div className="text-center text-gray-500 text-sm">Select an instance to view its flow</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 h-full" style={{ minHeight: 300, background: '#1a1a2e' }}>
+    <div className="flex-1 h-full" style={{ minHeight: 300, background: '#141821' }}>
       <ReactFlow nodes={safeNodes} edges={safeEdges} nodeTypes={nodeTypes}
         onInit={(rf: any) => { rfRef.current = rf; }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}>

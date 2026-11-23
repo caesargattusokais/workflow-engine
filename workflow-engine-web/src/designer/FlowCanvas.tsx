@@ -156,7 +156,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   }, [nodes, setNodes]);
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400, background: '#1a1a2e' }}>
+    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400, background: '#141821' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -188,9 +188,9 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
           interactionWidth: 20,
           data: { edgeType: 'direct' }
         }}
-        style={{ background: '#1a1a2e' }}
+        style={{ background: '#141821' }}
       >
-        <Background color="#2a2a4a" gap={20} size={1} />
+        <Background color="#252b38" gap={20} size={1} />
       </ReactFlow>
 
       {/* ── Bottom-left tools ─────────────────── */}
@@ -212,7 +212,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       {/* ── Context Menu ──────────────────────── */}
       {menu && (
         <div
-          className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-xl py-1 min-w-[140px]"
+          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-popover py-1 min-w-[160px]"
           style={{ left: menu.x, top: menu.y }}
           onClick={e => e.stopPropagation()}
         >
@@ -293,7 +293,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               ))}
               {needsExpr && (
                 <div className="px-3 py-1" onClick={e => e.stopPropagation()}>
-                  <input className="w-full bg-gray-700 rounded px-1.5 py-0.5 text-white text-xs mt-1"
+                  <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-gray-200 text-xs mt-1"
                     placeholder="SpEL: days > 3"
                     defaultValue={(edges.find(e => e.id === menu.edgeId)?.data?.expr as string) || ''}
                     onBlur={e => {

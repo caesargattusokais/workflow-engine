@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Sparkles, X, PlugZap, FileText, BookOpen, RotateCcw, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 import { useT } from '../i18n';
 import {
   getAiConfig, saveAiConfig, resetAiConfig, testAiConfig, AiConfigView,
@@ -82,11 +83,8 @@ export default function AiConfigModal({ onClose, onSaved }: {
     }).catch(e => setError(e.message));
   }, []);
 
-  // gray-750 is not a Tailwind colour (default ramp jumps 700 -> 800), so it
-  // was silently dropped and left light text on a white background. Use a
-  // real ramp step for every input, textarea and select in this modal.
-  const inputCls = "w-full bg-gray-700 border border-gray-600 rounded p-2.5 text-sm text-gray-200 placeholder-gray-500 focus:border-purple-500 focus:outline-none";
-  const optionCls = "bg-gray-700 text-gray-200";
+  const inputCls = "w-full bg-gray-900/70 border border-gray-700 rounded-md px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 hover:border-gray-600 focus:border-purple-500 focus:outline-none transition-colors";
+  const optionCls = "bg-gray-800 text-gray-200";
 
   // ── connection tab ──────────────────────────────
   const connPayload = () => ({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), model: model.trim() });
@@ -195,27 +193,37 @@ export default function AiConfigModal({ onClose, onSaved }: {
   const keylessProvider = PROVIDERS.some(p => p.id === provider && p.keyless);
 
   const tabCls = (active: boolean) =>
-    `px-3 py-1.5 text-sm rounded ${active ? 'bg-purple-600/30 text-purple-300' : 'text-gray-400 hover:text-gray-200'}`;
+    `flex items-center gap-1.5 px-3 py-2 text-xs rounded-md font-medium transition-colors ${active ? 'bg-purple-600/20 text-purple-300' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}`;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-gray-800 rounded-lg shadow-2xl w-[620px] p-6" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg text-gray-200 font-bold">{t.designer.aiConfigTitle}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">&times;</button>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-gray-800 rounded-lg shadow-2xl w-[660px] max-h-[88vh] overflow-y-auto border border-gray-700" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-700/70">
+          <div className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <Sparkles size={16} strokeWidth={2} />
+          </div>
+          <h2 className="text-sm font-semibold text-gray-100 flex-1">{t.designer.aiConfigTitle}</h2>
+          <button onClick={onClose} className="btn-icon" aria-label="Close">
+            <X size={16} strokeWidth={2} />
+          </button>
         </div>
 
-        <div className="flex gap-1 border-b border-gray-700 mb-4 pb-1">
+        <div className="flex gap-1 border-b border-gray-700/70 mx-5 mt-4 mb-5">
           <button onClick={() => setTab('connection')} className={tabCls(tab === 'connection')}>
+            <PlugZap size={13} strokeWidth={2} />
             {t.designer.aiTabConnection}
           </button>
           <button onClick={() => setTab('generation')} className={tabCls(tab === 'generation')}>
+            <SlidersHorizontal size={13} strokeWidth={2} />
             {t.designer.aiTabGeneration}
           </button>
           <button onClick={() => setTab('knowledge')} className={tabCls(tab === 'knowledge')}>
+            <BookOpen size={13} strokeWidth={2} />
             {t.designer.aiTabKnowledge}
           </button>
         </div>
+
+        <div className="px-5 pb-5">
 
         {tab === 'connection' && (
           <div>
@@ -337,7 +345,8 @@ export default function AiConfigModal({ onClose, onSaved }: {
           </div>
         )}
 
-        {error && <div className="mt-3 text-xs rounded p-2 bg-red-900/50 text-red-300">✕ {error}</div>}
+        {error && <div className="mt-3 text-xs rounded p-2 bg-red-900/50 text-red-300 flex items-center gap-1.5"><X size={12} /> {error}</div>}
+        </div>
       </div>
     </div>
   );

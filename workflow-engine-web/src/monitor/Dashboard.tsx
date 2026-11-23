@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { BarChart3, Layers3, CircleDot, Clock3 } from 'lucide-react';
 import { apiGet, listInstances, listDrafts } from '../api/client';
 import { showToast } from '../api/toast';
 import { useT } from '../i18n';
@@ -73,8 +74,9 @@ export default function Dashboard() {
   return (
     <div className="flex h-full">
       {/* Left: Draft list */}
-      <div className="w-48 bg-gray-800 border-r border-gray-700 flex flex-col">
-        <div className="p-2 text-xs text-gray-400 font-semibold border-b border-gray-700">
+      <div className="w-52 bg-gray-850 border-r border-gray-700/70 flex flex-col">
+        <div className="px-3 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-medium border-b border-gray-700/70 flex items-center gap-2">
+          <Layers3 size={12} strokeWidth={2} />
           {t.dashboard.myFlows}
         </div>
         <div className="flex-1 overflow-y-auto"
@@ -87,9 +89,9 @@ export default function Dashboard() {
           {drafts.map((d: any) => (
             <div key={d.id}
               onClick={() => selectDraft(d)}
-              className={`px-3 py-2 cursor-pointer text-xs border-b border-gray-800 hover:bg-gray-750
-                ${selectedDraft?.id === d.id ? 'bg-blue-600/30 border-l-2 border-l-blue-500' : ''}`}>
-              <div className="text-gray-300 truncate">{d.name}</div>
+              className={`px-3 py-2 cursor-pointer text-xs border-b border-gray-800/60 hover:bg-gray-800/70 transition-colors
+                ${selectedDraft?.id === d.id ? 'bg-blue-600/20 border-l-2 border-l-blue-500' : ''}`}>
+              <div className={`truncate font-medium ${selectedDraft?.id === d.id ? 'text-gray-100' : 'text-gray-300'}`}>{d.name}</div>
             </div>
           ))}
           {draftHasMore ? (
@@ -111,13 +113,16 @@ export default function Dashboard() {
       </div>
 
       {/* Right: Stats + Instances */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-6">
         {!selectedDraft ? (
           <>
             {/* Global stats when no draft selected */}
             {globalStats ? (
               <div>
-                <h2 className="text-gray-200 font-bold mb-4">{t.dashboard.allFlows || 'All Flows'}</h2>
+                <h2 className="text-base font-semibold text-gray-100 mb-5 flex items-center gap-2">
+                  <BarChart3 size={16} className="text-blue-400" strokeWidth={2} />
+                  {t.dashboard.allFlows || 'All Flows'}
+                </h2>
                 <div className="grid grid-cols-5 gap-3 mb-6">
                   <Kpi label={t.dashboard.totalInstances} value={globalStats.total || 0} color="text-blue-400" />
                   <Kpi label={t.dashboard.running} value={globalStats.running || 0} color="text-green-400" />
@@ -126,9 +131,10 @@ export default function Dashboard() {
                   <Kpi label={t.dashboard.pendingTasks || 'Pending Tasks'} value={globalStats.pendingTasks || 0} color="text-purple-400" />
                 </div>
                 {(globalStats.total || 0) > 0 && (
-                  <div className="bg-gray-750 rounded p-3">
-                    <div className="text-xs text-gray-400">
-                      {t.dashboard.avgDuration} <span className="text-gray-200 font-bold">{formatDuration(globalStats.avgDurationMs || 0)}</span>
+                  <div className="bg-gray-800/70 border border-gray-700/60 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                      <Clock3 size={12} className="text-gray-500" />
+                      {t.dashboard.avgDuration} <span className="text-gray-100 font-semibold">{formatDuration(globalStats.avgDurationMs || 0)}</span>
                     </div>
                     <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden flex mt-2">
                       <Bar pct={pct(globalStats.completed, globalStats.total)} color="bg-green-500" />
@@ -147,8 +153,8 @@ export default function Dashboard() {
           <div className="text-gray-500 text-sm text-center mt-20">{t.dashboard.loading}</div>
         ) : (
           <>
-            <h2 className="text-gray-200 font-bold mb-1">{selectedDraft.name}</h2>
-            <div className="text-[10px] text-gray-600 mb-4">{selectedDraft.id}</div>
+            <h2 className="text-base font-semibold text-gray-100 mb-1">{selectedDraft.name}</h2>
+            <div className="text-[10px] text-gray-600 font-mono mb-5">{selectedDraft.id}</div>
 
             {/* KPI cards */}
             <div className="grid grid-cols-5 gap-3 mb-6">
@@ -160,9 +166,10 @@ export default function Dashboard() {
             </div>
 
             {/* Avg duration + progress */}
-            <div className="bg-gray-750 rounded p-3 mb-6">
-              <div className="text-xs text-gray-400">
-                {t.dashboard.avgDuration} <span className="text-gray-200 font-bold">{formatDuration(stats.avgDurationMs || 0)}</span>
+            <div className="bg-gray-800/70 border border-gray-700/60 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                <Clock3 size={12} className="text-gray-500" />
+                {t.dashboard.avgDuration} <span className="text-gray-100 font-semibold">{formatDuration(stats.avgDurationMs || 0)}</span>
               </div>
               {(stats.total || 0) > 0 && (
                 <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden flex mt-2">
@@ -177,7 +184,7 @@ export default function Dashboard() {
             {/* Instance list + Timeline */}
             <div className="flex gap-4" style={{ minHeight: 0 }}>
               <div className="flex-1">
-                <h3 className="text-xs text-gray-400 font-semibold mb-2">{t.dashboard.instanceList}</h3>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-medium mb-3">{t.dashboard.instanceList}</h3>
                 <div className="max-h-64 overflow-y-auto">
                   {instances.map((inst: any) => (
                     <div key={inst.id}
@@ -211,7 +218,7 @@ export default function Dashboard() {
 
               {/* Timeline */}
               <div className="flex-1">
-                <h3 className="text-xs text-gray-400 font-semibold mb-2">{t.dashboard.stepDuration}</h3>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-medium mb-3">{t.dashboard.stepDuration}</h3>
                 {!selectedInstId && <div className="text-xs text-gray-600">{t.dashboard.clickForTimeline}</div>}
                 {timeline && timeline.length === 0 && <div className="text-xs text-gray-500">{t.dashboard.noHistory}</div>}
                 {timeline && timeline.map((step: any, i: number) => (
@@ -237,9 +244,9 @@ export default function Dashboard() {
 
 function Kpi({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="bg-gray-750 rounded p-3 text-center">
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-[10px] text-gray-500">{label}</div>
+    <div className="bg-gray-800/70 border border-gray-700/60 rounded-lg p-4 hover:border-gray-600 transition-colors">
+      <div className={`text-2xl font-bold leading-none tracking-tight ${color}`} style={{ fontSize: 26, fontWeight: 600 }}>{value}</div>
+      <div className="text-[11px] text-gray-500 mt-2">{label}</div>
     </div>
   );
 }

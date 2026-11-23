@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
+import { Play, RefreshCw, Square, PlayCircle, XCircle } from 'lucide-react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
@@ -367,22 +368,25 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   return (
     <div className="flex flex-col h-full">
       {/* Start panel */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-3 text-sm">
-        <span className="text-gray-400">Start:</span>
+      <div className="bg-gray-850 border-b border-gray-700/70 px-4 h-11 flex items-center gap-2.5">
+        <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Start</span>
         <select value={startDefId} onChange={e => setStartDefId(e.target.value)}
-          className="bg-gray-700 rounded px-2 py-1 text-white text-xs">
+          className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1.5 text-gray-200 text-xs
+                     hover:border-gray-600 focus:border-blue-500 transition-colors max-w-[240px]">
           <option value="">-- pick definition --</option>
           {allDefs.map((d: any) => (
             <option key={d.id} value={d.id}>{d.name || d.id} (v{d.version})</option>
           ))}
         </select>
         <input value={startVars} onChange={e => setStartVars(e.target.value)}
-          placeholder='{"var":"value"}' className="bg-gray-700 rounded px-2 py-1 text-white text-xs w-32" />
-        <button onClick={handleStart}
-          className="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded">
+          placeholder='{"var":"value"}'
+          className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1.5 text-gray-200 text-xs font-mono w-40
+                     placeholder:text-gray-600 hover:border-gray-600 focus:border-blue-500 transition-colors" />
+        <button onClick={handleStart} className="btn-success">
+          <Play size={12} fill="currentColor" strokeWidth={2} />
           Start Instance
         </button>
-        <span className="text-[10px] text-gray-600">Variables: JSON, e.g. {"{}"}"applicant":"user1"{"}"}</span>
+        <span className="text-[10px] text-gray-600 ml-1">Variables: JSON, e.g. {"{}"}"applicant":"user1"{"}"}</span>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -420,16 +424,29 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         <div className="flex-1 flex flex-col">
           <InstanceFlow nodes={nodes} edges={edges} error={error || undefined} />
           {selectedInst && (
-            <div className={`p-2 flex gap-2 border-t text-xs
-              ${selectedInst.status === 'SUSPENDED' ? 'bg-yellow-900 border-yellow-700' :
-                selectedInst.status === 'RUNNING' ? 'bg-gray-800 border-gray-700' : 'bg-gray-850 border-gray-700'}`}>
-              <span className="text-gray-400 self-center">{selectedInst.id.substring(0,8)} — {statusLabel(selectedInst.status)}</span>
+            <div className={`px-4 py-2 flex gap-2.5 items-center border-t text-xs
+              ${selectedInst.status === 'SUSPENDED' ? 'bg-amber-950/40 border-amber-800/40' :
+                'bg-gray-850 border-gray-700/70'}`}>
+              <span className="text-gray-400 font-mono text-[11px]">{selectedInst.id.substring(0,8)}</span>
+              <span className="text-gray-700">—</span>
+              <span className={`text-[11px] font-medium ${
+                selectedInst.status === 'RUNNING' ? 'text-emerald-400' :
+                selectedInst.status === 'COMPLETED' ? 'text-blue-400' :
+                selectedInst.status === 'SUSPENDED' ? 'text-amber-400' : 'text-red-400'}`}>
+                {statusLabel(selectedInst.status)}
+              </span>
               <div className="flex-1" />
               {(selectedInst.status === 'RUNNING' || selectedInst.status === 'SUSPENDED') && (
-                <button onClick={() => doTerminate(selectedId!)} className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded">{t.monitor.terminate}</button>
+                <button onClick={() => doTerminate(selectedId!)} className="btn-ghost hover:!bg-red-600 hover:!text-white">
+                  <Square size={12} fill="currentColor" strokeWidth={1} />
+                  {t.monitor.terminate}
+                </button>
               )}
               {selectedInst.status === 'SUSPENDED' && (
-                <button onClick={() => doResume(selectedId!)} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded">{t.monitor.resume}</button>
+                <button onClick={() => doResume(selectedId!)} className="btn-ghost !bg-amber-600/20 !text-amber-300 hover:!bg-amber-600 hover:!text-white">
+                  <PlayCircle size={12} strokeWidth={2} />
+                  {t.monitor.resume}
+                </button>
               )}
             </div>
           )}

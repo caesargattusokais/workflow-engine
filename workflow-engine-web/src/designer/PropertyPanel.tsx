@@ -91,7 +91,7 @@ export default function PropertyPanel({ node, onChange, edges, onSelectEdge, onE
         {/* Name (all nodes) */}
         <label className="block mb-3">
           <span className="text-gray-400 text-xs">{t.props.name}</span>
-          <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+          <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-sm mt-0.5"
             value={(node.data.name as string) || ''}
             onChange={e => updateData('name', e.target.value)} />
         </label>

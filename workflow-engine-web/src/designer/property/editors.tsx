@@ -21,9 +21,9 @@ export function KvEditor({ label, entries, onChange, keyPlaceholder, valPlacehol
       {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">{emptyText || 'No params yet'}</div>}
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1 mb-1">
-          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+          <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"
             value={e.key} placeholder={keyPlaceholder} onChange={ev => updateKey(i, ev.target.value)} />
-          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+          <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"
             value={e.value} placeholder={valPlaceholder} onChange={ev => updateVal(i, ev.target.value)} />
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
         </div>
@@ -53,7 +53,7 @@ export function ReturnValueEditor({ label, entries, onChange }: {
       {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">No return values defined</div>}
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1 mb-1">
-          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+          <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"
             value={e.key} placeholder="fieldName" onChange={ev => updateKey(i, ev.target.value)} />
           <select className="w-20 bg-gray-700 rounded px-1 py-1 text-white text-xs"
             value={e.type} onChange={ev => updateType(i, ev.target.value)}>
@@ -78,7 +78,7 @@ export function RetryOnEditor({ entries, onChange, addLabel }: { entries: any[];
     <div>
       {entries.map((e:any,i:number) => (
         <div key={i} className="flex gap-1 mb-1">
-          <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+          <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"
             value={e.expr||''} placeholder="exception.type.contains('TimeoutException')"
             onChange={ev => update(i, ev.target.value)} />
           <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>

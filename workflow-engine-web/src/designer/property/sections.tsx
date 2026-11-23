@@ -62,7 +62,7 @@ export function FormFieldsEditor({ node, updateData }: SectionProps) {
       {fields.map((f, i) => (
         <div key={i} className="bg-gray-750/60 rounded p-2 mb-2 border border-gray-700">
           <div className="flex gap-1 mb-1">
-            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs font-mono"
+            <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"
               value={f.key || ''} placeholder={t.props.fieldKeyPlaceholder}
               onChange={ev => patch(i, { key: ev.target.value })} />
             <select className="w-24 bg-gray-700 rounded px-1 py-1 text-white text-xs"
@@ -72,15 +72,15 @@ export function FormFieldsEditor({ node, updateData }: SectionProps) {
             <button onClick={() => remove(i)} className="text-red-400 hover:text-red-300 text-xs px-1">&times;</button>
           </div>
           <div className="flex gap-1 mb-1">
-            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+            <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs"
               value={f.label || ''} placeholder={t.props.fieldLabelPlaceholder}
               onChange={ev => patch(i, { label: ev.target.value })} />
-            <input className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+            <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs"
               value={f.placeholder || ''} placeholder={t.props.fieldPlaceholderPlaceholder}
               onChange={ev => patch(i, { placeholder: ev.target.value })} />
           </div>
           {f.type === 'select' && (
-            <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1"
+            <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mb-1"
               value={(f.options || []).join(', ')} placeholder={t.props.fieldOptionsPlaceholder}
               onChange={ev => patch(i, { options: ev.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
           )}
@@ -162,7 +162,7 @@ export function ServiceTaskSection({ node, updateData }: SectionProps) {
         <>
           <label className="block mb-2">
             <span className="text-gray-400 text-xs">{t.props.handlerClass}</span>
-            <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+            <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-sm mt-0.5"
               value={(node.data.handlerClass as string) || ''} placeholder="com.myapp.Handler"
               onChange={e => updateData('handlerClass', e.target.value)} />
           </label>
@@ -182,19 +182,19 @@ export function ServiceTaskSection({ node, updateData }: SectionProps) {
         <div className="text-[10px] text-gray-500 mb-1">Set maxAttempts &gt; 1 to enable retry. Leave at 1 for no retry.</div>
         <label className="block mb-1">
           <span className="text-gray-400 text-xs">{t.props.maxAttempts}</span>
-          <input type="number" min="1" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+          <input type="number" min="1" className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5"
             value={(node.data.retryMaxAttempts as number) || 1}
             onChange={e => updateData('retryMaxAttempts', parseInt(e.target.value)||1)} />
         </label>
         <label className="block mb-1">
           <span className="text-gray-400 text-xs">{t.props.delayMs}</span>
-          <input type="number" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+          <input type="number" className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5"
             value={(node.data.retryDelayMs as number) || 1000}
             onChange={e => updateData('retryDelayMs', parseInt(e.target.value)||1000)} />
         </label>
         <label className="block mb-2">
           <span className="text-gray-400 text-xs">{t.props.backoff}</span>
-          <input type="number" step="0.5" className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+          <input type="number" step="0.5" className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5"
             value={(node.data.retryBackoff as number) || 2}
             onChange={e => updateData('retryBackoff', parseFloat(e.target.value)||2)} />
         </label>
@@ -221,7 +221,7 @@ export function AiTaskSection({ node, updateData }: SectionProps) {
     <div className="border-t border-pink-500/50 pt-3 mt-2 space-y-3">
       <div>
         <label className="text-gray-400 text-xs">{t.props.aiMode}</label>
-        <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+        <select className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-sm mt-0.5"
           value={mode} onChange={e => updateData('mode', e.target.value)}>
           <option value="summary" className="bg-gray-700">{t.props.aiModeSummary}</option>
           <option value="extract" className="bg-gray-700">{t.props.aiModeExtract}</option>
@@ -231,14 +231,14 @@ export function AiTaskSection({ node, updateData }: SectionProps) {
       <div>
         <label className="text-gray-400 text-xs">{t.props.aiPrompt}</label>
         <textarea rows={5} spellCheck={false}
-          className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 resize-y"
+          className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5 resize-y"
           value={(node.data.prompt as string) || ''}
           onChange={e => updateData('prompt', e.target.value)}
           placeholder={t.props.aiPromptHint} />
       </div>
       <div>
         <label className="text-gray-400 text-xs">{t.props.aiOutputVar}</label>
-        <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+        <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-sm mt-0.5"
           value={(node.data.outputVar as string) || ''}
           onChange={e => updateData('outputVar', e.target.value)}
           placeholder={t.props.aiOutputVarHint} />
@@ -246,7 +246,7 @@ export function AiTaskSection({ node, updateData }: SectionProps) {
       {mode === 'classify' && (
         <div>
           <label className="text-gray-400 text-xs">{t.props.aiCategories}</label>
-          <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-sm mt-0.5"
+          <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-sm mt-0.5"
             value={options.join(', ')}
             onChange={e => updateData('options', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
             placeholder={t.props.aiCategoriesHint} />
@@ -318,11 +318,11 @@ export function GatewayConditionsSection({ node, updateData, kind }: SectionProp
             </div>
           </div>
           {!c.isDefault && (
-            <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mb-1 font-mono"
+            <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mb-1 font-mono"
               value={c.expr} placeholder={isXor ? 'SpEL: days > 3' : 'SpEL: amount > 1000'}
               onChange={e => updateCondition(i, 'expr', e.target.value)} />
           )}
-          <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs"
+          <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs"
             value={c.to} placeholder={t.designer.targetNodeId} onChange={e => updateCondition(i, 'to', e.target.value)} />
         </div>
       ))}
@@ -343,7 +343,7 @@ export function TimerSection({ node, updateData }: SectionProps) {
       <label className="block mb-2">
         <span className="text-gray-400 text-xs">{t.props.deadline}</span>
         <input type="datetime-local"
-          className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+          className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5"
           style={{ colorScheme: 'dark' }}
           value={toDatetimeLocal(node.data.deadline as string)}
           onChange={e => {
@@ -370,7 +370,7 @@ export function CallActivitySection({ node, updateData }: SectionProps) {
         <span className="text-gray-400 text-xs">{t.props.calledProcess}</span>
         <select value={(node.data.calledId as string) || ''}
           onChange={e => updateData('calledId', e.target.value)}
-          className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-1">
+          className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-1">
           <option value="">-- select definition --</option>
           {allDefs.map((d: any) => (
             <option key={`${d.id}-${d.version}`} value={d.id}>{d.name || d.id} (v{d.version})</option>
@@ -384,7 +384,7 @@ export function CallActivitySection({ node, updateData }: SectionProps) {
           <span className="text-gray-400 text-xs">{t.props.calledVersion}</span>
           <select value={(node.data.calledVersion as number) || 'latest'}
             onChange={e => updateData('calledVersion', e.target.value === 'latest' ? undefined : parseInt(e.target.value))}
-            className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-1">
+            className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-1">
             <option value="latest">latest</option>
             {allDefs.filter((d: any) => d.id === (node.data.calledId as string)).map((d: any) => (
               <option key={d.version} value={d.version}>v{d.version}</option>
@@ -468,14 +468,14 @@ function HttpCallbackFields({ node, updateData, urlPlaceholder, paramKeyPlacehol
       <div className="text-[10px] text-gray-500 mb-2">{t.props.callbackHint}</div>
       <label className="block mb-2">
         <span className="text-teal-400 text-xs">{t.props.url}</span>
-        <input className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5 font-mono"
+        <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5 font-mono"
           value={(node.data.url as string) || ''} placeholder={urlPlaceholder}
           onChange={e => updateData('url', e.target.value)} />
       </label>
       <div className="flex gap-2 mb-2">
         <label className="flex-1">
           <span className="text-gray-400 text-xs">{t.props.method}</span>
-          <select className="w-full bg-gray-700 rounded px-2 py-1 text-white text-xs mt-0.5"
+          <select className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs mt-0.5"
             value={(node.data.method as string) || 'POST'}
             onChange={e => updateData('method', e.target.value)}>
             {['GET','POST','PUT','DELETE','PATCH'].map(m => (
@@ -503,7 +503,7 @@ function DurationField({ label, value, onChange }: { label: string; value: strin
     <label className="block mb-2">
       <span className="text-gray-400 text-xs">{label}</span>
       <div className="flex gap-1 mt-0.5">
-        <input type="number" min="1" className="flex-1 bg-gray-700 rounded px-2 py-1 text-white text-xs"
+        <input type="number" min="1" className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs"
           value={parseDurationValue(value)}
           onChange={e => {
             const val = parseInt(e.target.value) || 0;

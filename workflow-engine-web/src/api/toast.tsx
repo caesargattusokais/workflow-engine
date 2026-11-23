@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export interface Toast {
   id: number;
@@ -41,15 +42,26 @@ export function useToasts() {
 export function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: number) => void }) {
   if (toasts.length === 0) return null;
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm">
       {toasts.map(t => (
         <div key={t.id}
           onClick={() => removeToast(t.id)}
-          className={`px-4 py-2.5 rounded-lg shadow-lg text-sm cursor-pointer transition-all
-            ${t.type === 'error' ? 'bg-red-600 text-white' :
-              t.type === 'success' ? 'bg-green-600 text-white' :
-              'bg-blue-600 text-white'}`}>
-          {t.message}
+          className={`flex items-center gap-2.5 px-3.5 py-3 rounded-lg shadow-popover text-xs cursor-pointer
+            border backdrop-blur-sm transition-all hover:translate-y-[-1px] max-w-sm
+            ${t.type === 'error' ? 'bg-red-600 border-red-800/60 text-red-200' :
+              t.type === 'success' ? 'bg-green-600 border-emerald-800/60 text-emerald-200' :
+              'bg-blue-600 border-slate-700/60 text-slate-200'}`}
+          style={{ backgroundColor: t.type === 'error' ? 'rgba(69,10,10,0.96)'
+            : t.type === 'success' ? 'rgba(6,46,31,0.96)' : 'rgba(30,41,59,0.96)' }}>
+          {t.type === 'error'
+            ? <AlertCircle size={15} className="shrink-0 text-red-400" strokeWidth={2} />
+            : t.type === 'success'
+              ? <CheckCircle2 size={15} className="shrink-0 text-emerald-400" strokeWidth={2} />
+              : <Info size={15} className="shrink-0 text-blue-400" strokeWidth={2} />}
+          <span className="flex-1 leading-relaxed">{t.message}</span>
+          <button onClick={(e) => { e.stopPropagation(); removeToast(t.id); }} className="shrink-0 opacity-60 hover:opacity-100">
+            <X size={13} strokeWidth={2} />
+          </button>
         </div>
       ))}
     </div>

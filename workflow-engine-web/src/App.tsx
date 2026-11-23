@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { GitBranch, Activity, BarChart3, Settings2, Sparkles } from 'lucide-react';
 import LanguageSwitcher, { useT } from './i18n';
 import DesignerPage from './designer/DesignerPage';
 import MonitorPage from './monitor/MonitorPage';
@@ -31,29 +32,42 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col">
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex gap-4 items-center">
+      <header className="bg-gray-850/95 border-b border-gray-700/70 px-4 h-12 flex gap-1 items-center backdrop-blur">
+        <div className="flex items-center gap-2 mr-5 select-none">
+          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
+            <Sparkles size={15} className="text-white" strokeWidth={2.2} />
+          </div>
+          <span className="text-[13px] font-semibold text-gray-100 tracking-tight">FlowForge</span>
+        </div>
         <button onClick={() => setTab('designer')}
-          className={`px-4 py-1 rounded ${tab === 'designer' ? 'bg-blue-600' : 'bg-gray-700'}`}>
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium transition-colors
+            ${tab === 'designer' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800'}`}>
+          <GitBranch size={14} strokeWidth={2} />
           {t.app.designer}
         </button>
         <button onClick={() => setTab('monitor')}
-          className={`px-4 py-1 rounded ${tab === 'monitor' ? 'bg-blue-600' : 'bg-gray-700'}`}>
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium transition-colors
+            ${tab === 'monitor' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800'}`}>
+          <Activity size={14} strokeWidth={2} />
           {t.app.monitor}
         </button>
         <button onClick={() => setTab('dashboard')}
-          className={`px-4 py-1 rounded ${tab === 'dashboard' ? 'bg-blue-600' : 'bg-gray-700'}`}>
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium transition-colors
+            ${tab === 'dashboard' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800'}`}>
+          <BarChart3 size={14} strokeWidth={2} />
           {t.app.dashboard}
         </button>
         <div className="flex-1" />
         <button onClick={() => setShowAiConfig(true)}
           title={aiConfigured === false ? t.app.settingsNotConfigured : t.app.settingsConfigured}
-          className="flex items-center gap-1.5 px-3 py-1 rounded bg-gray-700 hover:bg-gray-600
-            text-gray-200 text-sm transition-colors">
-          <span className="text-base leading-none">⚙</span>
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-800 hover:bg-gray-700
+            border border-gray-700/70 text-gray-300 hover:text-white text-xs font-medium transition-colors">
+          <Settings2 size={14} strokeWidth={2} />
+          <span className="sr-only">⚙</span>
           <span>{t.app.settings}</span>
-          <span className={`w-1.5 h-1.5 rounded-full ${
+          <span className={`w-1.5 h-1.5 rounded-full ring-2 ring-gray-900 ${
             aiConfigured === null ? 'bg-gray-500'
-              : aiConfigured ? 'bg-green-400' : 'bg-amber-400'}`} />
+              : aiConfigured ? 'bg-emerald-400' : 'bg-amber-400'}`} />
         </button>
         <LanguageSwitcher />
       </header>

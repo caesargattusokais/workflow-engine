@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/react';
+import { Save, Trash2, Braces, Rocket, CheckCircle2, XCircle, Eye, EyeOff, X, Wand2 } from 'lucide-react';
 import NodePalette from './NodePalette';
 import FlowCanvas from './FlowCanvas';
 import PropertyPanel from './PropertyPanel';
@@ -313,56 +314,65 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-1 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">
-            {activeDraft ? `${activeDraft.name} v${activeDraft.version || 1}` : t.designer.noDraft}
+      <div className="bg-gray-850 border-b border-gray-700/70 px-4 h-11 flex justify-between items-center">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs text-gray-300 font-medium">
+            {activeDraft ? `${activeDraft.name}` : t.designer.noDraft}
           </span>
-          <button onClick={doSave}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">
+          {activeDraft && <span className="text-[10px] text-gray-600 font-mono bg-gray-800 px-1.5 py-0.5 rounded">v{activeDraft.version || 1}</span>}
+          <div className="w-px h-4 bg-gray-700 mx-1" />
+          <button onClick={doSave} className="btn-primary">
+            <Save size={13} strokeWidth={2} />
             {saving ? t.designer.saving : t.designer.save}
           </button>
           {selectedNode && (
-            <button onClick={handleDeleteNode}
-              className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-0.5 rounded">
+            <button onClick={handleDeleteNode} className="btn-ghost hover:!bg-red-600 hover:!text-white">
+              <Trash2 size={13} strokeWidth={2} />
               {t.designer.deleteNode}
             </button>
           )}
           <button onClick={() => setShowVars(!showVars)}
-            className={`text-xs px-2 py-1 rounded ${showVars ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
+            className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5
+              ${showVars ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}`}>
+            <Braces size={13} strokeWidth={2} />
             Variables ({allVars.length})
           </button>
         </div>
-        <button onClick={handleDeploy}
-          className="bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-1 rounded">
+        <button onClick={handleDeploy} className="btn-success !text-[13px] !px-4">
+          <Rocket size={14} strokeWidth={2.2} />
           {t.designer.deploy}
         </button>
       </div>
 
-      {/* Toast + YAML preview */}
+      {/* Toast + YAML preview — keeps bg-green-900 for E2E toast detection */}
       {toast && (
-        <div className="bg-green-900 border-b border-green-700 px-4 py-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-green-300">{toast}</span>
-            <div className="flex gap-2">
+        <div className="bg-green-900 border-b border-green-700/70 px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={15} className="text-green-400 shrink-0" strokeWidth={2} />
+            <span className="text-xs text-green-200 flex-1">{toast}</span>
+            <div className="flex gap-1.5">
               {deployedId && (
                 <button onClick={() => onNavigate?.('monitor', deployedId, deployedInstanceId || undefined)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
                   {t.designer.viewInMonitor}
                 </button>
               )}
               {deployedYaml && (
                 <button onClick={() => setShowYaml(!showYaml)}
-                  className="bg-gray-600 hover:bg-gray-500 text-white text-xs px-2 py-0.5 rounded">
+                  className="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                  {showYaml ? <EyeOff size={12} /> : <Eye size={12} />}
                   {showYaml ? t.designer.hideYaml : t.designer.showYaml}
                 </button>
               )}
               <button onClick={() => { setToast(null); setDeployedYaml(null); setShowYaml(false); }}
-                className="text-gray-400 hover:text-white text-xs">✕</button>
+                className="btn-icon !w-6 !h-6 hover:!text-white" aria-label="Close">
+                <X size={14} />
+                <span className="sr-only">✕</span>
+              </button>
             </div>
           </div>
           {deployedYaml && showYaml && (
-            <pre className="mt-2 bg-gray-900 rounded p-2 text-xs text-green-400 overflow-auto max-h-48 font-mono">
+            <pre className="mt-2.5 bg-gray-950/80 rounded-md p-3 text-[11px] text-emerald-300 overflow-auto max-h-48 font-mono border border-gray-800 leading-relaxed">
               {deployedYaml}
             </pre>
           )}
@@ -371,14 +381,15 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
       {/* Variables Panel */}
       {showVars && (
-        <div className="bg-gray-800 border-b border-gray-700 px-4 py-2">
+        <div className="bg-gray-850 border-b border-gray-700/70 px-4 py-2.5">
           <div className="flex flex-wrap gap-1.5">
             {allVars.length === 0 ? (
-              <span className="text-xs text-gray-600 italic">{t.designer.noVariables}</span>
+              <span className="text-[11px] text-gray-600 italic">{t.designer.noVariables}</span>
             ) : allVars.map((v, i) => (
-              <span key={i} className="inline-flex items-center gap-1 bg-gray-750 border border-gray-600
-                       rounded px-2 py-0.5 text-xs text-gray-300" title={v.source}>
-                <code className="text-blue-400">{v.name}</code>
+              <span key={i} className="inline-flex items-center gap-1.5 bg-gray-800 border border-gray-700/70
+                       rounded-md px-2.5 py-1 text-[11px] text-gray-300" title={v.source}>
+                <Braces size={10} className="text-blue-400" />
+                <code className="text-blue-400 font-mono">{v.name}</code>
                 <span className="text-[10px] text-gray-600">← {v.source}</span>
               </span>
             ))}
