@@ -32,8 +32,17 @@ public class InMemoryUserStore implements UserStore {
         return Optional.ofNullable(users.get(username.toLowerCase()));
     }
 
-    /** Exposed for tests/bootstrap to seed additional users at runtime. */
+    /** Exposed for tests/bootstrap to seed additional users at runtime (overwrites). */
     public void put(AuthUser user, String rawPassword) {
         users.put(user.getUsername().toLowerCase(), new StoredUser(user, encoder.encode(rawPassword)));
+    }
+
+    /** Create a new user, rejecting duplicates. */
+    @Override
+    public boolean create(AuthUser user, String rawPassword) {
+        String key = user.getUsername().toLowerCase();
+        if (users.containsKey(key)) return false;
+        users.put(key, new StoredUser(user, encoder.encode(rawPassword)));
+        return true;
     }
 }

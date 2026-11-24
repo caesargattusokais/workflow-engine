@@ -24,6 +24,7 @@ public class AuthController {
     }
 
     public record LoginRequest(String username, String password) {}
+    public record RegisterRequest(String username, String password, String displayName, String email) {}
     public record LoginResponse(String token, AuthUser.View user, long expiresInSeconds) {}
     public record ChangePasswordRequest(String oldPassword, String newPassword) {}
 
@@ -39,6 +40,30 @@ public class AuthController {
         } catch (AuthService.BadCredentialsException e) {
             return org.springframework.http.ResponseEntity.status(401)
                     .body(Map.of("error", "Bad credentials", "message", "用户名或密码错误"));
+        }
+    }
+
+    /** Public self-registration. On success the new account is signed in immediately. */
+    @PostMapping("/register")
+    public org.springframework.http.ResponseEntity<?> register(@RequestBody RegisterRequest req,
+                                                               HttpServletResponse response) {
+        if (!props.isRegistrationEnabled()) {
+            return org.springframework.http.ResponseEntity.status(403)
+                    .body(Map.of("error", "Registration disabled"));
+        }
+        try {
+            AuthUser user = authService.register(
+                    req.username(), req.password(), req.displayName(), req.email());
+            String token = authService.issueToken(user);
+            response.addHeader(HttpHeaders.SET_COOKIE, buildCookie(token, tokenMaxAgeSeconds()).toString());
+            return org.springframework.http.ResponseEntity.status(201).body(new LoginResponse(
+                    token, AuthUser.View.of(user), tokenMaxAgeSeconds()));
+        } catch (AuthService.InvalidRegistrationException e) {
+            return org.springframework.http.ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid registration", "message", e.getMessage()));
+        } catch (AuthService.DuplicateUsernameException e) {
+            return org.springframework.http.ResponseEntity.status(409)
+                    .body(Map.of("error", "Username already exists", "message", "用户名已被占用"));
         }
     }
 
@@ -71,7 +96,10 @@ public class AuthController {
     /** Health/probe: public, no credentials required. */
     @GetMapping("/status")
     public Map<String, Object> status() {
-        return Map.of("enabled", props.isEnabled(), "headerCompat", props.isHeaderCompatEnabled());
+        return Map.of(
+                "enabled", props.isEnabled(),
+                "headerCompat", props.isHeaderCompatEnabled(),
+                "registrationEnabled", props.isRegistrationEnabled());
     }
 
     private ResponseCookie buildCookie(String value, long maxAgeSeconds) {

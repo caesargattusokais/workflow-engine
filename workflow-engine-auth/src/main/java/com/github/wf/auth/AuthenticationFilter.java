@@ -38,6 +38,7 @@ public class AuthenticationFilter extends OncePerRequestFilter {
         // Non-API paths and public auth endpoints (login + health probe) are open.
         return !path.startsWith("/api/")
                 || path.equals("/api/auth/login")
+                || path.equals("/api/auth/register")
                 || path.equals("/api/auth/status");
     }
 

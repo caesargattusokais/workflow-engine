@@ -121,4 +121,14 @@ public class RepositoryConfig {
     public DefinitionRepository definitionRepositoryMemory() {
         return new InMemoryDefinitionRepository();
     }
+
+    // ── Auth user store: JDBC for persistence, in-memory for the memory profile ──
+
+    /** Persisted user accounts so self-registration survives restarts.
+     *  Overrides the auth module's default in-memory store (ConditionalOnMissingBean). */
+    @Bean @Profile("!memory")
+    public com.github.wf.auth.UserStore jdbcUserStore(DataSource dataSource,
+                                                      com.github.wf.auth.AuthProperties authProps) {
+        return new com.github.wf.auth.JdbcUserStore(new JdbcTemplate(dataSource), authProps);
+    }
 }

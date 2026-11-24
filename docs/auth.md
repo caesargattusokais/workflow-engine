@@ -31,11 +31,29 @@ call carries it automatically.
 | Method | Path                | Auth | Purpose |
 |--------|---------------------|------|---------|
 | POST   | `/api/auth/login`   | no   | `{username, password}` → `{token, user, expiresInSeconds}`, sets cookie |
+| POST   | `/api/auth/register`| no   | `{username, password, displayName?, email?}` → same as login, sets cookie, `201` |
 | POST   | `/api/auth/logout`  | yes  | revokes token server-side, clears cookie |
 | GET    | `/api/auth/me`      | yes  | `{authenticated, user, source}` |
-| GET    | `/api/auth/status`  | no   | `{enabled, headerCompat}` probe |
+| GET    | `/api/auth/status`  | no   | `{enabled, headerCompat, registrationEnabled}` probe |
 
 `source` is `token` (cookie / Bearer) or `header` (legacy `X-User-Id`).
+
+### Registration
+
+Public self-signup is on by default. Rules enforced server-side:
+
+- Username: 3–32 chars, `[A-Za-z0-9_.-]` only, case-insensitively unique.
+- Password: at least `auth.min-password-length` (default 6) chars, BCrypt-hashed.
+- New accounts receive only `auth.default-roles` (default `[USER]`) — never ADMIN.
+- On success the account is signed in immediately (cookie set, `201` + token body).
+- Errors: `400` invalid input, `409` duplicate username, `403` when disabled.
+
+**Persistence**: registered users live in the `auth_user` table via `JdbcUserStore`
+(auto-created, self-seeded from `auth.users`) on every non-`memory` profile, so
+they survive restarts. The `memory` profile uses the in-memory store (users are
+ephemeral — fine for E2E/demo). Disable signup entirely with
+`auth.registration-enabled: false` (or `AUTH_REGISTRATION_ENABLED=false`) for
+invite-only deployments.
 
 ## Configuration
 
@@ -49,6 +67,9 @@ All settings live under `auth.*` (see `application.yml`):
 | `auth.cookie-name` | `wf_session` | session cookie name |
 | `auth.cookie-secure` | `false` | set `Secure` flag (enable behind HTTPS) |
 | `auth.header-compat-enabled` | `true` | accept legacy `X-User-Id` as identity |
+| `auth.registration-enabled` | `true` | allow public self-registration |
+| `auth.default-roles` | `[USER]` | roles granted to registered users |
+| `auth.min-password-length` | `6` | minimum password length on signup |
 | `auth.users[*]` | — | bootstrap users |
 
 ### Production hardening

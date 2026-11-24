@@ -6,8 +6,9 @@ import MonitorPage from './monitor/MonitorPage';
 import Dashboard from './monitor/Dashboard';
 import AiConfigModal from './designer/AiConfigModal';
 import LoginPage from './auth/LoginPage';
+import RegisterPage from './auth/RegisterPage';
 import { useToasts, ToastContainer, showToast } from './api/toast';
-import { getAiConfig, getAuthMe, logout, onUnauthorized, type LoginUser } from './api/client';
+import { getAiConfig, getAuthMe, getAuthStatus, logout, onUnauthorized, type LoginUser } from './api/client';
 
 export default function App() {
   const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
@@ -18,12 +19,18 @@ export default function App() {
   // ── Auth gate ──────────────────────────────────────────────────────────
   // undefined = checking session; null = show login; AuthUser = signed in.
   const [currentUser, setCurrentUser] = useState<LoginUser | null | undefined>(undefined);
+  const [authView, setAuthView] = useState<'login' | 'register'>('login');
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const { t, lang } = useT();
   const { toasts, removeToast } = useToasts();
 
   // A preset X-User-Id (E2E fixtures, MCP-style service callers) is a valid
   // legacy identity — skip the login screen for those flows.
   const hasLegacyIdentity = () => !!localStorage.getItem('userId');
+
+  useEffect(() => {
+    getAuthStatus().then(s => setRegistrationEnabled(!!s.registrationEnabled)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     getAuthMe().then(me => {
@@ -66,7 +73,15 @@ export default function App() {
     return <div className="h-screen w-screen" style={{ background: '#141821' }} />;
   }
   if (currentUser === null) {
-    return <LoginPage lang={lang} onSuccess={u => setCurrentUser(u)} />;
+    if (authView === 'register' && registrationEnabled) {
+      return <RegisterPage lang={lang}
+        onBack={() => setAuthView('login')}
+        onSuccess={u => { setAuthView('login'); setCurrentUser(u); }} />;
+    }
+    return <LoginPage lang={lang}
+      registrationEnabled={registrationEnabled}
+      onRegister={() => setAuthView('register')}
+      onSuccess={u => setCurrentUser(u)} />;
   }
 
   return (

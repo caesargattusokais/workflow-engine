@@ -3,8 +3,10 @@ import { Sparkles, LogIn, UserRound, LockKeyhole, Eye, EyeOff, Loader2 } from 'l
 import { login, type LoginUser } from '../api/client';
 
 /** Full-screen login gate. Uses the same dark, elevated visual language as the app. */
-export default function LoginPage({ onSuccess, lang }: {
+export default function LoginPage({ onSuccess, onRegister, registrationEnabled = true, lang }: {
   onSuccess: (user: LoginUser) => void;
+  onRegister?: () => void;
+  registrationEnabled?: boolean;
   lang: 'zh' | 'en';
 }) {
   const zh = lang === 'zh';
@@ -116,6 +118,15 @@ export default function LoginPage({ onSuccess, lang }: {
         <p className="text-center text-[11px] text-gray-600 mt-5">
           {zh ? '演示账号：admin / admin123　·　testuser / test123' : 'Demo accounts: admin / admin123 · testuser / test123'}
         </p>
+        {registrationEnabled && onRegister && (
+          <p className="text-center text-[11px] text-gray-500 mt-3">
+            {zh ? '还没有账号？' : 'No account yet?'}{' '}
+            <button type="button" onClick={onRegister}
+              className="text-indigo-400 hover:text-indigo-300 font-medium">
+              {zh ? '立即注册' : 'Sign up'}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

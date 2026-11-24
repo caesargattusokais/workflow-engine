@@ -25,8 +25,8 @@ public class AuthAutoConfiguration {
 
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(AuthService.class)
-    public AuthService authService(UserStore store, TokenService tokens) {
-        return new AuthService(store, tokens);
+    public AuthService authService(UserStore store, TokenService tokens, AuthProperties props) {
+        return new AuthService(store, tokens, props);
     }
 
     @Bean

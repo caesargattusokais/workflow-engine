@@ -190,8 +190,35 @@ export async function login(username: string, password: string): Promise<LoginRe
   return res.json();
 }
 
+export async function register(username: string, password: string, displayName?: string, email?: string): Promise<LoginResult> {
+  const res = await fetch(`${BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ username, password, displayName, email })
+  });
+  if (!res.ok) {
+    let msg = `注册失败 (${res.status}) / Registration failed`;
+    try {
+      const body = await res.json();
+      if (body.message) msg = body.message;
+      else if (body.error === 'Username already exists') msg = '用户名已被占用 / Username already exists';
+      else if (body.error === 'Registration disabled') msg = '注册已关闭 / Registration disabled';
+    } catch { /* keep default */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function logout(): Promise<void> {
   await fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+}
+
+export interface AuthStatus { enabled: boolean; headerCompat: boolean; registrationEnabled: boolean }
+export async function getAuthStatus(): Promise<AuthStatus> {
+  const res = await fetch(`${BASE}/auth/status`, { credentials: 'same-origin' });
+  if (!res.ok) return { enabled: true, headerCompat: true, registrationEnabled: true };
+  return res.json();
 }
 
 export interface AuthMe { authenticated: boolean; user?: LoginUser; source?: string }

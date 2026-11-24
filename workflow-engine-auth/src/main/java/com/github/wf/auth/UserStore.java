@@ -10,6 +10,15 @@ import java.util.Optional;
 public interface UserStore {
     Optional<StoredUser> findByUsername(String username);
 
+    /**
+     * Persist a new user. Implementations MUST reject a duplicate username and
+     * return false (never overwrite an existing account). The password passed
+     * here is the raw value; implementations are responsible for hashing it.
+     *
+     * @return true if the user was created, false if the username already exists
+     */
+    default boolean create(AuthUser user, String rawPassword) { return false; }
+
     /** Record combining the public principal with the credential material. */
     record StoredUser(AuthUser user, String passwordHash) {}
 }

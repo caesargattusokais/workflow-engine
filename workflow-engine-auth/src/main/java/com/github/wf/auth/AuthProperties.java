@@ -37,6 +37,15 @@ public class AuthProperties {
     /** Whether login is required at all. Disable only for fully trusted local dev. */
     private boolean enabled = true;
 
+    /** Allow public self-registration at POST /api/auth/register. */
+    private boolean registrationEnabled = true;
+
+    /** Roles granted to self-registered accounts (never ADMIN by default). */
+    private List<String> defaultRoles = new ArrayList<>(List.of("USER"));
+
+    /** Minimum password length enforced on registration. */
+    private int minPasswordLength = 6;
+
     private List<User> users = new ArrayList<>();
 
     public static class User {
@@ -76,6 +85,12 @@ public class AuthProperties {
     public void setHeaderCompatEnabled(boolean headerCompatEnabled) { this.headerCompatEnabled = headerCompatEnabled; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public boolean isRegistrationEnabled() { return registrationEnabled; }
+    public void setRegistrationEnabled(boolean registrationEnabled) { this.registrationEnabled = registrationEnabled; }
+    public List<String> getDefaultRoles() { return defaultRoles; }
+    public void setDefaultRoles(List<String> defaultRoles) { this.defaultRoles = defaultRoles; }
+    public int getMinPasswordLength() { return minPasswordLength; }
+    public void setMinPasswordLength(int minPasswordLength) { this.minPasswordLength = minPasswordLength; }
     public List<User> getUsers() { return users; }
     public void setUsers(List<User> users) { this.users = users; }
 }

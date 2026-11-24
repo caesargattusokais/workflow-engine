@@ -18,6 +18,11 @@ auth:
   # Legacy X-User-Id header still authenticates service callers (MCP, E2E).
   # Set false in a browser-only production deployment.
   header-compat-enabled: ${AUTH_HEADER_COMPAT:true}
+  # Public self-registration. New users get only the default roles below —
+  # set false for closed deployments (invite-only via bootstrap users).
+  registration-enabled: ${AUTH_REGISTRATION_ENABLED:true}
+  default-roles: [USER]
+  min-password-length: 6
   users:
     - username: admin
       password: admin123
