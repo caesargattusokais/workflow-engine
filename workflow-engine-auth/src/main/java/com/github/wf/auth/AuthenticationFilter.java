@@ -1,0 +1,104 @@
+package com.github.wf.auth;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Map;
+
+/**
+ * Resolves identity for every {@code /api/**} call in priority order:
+ *   1. signed session token (cookie, then Authorization: Bearer)
+ *   2. legacy X-User-Id header (when {@code auth.header-compat-enabled=true})
+ *
+ * <p>The resolved identity is exposed as a {@link CurrentUser} request attribute
+ * AND written back into the X-User-Id header, so existing controllers and the
+ * tenant guard keep working with no changes.
+ */
+public class AuthenticationFilter extends OncePerRequestFilter {
+
+    private final AuthService authService;
+    private final AuthProperties props;
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public AuthenticationFilter(AuthService authService, AuthProperties props) {
+        this.authService = authService;
+        this.props = props;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        if (!props.isEnabled()) return true;
+        String path = request.getRequestURI();
+        // Non-API paths and public auth endpoints (login + health probe) are open.
+        return !path.startsWith("/api/")
+                || path.equals("/api/auth/login")
+                || path.equals("/api/auth/status");
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        String token = extractToken(request);
+
+        if (token != null) {
+            try {
+                TokenService.Claims claims = authService.verifyToken(token);
+                UserStore.StoredUser stored = findUser(claims.username());
+                if (stored != null && stored.user().isEnabled()) {
+                    CurrentUser cu = new CurrentUser(stored.user(), "token");
+                    request.setAttribute(CurrentUser.ATTRIBUTE, cu);
+                    chain.doFilter(new AuthenticatedRequestWrapper(request, stored.user().getUsername()), response);
+                    return;
+                }
+            } catch (TokenService.InvalidTokenException ignored) {
+                // fall through to header compat / 401
+            }
+        }
+
+        String headerUser = request.getHeader("X-User-Id");
+        if (props.isHeaderCompatEnabled() && headerUser != null && !headerUser.isBlank()) {
+            String uid = headerUser.trim();
+            request.setAttribute(CurrentUser.ATTRIBUTE, CurrentUser.fromHeader(uid));
+            chain.doFilter(request, response);
+            return;
+        }
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        response.setCharacterEncoding("UTF-8");
+        mapper.writeValue(response.getWriter(), Map.of(
+                "error", "Unauthorized",
+                "message", "Login required or session expired / 请先登录或重新登录"));
+    }
+
+    /** Cookie first (browser default), then Authorization: Bearer (service callers). */
+    String extractToken(HttpServletRequest request) {
+        if (props.getCookieName() != null) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie c : cookies) {
+                    if (props.getCookieName().equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+                        return c.getValue();
+                    }
+                }
+            }
+        }
+        String auth = request.getHeader("Authorization");
+        if (auth != null && auth.startsWith("Bearer ")) {
+            String t = auth.substring(7).trim();
+            if (!t.isEmpty()) return t;
+        }
+        return null;
+    }
+
+    private UserStore.StoredUser findUser(String username) {
+        // Access the store through the service's public accessor.
+        return authService.findUser(username);
+    }
+}

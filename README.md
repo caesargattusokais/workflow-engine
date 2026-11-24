@@ -9,6 +9,7 @@ workflow-engine/
 ├── workflow-engine-core/         # 核心引擎（模型、解析器、执行器、SPI）
 ├── workflow-engine-memory/       # 内存 + JDBC 持久化实现
 ├── workflow-engine-mock-ldap/    # Mock LDAP 组织架构（测试用）
+├── workflow-engine-auth/         # 登录认证 — BCrypt 密码 + 签名会话令牌（详见 docs/auth.md）
 ├── workflow-engine-server/       # Spring Boot REST API 服务
 ├── workflow-engine-mcp/          # MCP server — 把引擎接入 Claude Code / Cursor 等 AI 客户端
 ├── workflow-engine-web/          # React 可视化设计器 + 监控面板

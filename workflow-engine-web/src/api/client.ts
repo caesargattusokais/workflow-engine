@@ -27,8 +27,8 @@ async function parseError(res: Response, path: string): Promise<Error> {
 }
 
 async function apiGet(path: string) {
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
-  if (!res.ok) throw await parseError(res, path);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders(), credentials: 'same-origin' });
+  if (!res.ok) { checkUnauthorized(res); throw await parseError(res, path); }
   return res.json();
 }
 
@@ -36,9 +36,10 @@ async function apiPost(path: string, body?: unknown) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'same-origin',
     body: body ? JSON.stringify(body) : undefined
   });
-  if (!res.ok) throw await parseError(res, path);
+  if (!res.ok) { checkUnauthorized(res); throw await parseError(res, path); }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
@@ -47,16 +48,17 @@ async function apiPut(path: string, body: unknown) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'same-origin',
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw await parseError(res, path);
+  if (!res.ok) { checkUnauthorized(res); throw await parseError(res, path); }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
 async function apiDelete(path: string) {
-  const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
-  if (!res.ok) throw await parseError(res, path);
+  const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders(), credentials: 'same-origin' });
+  if (!res.ok) { checkUnauthorized(res); throw await parseError(res, path); }
 }
 
 export async function listInstances(page = 1, size = 10, definitionId?: string, status?: string) {
@@ -163,6 +165,47 @@ export interface AiDiagnosis {
 }
 export async function diagnoseInstance(instanceId: string) {
   return apiPost('/ai/diagnose', { instanceId }) as Promise<AiDiagnosis>;
+}
+
+// ── Authentication ──────────────────────────────────────────────────────
+// The session token lives in an HttpOnly cookie set by the server, so fetch
+// sends it automatically (same-origin via the nginx proxy). The token is also
+// returned in the body for clients that prefer Authorization: Bearer.
+export interface LoginUser { username: string; displayName: string; email?: string | null; roles: string[] }
+export interface LoginResult { token: string; user: LoginUser; expiresInSeconds: number }
+
+export async function login(username: string, password: string): Promise<LoginResult> {
+  const res = await fetch(`${BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ username, password })
+  });
+  if (!res.ok) {
+    const msg = res.status === 401
+      ? '用户名或密码错误 / Invalid username or password'
+      : `登录失败 (${res.status}) / Login failed`;
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+}
+
+export interface AuthMe { authenticated: boolean; user?: LoginUser; source?: string }
+export async function getAuthMe(): Promise<AuthMe> {
+  const res = await fetch(`${BASE}/auth/me`, { credentials: 'same-origin' });
+  if (!res.ok) return { authenticated: false };
+  return res.json();
+}
+
+/** Global hook: apiGet/Post surface 401 here so the app can show the login screen. */
+let unauthorizedHandler: (() => void) | null = null;
+export function onUnauthorized(handler: (() => void) | null) { unauthorizedHandler = handler; }
+function checkUnauthorized(res: Response) {
+  if (res.status === 401 && unauthorizedHandler) unauthorizedHandler();
 }
 
 export { userId, authHeaders, apiGet, apiPost };

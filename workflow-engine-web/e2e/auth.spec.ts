@@ -1,11 +1,14 @@
 import { test, expect, ApiClient, TEST_USER, API_BASE } from './fixtures';
 
 test.describe('Authentication / X-User-Id', () => {
-  test('missing X-User-Id header returns 401', async () => {
+  test('missing credentials returns 401', async () => {
     const res = await fetch(`${API_BASE}/drafts`);
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toContain('Missing X-User-Id');
+    // The auth filter now handles this before the legacy interceptor; it
+    // deliberately returns a generic error so callers can't probe which
+    // credential mechanism is missing.
+    expect(body.error).toContain('Unauthorized');
   });
 
   test('blank X-User-Id header returns 401', async () => {

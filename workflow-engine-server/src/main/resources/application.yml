@@ -4,6 +4,32 @@ server:
 engine:
   base-url: ${ENGINE_BASE_URL:http://localhost:8080}
 
+# ── Authentication (workflow-engine-auth module) ──────────────────────────
+# Login at POST /api/auth/login {username,password}; session travels in an
+# HttpOnly cookie (wf_session) or Authorization: Bearer token.
+# SECURITY: override auth.secret and the bootstrap passwords in
+# application-local.yml (gitignored) or env vars before any real deployment.
+auth:
+  enabled: ${AUTH_ENABLED:true}
+  secret: ${AUTH_SECRET:wf-dev-only-secret-change-me-please-32b}
+  token-ttl: ${AUTH_TOKEN_TTL:8h}
+  cookie-name: wf_session
+  cookie-secure: ${AUTH_COOKIE_SECURE:false}
+  # Legacy X-User-Id header still authenticates service callers (MCP, E2E).
+  # Set false in a browser-only production deployment.
+  header-compat-enabled: ${AUTH_HEADER_COMPAT:true}
+  users:
+    - username: admin
+      password: admin123
+      display-name: 系统管理员
+      email: admin@flowforge.local
+      roles: [ADMIN]
+    - username: testuser
+      password: test123
+      display-name: 测试用户
+      email: testuser@flowforge.local
+      roles: [USER]
+
 # Secrets are NOT stored in git. Provide them via environment variables or a
 # local override file: create application-local.yml next to this file (it is
 # gitignored) — see the git history of this file for why (leaked credentials).

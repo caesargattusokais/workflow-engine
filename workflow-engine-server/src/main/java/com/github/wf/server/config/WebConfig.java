@@ -15,7 +15,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // /api/auth/** is handled by the AuthenticationFilter (login is public;
+        // me/logout validate the session token). Exclude it from the legacy
+        // header check so a browser without X-User-Id can still log in.
         registry.addInterceptor(userIdInterceptor)
-                .addPathPatterns("/api/**");
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/api/auth/**");
     }
 }
