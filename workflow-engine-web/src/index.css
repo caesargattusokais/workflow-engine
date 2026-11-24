@@ -5,51 +5,72 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --bg-app: #12151b;
+    --bg-panel: #191d25;
+    --bg-elevated: #1e222b;
+    --ink-1: #f2f5f9;
+    --ink-2: #c2cad6;
+    --ink-3: #8a94a6;
+    --ink-4: #5d6778;
+    --accent: #6d74e8;
+    --accent-soft: rgba(109,116,232,0.15);
+    --hairline: rgba(255,255,255,0.07);
+    --ease-swift: cubic-bezier(0.2,0.8,0.2,1);
   }
 
-  html, body, #root {
-    height: 100%;
-  }
+  html, body, #root { height: 100%; }
 
   body {
     margin: 0;
-    background: #12151b;
-    color: #e4e8ee;
+    background: var(--bg-app);
+    color: var(--ink-1);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
       'PingFang SC', 'Microsoft YaHei', sans-serif;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* The codebase sprinkles text-[10px] everywhere; bump to a legible 11px
-     without touching 60+ call sites (and the E2E selectors that use them). */
+  /* E2E relies on text-[10px] existing; keep the class, raise legibility. */
   .text-\[10px\] { font-size: 11px !important; }
 
-  /* Slim, unobtrusive scrollbars — the default chunky ones look cheap. */
   * { scrollbar-width: thin; scrollbar-color: #3a4150 transparent; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #343b48; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #465066; }
+  ::-webkit-scrollbar-thumb:hover { background: #4a556b; }
 
-  /* Form controls: one consistent dark surface instead of ad-hoc colors. */
-  input, textarea, select {
-    color-scheme: dark;
-  }
+  input, textarea, select { color-scheme: dark; }
   input:focus, textarea:focus, select:focus, button:focus-visible {
-    outline: 2px solid rgba(94, 106, 210, 0.6);
+    outline: 2px solid rgba(109,116,232,0.7);
     outline-offset: 1px;
   }
 }
 
 @layer components {
-  /* Primary action — used by Deploy / Save / Start. */
-  .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-md
-           font-medium transition-colors inline-flex items-center justify-center gap-1.5;
+  /* ---- Typography scale: 3 clear ranks instead of one flat grey ---- */
+  /* Page/section title */
+  .title-lg { @apply text-[19px] font-semibold tracking-[-0.02em] text-gray-50; }
+  .title-md { @apply text-[15px] font-semibold tracking-[-0.01em] text-gray-100; }
+  /* Eyebrow / section label */
+  .eyebrow { @apply text-[11px] font-medium uppercase tracking-[0.08em] text-gray-500; }
+  /* Hero metric number */
+  .metric-num {
+    @apply text-[38px] font-semibold leading-none tracking-[-0.04em] tabular-nums;
+    background: linear-gradient(180deg, #ffffff 0%, #b8c0cf 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  /* Success action — keep bg-green-600 so E2E selectors still match where used. */
+
+  /* ---- Buttons ---- */
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover text-white text-xs px-3.5 py-2 rounded-lg
+           font-medium inline-flex items-center justify-center gap-1.5
+           transition-all duration-150 ease-swift;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(109,116,232,0.3); }
   .btn-success {
     @apply bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1.5 rounded-md
            font-medium transition-colors inline-flex items-center justify-center gap-1.5;
@@ -58,31 +79,44 @@
     @apply bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1.5 rounded-md
            font-medium transition-colors inline-flex items-center justify-center gap-1.5;
   }
-  /* Neutral / secondary action. */
   .btn-ghost {
-    @apply bg-gray-700/70 hover:bg-gray-600 text-gray-300 hover:text-white
+    @apply bg-gray-700/60 hover:bg-gray-700 text-gray-300 hover:text-white
            text-xs px-2.5 py-1 rounded-md transition-colors
            inline-flex items-center justify-center gap-1.5;
   }
-  /* Icon-only button in a toolbar. */
   .btn-icon {
     @apply w-7 h-7 rounded-md flex items-center justify-center text-gray-400
            hover:text-white hover:bg-gray-700 transition-colors;
   }
-  /* Consistent dark input. */
   .input-dark {
     @apply bg-gray-900/70 border border-gray-700 rounded-md px-2.5 py-1.5
            text-gray-200 text-xs placeholder:text-gray-600
-           hover:border-gray-600 focus:border-blue-500 transition-colors;
+           hover:border-gray-600 focus:border-accent transition-colors;
   }
-  /* Panel/card surface with hairline border. */
+
+  /* ---- Surfaces: the "designed" feeling lives here ---- */
+  /* Base elevated card: hairline border, top highlight, subtle sheen. */
   .surface {
     @apply bg-gray-800 border border-gray-700/80 rounded-lg;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.2);
   }
-  /* Section label above a group of controls. */
-  .section-label {
-    @apply text-[11px] uppercase tracking-wider text-gray-500 font-medium;
+  /* Interactive card — lifts and lights its border on hover. */
+  .card-hover {
+    @apply bg-card-sheen rounded-xl border transition-all duration-200 ease-swift;
+    border-color: rgba(255,255,255,0.07);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.2);
   }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgba(109,116,232,0.45);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), 0 12px 28px rgba(0,0,0,0.4), 0 0 0 1px rgba(109,116,232,0.12);
+  }
+  /* Colored icon tile inside a card. */
+  .icon-tile {
+    @apply w-9 h-9 rounded-lg flex items-center justify-center shrink-0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
+  }
+  .section-label { @apply eyebrow; }
 }
 
 /* ReactFlow controls / minimap: match the dark surface, no white flashes. */

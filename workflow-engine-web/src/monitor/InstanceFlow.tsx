@@ -3,6 +3,7 @@ import { ReactFlow, Background, MarkerType, type Node, type Edge } from '@xyflow
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from '../designer/nodes';
 import { useT } from '../i18n';
+import EmptyStateArt from '../components/EmptyStateArt';
 
 function edgeStyle(edgeType?: string) {
   switch (edgeType) {
@@ -77,8 +78,12 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
 
   if (!nodes || nodes.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#141821' }}>
-        <div className="text-center text-gray-500 text-sm">Select an instance to view its flow</div>
+      <div className="flex-1 flex flex-col" style={{ minHeight: 300, background: 'radial-gradient(circle at 50% 42%, rgba(109,116,232,0.07), transparent 55%), #141821' }}>
+        <EmptyStateArt
+          art="flow"
+          title="Select an instance to view its flow"
+          hint="从左侧实例列表选择一个，实时查看它走过的节点路径与当前停留位置。"
+        />
       </div>
     );
   }

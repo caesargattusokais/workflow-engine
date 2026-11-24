@@ -193,6 +193,24 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         <Background color="#252b38" gap={20} size={1} />
       </ReactFlow>
 
+      {/* ── Empty canvas hint (does not block dragging) ─── */}
+      {nodes.length === 0 && (
+        <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center pointer-events-none select-none">
+          <div className="w-40 h-28 mb-3 opacity-80">
+            <svg viewBox="0 0 160 110" className="w-full h-full" fill="none">
+              <rect x="18" y="30" width="124" height="66" rx="10" fill="#6d74e8" fillOpacity="0.05"
+                stroke="#6d74e8" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="5 5" />
+              <rect x="34" y="50" width="32" height="24" rx="6" fill="#6d74e8" fillOpacity="0.16" stroke="#6d74e8" strokeOpacity="0.5" strokeWidth="1.5" />
+              <circle cx="50" cy="62" r="3.5" fill="#6d74e8" />
+              <path d="M78 62h20m-6-5l6 5-6 5" stroke="#6d74e8" strokeOpacity="0.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="110" y="50" width="32" height="24" rx="6" fill="#4ade80" fillOpacity="0.12" stroke="#4ade80" strokeOpacity="0.45" strokeWidth="1.5" />
+            </svg>
+          </div>
+          <div className="text-[13px] font-medium text-gray-400 mb-1.5">{t.designer.dragHint}</div>
+          <div className="text-[11px] text-gray-600">从左侧节点面板拖入开始节点，或点击「AI 生成」描述你的流程</div>
+        </div>
+      )}
+
       {/* ── Bottom-left tools ─────────────────── */}
       <div className="absolute bottom-3 left-3 z-10 flex gap-1.5">
         <button onClick={() => rfInstance.current?.fitView({ duration: 300 })}

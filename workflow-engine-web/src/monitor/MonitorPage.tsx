@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, RefreshCw, Square, PlayCircle, XCircle } from 'lucide-react';
+import { Play, RefreshCw, Square, PlayCircle, XCircle, Zap } from 'lucide-react';
 import InstanceList from './InstanceList';
 import InstanceFlow from './InstanceFlow';
 import TaskPanel from './TaskPanel';
@@ -368,11 +368,14 @@ export default function MonitorPage({ initialDefId, initialInstId }:
   return (
     <div className="flex flex-col h-full">
       {/* Start panel */}
-      <div className="bg-gray-850 border-b border-gray-700/70 px-4 h-11 flex items-center gap-2.5">
-        <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Start</span>
+      <div className="bg-gray-850 border-b border-white/[0.06] px-5 h-12 flex items-center gap-3">
+        <span className="eyebrow flex items-center gap-1.5">
+          <Zap size={12} className="text-accent" strokeWidth={2} /> Start
+        </span>
+        <div className="h-5 w-px bg-white/[0.08] mx-0.5" />
         <select value={startDefId} onChange={e => setStartDefId(e.target.value)}
           className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1.5 text-gray-200 text-xs
-                     hover:border-gray-600 focus:border-blue-500 transition-colors max-w-[240px]">
+                     hover:border-gray-600 focus:border-accent transition-colors max-w-[240px]">
           <option value="">-- pick definition --</option>
           {allDefs.map((d: any) => (
             <option key={d.id} value={d.id}>{d.name || d.id} (v{d.version})</option>
@@ -381,12 +384,12 @@ export default function MonitorPage({ initialDefId, initialInstId }:
         <input value={startVars} onChange={e => setStartVars(e.target.value)}
           placeholder='{"var":"value"}'
           className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1.5 text-gray-200 text-xs font-mono w-40
-                     placeholder:text-gray-600 hover:border-gray-600 focus:border-blue-500 transition-colors" />
-        <button onClick={handleStart} className="btn-success">
+                     placeholder:text-gray-600 hover:border-gray-600 focus:border-accent transition-colors" />
+        <button onClick={handleStart} className="btn-primary" style={{ background: '#1f9d6b' }}>
           <Play size={12} fill="currentColor" strokeWidth={2} />
           Start Instance
         </button>
-        <span className="text-[10px] text-gray-600 ml-1">Variables: JSON, e.g. {"{}"}"applicant":"user1"{"}"}</span>
+        <span className="text-[11px] text-gray-600 ml-1">Variables: JSON, e.g. {"{}"}"applicant":"user1"{"}"}</span>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
