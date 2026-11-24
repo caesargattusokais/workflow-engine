@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, memo } from 'react';
-import { ReactFlow, Background, MarkerType, type Node, type Edge } from '@xyflow/react';
+import { ReactFlow, Background, BackgroundVariant, MarkerType, type Node, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from '../designer/nodes';
 import { useT } from '../i18n';
@@ -11,8 +11,8 @@ function edgeStyle(edgeType?: string) {
     case 'exception': return { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' };
     case 'timeout': return { stroke: '#f97316', strokeWidth: 2, strokeDasharray: '5,5' };
     case 'conditional': return { stroke: '#e5a50a', strokeWidth: 2 };
-    case 'default': return { stroke: '#888', strokeWidth: 2, strokeDasharray: '3,3' };
-    default: return { stroke: '#666', strokeWidth: 2 };
+    case 'default': return { stroke: '#8b94a8', strokeWidth: 2, strokeDasharray: '3,3' };
+    default: return { stroke: '#7d879c', strokeWidth: 2 };
   }
 }
 
@@ -50,7 +50,7 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
     markerEnd: e.markerEnd === 'arrowclosed'
       ? { type: MarkerType.ArrowClosed, color: edgeStyle((e.data as any)?.edgeType).stroke as string }
       : e.markerEnd
-      ? { type: MarkerType.ArrowClosed, color: '#666' }
+      ? { type: MarkerType.ArrowClosed, color: '#7d879c' }
       : undefined,
   })), [edges]);
 
@@ -67,7 +67,7 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: '#141821' }}>
+      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: 'radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
         <div className="text-center">
           <div className="text-red-400 text-sm mb-2">Failed to load flow</div>
           <div className="text-gray-500 text-xs">{error}</div>
@@ -78,7 +78,7 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
 
   if (!nodes || nodes.length === 0) {
     return (
-      <div className="flex-1 flex flex-col" style={{ minHeight: 300, background: 'radial-gradient(circle at 50% 42%, rgba(109,116,232,0.07), transparent 55%), #141821' }}>
+      <div className="flex-1 flex flex-col" style={{ minHeight: 300, background: 'radial-gradient(circle at 50% 42%, rgba(109,116,232,0.09), transparent 55%), radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
         <EmptyStateArt
           art="flow"
           title="Select an instance to view its flow"
@@ -89,11 +89,11 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
   }
 
   return (
-    <div className="flex-1 h-full" style={{ minHeight: 300, background: '#141821' }}>
+    <div className="flex-1 h-full" style={{ minHeight: 300, background: 'radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
       <ReactFlow nodes={safeNodes} edges={safeEdges} nodeTypes={nodeTypes}
         onInit={(rf: any) => { rfRef.current = rf; }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}>
-        <Background />
+        <Background variant={BackgroundVariant.Dots} color="#384159" gap={22} size={1.3} />
       </ReactFlow>
     </div>
   );

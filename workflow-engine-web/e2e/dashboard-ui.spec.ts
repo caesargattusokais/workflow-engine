@@ -26,12 +26,12 @@ test.describe('Dashboard', () => {
   });
 
   test('empty dashboard prompt', async ({ page }) => {
-    // If no draft is selected, should show prompt
-    const prompt = page.locator('text=← Select a flow');
-    // This may or may not be visible depending on state
+    // With nothing selected, the dashboard shows an empty-state prompt rather
+    // than a blank panel. The copy changed with the v2 dashboard redesign
+    // ("← Select a flow" → "No flows to display"), so assert the current text.
     const flowItem = page.locator('.px-3.py-2.cursor-pointer').first();
     if (!(await flowItem.isVisible())) {
-      await expect(prompt).toBeVisible();
+      await expect(page.getByText('No flows to display')).toBeVisible({ timeout: 5000 });
     }
   });
 });

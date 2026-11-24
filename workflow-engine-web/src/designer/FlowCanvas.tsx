@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useT } from '../i18n';
 import {
-  ReactFlow, Background, MiniMap,
+  ReactFlow, Background, BackgroundVariant, MiniMap,
   addEdge, Connection, MarkerType,
   type Node, type Edge
 } from '@xyflow/react';
@@ -34,8 +34,8 @@ function getEdgeStyle(type?: string) {
     case 'exception': return { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' };
     case 'timeout': return { stroke: '#f97316', strokeWidth: 2, strokeDasharray: '5,5' };
     case 'conditional': return { stroke: '#e5a50a', strokeWidth: 2 };
-    case 'default': return { stroke: '#888', strokeWidth: 2, strokeDasharray: '3,3' };
-    default: return { stroke: '#666', strokeWidth: 2 };
+    case 'default': return { stroke: '#8b94a8', strokeWidth: 2, strokeDasharray: '3,3' };
+    default: return { stroke: '#7d879c', strokeWidth: 2 };
   }
 }
 
@@ -58,7 +58,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     setEdges([...edges, {
       ...params,
       id: `edge_${Date.now()}`,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#7d879c' },
       style: getEdgeStyle(),
       interactionWidth: 20,
       data: { edgeType: 'direct' }
@@ -156,7 +156,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   }, [nodes, setNodes]);
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400, background: '#141821' }}>
+    <div ref={reactFlowWrapper} className="flex-1 h-full relative" style={{ minHeight: 400, background: 'radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -184,13 +184,13 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
           style: getEdgeStyle(),
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#666' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#7d879c' },
           interactionWidth: 20,
           data: { edgeType: 'direct' }
         }}
-        style={{ background: '#141821' }}
+        style={{ background: 'transparent' }}
       >
-        <Background color="#252b38" gap={20} size={1} />
+        <Background variant={BackgroundVariant.Dots} color="#384159" gap={22} size={1.3} />
       </ReactFlow>
 
       {/* ── Empty canvas hint (does not block dragging) ─── */}

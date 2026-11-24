@@ -121,14 +121,21 @@
 
 /* ReactFlow controls / minimap: match the dark surface, no white flashes. */
 .react-flow__controls-button {
-  background: #1c1f26 !important;
-  border-color: #343b48 !important;
-  fill: #b9c2d0 !important;
+  background: #252b3b !important;
+  border-color: #3a445c !important;
+  fill: #c4ccdb !important;
 }
-.react-flow__controls-button:hover { background: #2a3040 !important; }
+.react-flow__controls-button:hover { background: #323a4e !important; }
 .react-flow__minimap {
-  background: #171a20 !important;
-  border: 1px solid #343b48 !important;
+  background: #1b2130 !important;
+  border: 1px solid #3a445c !important;
   border-radius: 8px !important;
 }
 .react-flow__attribution { background: transparent !important; opacity: 0.35; }
+/* Selected node: crisp accent ring instead of the browser default. */
+.react-flow__node.selected .node-card {
+  outline: 2px solid #8288f0 !important;
+  outline-offset: 2px;
+}
+/* Dot-grid dots should stay subtle but visible. */
+.react-flow__background pattern circle { fill: #3a445c; }
