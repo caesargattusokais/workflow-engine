@@ -32,6 +32,20 @@ public interface InstanceRepository {
             .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
             .count();
     }
+    /** Owner-scoped pagination — filter by user BEFORE slicing, so a small owner's
+     *  instances are not hidden behind another tenant's rows on page 1. */
+    default List<ProcessInstance> findAllPaginated(int page, int size, String status, String userId) {
+        return findAll().stream()
+            .filter(i -> userId == null || userId.equals(i.getVariable("_userId")))
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .skip((long)(page-1)*size).limit(size).toList();
+    }
+    default List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size, String status, String userId) {
+        return findByDefinitionId(definitionId).stream()
+            .filter(i -> userId == null || userId.equals(i.getVariable("_userId")))
+            .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+            .skip((long)(page-1)*size).limit(size).toList();
+    }
     /** Count optionally scoped to the owning user ({@code _userId} variable); {@code null} = all users. */
     default long count(String status, String userId) {
         return findAll().stream()

@@ -53,17 +53,18 @@ public class InstanceController {
             @RequestParam(value = "page", defaultValue = "1") int page,
             @Parameter(description = "Page size")
             @RequestParam(value = "size", defaultValue = "50") int size) {
+        // Filter by owner in the query itself (SQL WHERE user_id) BEFORE pagination —
+        // slicing first and filtering after hid small tenants behind a large tenant's page-1 rows.
         java.util.List<com.github.wf.model.ProcessInstance> all;
         long total;
         if (definitionId != null && !definitionId.isEmpty()) {
-            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size, status);
+            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size, status, userId);
             total = engine.instanceRepository.countByDefinitionId(definitionId, userId);
         } else {
-            all = engine.instanceRepository.findAllPaginated(page, size, status);
+            all = engine.instanceRepository.findAllPaginated(page, size, status, userId);
             total = engine.instanceRepository.count(status, userId);
         }
         var filtered = all.stream()
-                .filter(i -> userId.equals(i.getVariable("_userId")))
                 .map(InstanceDetailResponse::new)
                 .toList();
         Map<String, Object> result = new LinkedHashMap<>();

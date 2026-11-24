@@ -102,6 +102,18 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public List<ProcessInstance> findByDefinitionIdPaginated(String definitionId, int page, int size, String status, String userId) {
+        if (userId == null) return findByDefinitionIdPaginated(definitionId, page, size, status);
+        boolean hasStatus = status != null && !status.isEmpty();
+        String sql = "SELECT * FROM process_instance WHERE definition_id = ? AND user_id = ?" +
+            (hasStatus ? " AND status = ?" : "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        Object[] params = hasStatus
+            ? new Object[]{definitionId, userId, status, size, (page - 1) * size}
+            : new Object[]{definitionId, userId, size, (page - 1) * size};
+        return jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), params);
+    }
+
+    @Override
     public long countByDefinitionId(String definitionId) {
         Long c = jdbc.queryForObject(
             "SELECT COUNT(*) FROM process_instance WHERE definition_id = ?", Long.class, definitionId);
@@ -127,6 +139,17 @@ public class JdbcInstanceRepository implements InstanceRepository {
         return hasStatus
             ? jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), status, size, (page - 1) * size)
             : jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), size, (page - 1) * size);
+    }
+
+    @Override
+    public List<ProcessInstance> findAllPaginated(int page, int size, String status, String userId) {
+        if (userId == null) return findAllPaginated(page, size, status);
+        boolean hasStatus = status != null && !status.isEmpty();
+        String sql = "SELECT * FROM process_instance WHERE user_id = ?" +
+            (hasStatus ? " AND status = ?" : "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        return hasStatus
+            ? jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), userId, status, size, (page - 1) * size)
+            : jdbc.query(sql, (rs, rowNum) -> mapInstance(rs), userId, size, (page - 1) * size);
     }
 
     @Override

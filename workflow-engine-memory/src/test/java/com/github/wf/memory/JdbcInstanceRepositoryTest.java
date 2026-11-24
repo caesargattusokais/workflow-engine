@@ -347,4 +347,47 @@ class JdbcInstanceRepositoryTest {
         Map<String, Map<String, Long>> all = repo.getSummary();
         assertThat(all.get("wf-1").get("total")).isEqualTo(2L);
     }
+
+    /** Regression: owner filtering must happen BEFORE LIMIT/OFFSET. A tenant with
+     *  old rows hidden behind another tenant's page-1 rows must still see its own. */
+    @Test
+    void userScopedPaginationFiltersBeforeSlicing() {
+        Instant now = Instant.now();
+        // bob's 5 instances are newest → they fill page 1 of the unscoped query
+        for (int i = 0; i < 5; i++) {
+            repo.save(new ProcessInstance("inst-bob-" + i, "wf-bob", 1,
+                    Map.of("_userId", "bob"), now.minusSeconds(i), null));
+        }
+        // alice's single instance is oldest → unscoped page 1 never reaches it
+        repo.save(new ProcessInstance("inst-alice-1", "wf-alice", 1,
+                Map.of("_userId", "alice"), now.minusSeconds(100), null));
+
+        // Old behaviour: findAllPaginated(1,5,null) returns 5×bob, then filter by alice → empty.
+        assertThat(repo.findAllPaginated(1, 5, null)).extracting(ProcessInstance::getId)
+                .doesNotContain("inst-alice-1");
+
+        // New behaviour: SQL WHERE user_id before LIMIT → alice sees her own row on page 1.
+        var alicePage = repo.findAllPaginated(1, 5, null, "alice");
+        assertThat(alicePage).hasSize(1);
+        assertThat(alicePage.get(0).getId()).isEqualTo("inst-alice-1");
+
+        var bobPage = repo.findAllPaginated(1, 5, null, "bob");
+        assertThat(bobPage).hasSize(5);
+        assertThat(bobPage).allSatisfy(i -> assertThat(i.getVariable("_userId")).isEqualTo("bob"));
+    }
+
+    @Test
+    void userScopedPaginationByDefinition() {
+        Instant now = Instant.now();
+        for (int i = 0; i < 4; i++) {
+            repo.save(new ProcessInstance("inst-bob-d-" + i, "wf-shared", 1,
+                    Map.of("_userId", "bob"), now.minusSeconds(i), null));
+        }
+        repo.save(new ProcessInstance("inst-alice-d", "wf-shared", 1,
+                Map.of("_userId", "alice"), now.minusSeconds(100), null));
+
+        var alicePage = repo.findByDefinitionIdPaginated("wf-shared", 1, 4, null, "alice");
+        assertThat(alicePage).hasSize(1);
+        assertThat(alicePage.get(0).getId()).isEqualTo("inst-alice-d");
+    }
 }
