@@ -1,0 +1,70 @@
+id: ai-ticket-triage
+name: 'AI 工单智能分派'
+version: 1
+# 演示 aiTask 的 classify 模式 + options 候选分类 + result 边路由。
+# 需先在「设置」中配置 AI 模型，否则 AI 节点会降级或失败。
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: submit
+    type: userTask
+    name: 提交工单
+    assignee: "${applicant}"
+    formFields:
+      - key: description
+        label: 问题描述
+        type: textarea
+        required: true
+        placeholder: "例如：生产环境支付接口报错，影响所有订单"
+  - id: classify
+    type: aiTask
+    name: AI 判定紧急程度
+    mode: classify
+    prompt: "判断以下工单的紧急程度。工单：${description}"
+    options: ["P0-紧急", "P1-高", "P2-普通"]
+    outputVar: triageLevel
+    retry:
+      maxAttempts: 2
+      delayMs: 1000
+      backoffMultiplier: 2
+  - id: p0
+    type: userTask
+    name: P0 立即响应
+    assignee: oncall
+    boundaryTimer: "PT15M"
+  - id: p1
+    type: userTask
+    name: P1 当日处理
+    assignee: support-lead
+  - id: p2
+    type: userTask
+    name: P2 常规排队
+    assignee: support
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: submit
+  - from: submit
+    to: classify
+  # result 边：按 AI 分类结果路由
+  - from: classify
+    to: p0
+    type: result
+    expr: "classify_category == 'P0-紧急'"
+  - from: classify
+    to: p1
+    type: result
+    expr: "classify_category == 'P1-高'"
+  # 兜底 result 边（无 condition = catch-all）
+  - from: classify
+    to: p2
+    type: result
+  - from: p0
+    to: end
+  - from: p1
+    to: end
+  - from: p2
+    to: end

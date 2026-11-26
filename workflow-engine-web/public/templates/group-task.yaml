@@ -1,0 +1,60 @@
+id: group-task
+name: '候选组任务与认领'
+version: 1
+# 演示 userTask 的 candidateGroups（组任务）用法：任务对所有候选组成员可见，
+# 任一人可认领处理；配合 boundaryTimer 超时升级。
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: submit
+    type: userTask
+    name: 提交故障工单
+    assignee: "${applicant}"
+    formFields:
+      - key: title
+        label: 故障标题
+        type: text
+        required: true
+        placeholder: "例如：订单库连接池耗尽"
+      - key: severity
+        label: 严重程度
+        type: select
+        required: true
+        options: ["一般", "严重", "灾难"]
+  - id: triage
+    type: userTask
+    name: 运维组认领处理
+    candidateGroups: ["ops", "sre"]
+    formFields:
+      - key: diagnosis
+        label: 处理结论
+        type: textarea
+        required: true
+        placeholder: "填写诊断与处置结果"
+  - id: escalate
+    type: userTask
+    name: 超时升级-值班经理
+    assignee: manager
+    boundaryTimer: "PT2H"
+  - id: verify
+    type: userTask
+    name: 复核关闭
+    candidateGroups: ["qa"]
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: submit
+  - from: submit
+    to: triage
+  - from: triage
+    to: verify
+  - from: triage
+    to: escalate
+    type: timeout
+  - from: escalate
+    to: verify
+  - from: verify
+    to: end

@@ -1,0 +1,70 @@
+id: http-integration
+name: 'HTTP 集成与异常路由'
+version: 1
+# 演示 serviceTask 的 HTTP 代理模式 + result/exception 边路由 + 重试。
+# HTTP 目标默认指向本引擎的 /api/auth/status（开箱即跑）；改成自己的接口即可复用。
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: submit
+    type: userTask
+    name: 发起系统检查
+    assignee: "${applicant}"
+    formFields:
+      - key: systemId
+        label: 系统标识
+        type: text
+        required: true
+        placeholder: "例如：order-service"
+  - id: probe
+    type: serviceTask
+    name: 调用健康检查接口
+    httpMode: true
+    url: "http://app:8080/api/auth/status"
+    method: GET
+    headers:
+      Accept: "application/json"
+    retry:
+      maxAttempts: 3
+      delayMs: 500
+      backoffMultiplier: 2
+      retryOn:
+        - expr: "exception.message.contains('timeout')"
+        - expr: "exception.message.contains('HTTP 5')"
+  - id: ok
+    type: userTask
+    name: 检查通过-人工确认
+    assignee: admin
+  - id: degraded
+    type: userTask
+    name: 服务降级-人工介入
+    assignee: admin
+    boundaryTimer: "PT5M"
+  - id: fail
+    type: endEvent
+    name: 检查失败终止
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: submit
+  - from: submit
+    to: probe
+  # result 边：服务返回 enabled=true 走通过分支
+  - from: probe
+    to: ok
+    type: result
+    expr: "probe_result['enabled'] == true"
+  # exception 边：调用异常走降级分支
+  - from: probe
+    to: degraded
+    type: exception
+  - from: ok
+    to: end
+  - from: degraded
+    to: fail
+    type: timeout
+  - from: degraded
+    to: end

@@ -1,0 +1,88 @@
+id: inclusive-review
+name: '包容网关分级会签'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: submit
+    type: userTask
+    name: 提交合同
+    assignee: "${applicant}"
+    formFields:
+      - key: amount
+        label: 合同金额
+        type: number
+        required: true
+        placeholder: "例如：80000"
+      - key: category
+        label: 合同类型
+        type: select
+        required: true
+        options: ["采购", "服务", "技术"]
+        placeholder: "选择合同类型"
+  - id: split
+    type: inclusiveGateway
+    name: 按条件选派评审方
+  - id: legal
+    type: userTask
+    name: 法务审合同条款
+    assignee: legal
+    formFields:
+      - key: legalOpinion
+        label: 法务意见
+        type: textarea
+        required: true
+        placeholder: "条款风险说明"
+  - id: finance
+    type: userTask
+    name: 财务审预算
+    assignee: finance
+    formFields:
+      - key: financeOpinion
+        label: 财务意见
+        type: textarea
+        required: true
+        placeholder: "预算是否通过"
+  - id: manager
+    type: userTask
+    name: 直属经理审批
+    assignee: manager
+  - id: join
+    type: inclusiveGateway
+    name: 汇总所有被激活的评审
+  - id: archive
+    type: userTask
+    name: 合同归档
+    assignee: admin
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: submit
+  - from: submit
+    to: split
+  # 条件可同时命中多个分支 —— 这是 inclusive(OR) 与 exclusive(XOR) 的区别
+  - from: split
+    to: legal
+    type: conditional
+    expr: "amount >= 50000 || category == '技术'"
+  - from: split
+    to: finance
+    type: conditional
+    expr: "amount >= 100000"
+  # 都不命中时走 default，同样汇入 join
+  - from: split
+    to: manager
+    type: default
+  - from: legal
+    to: join
+  - from: finance
+    to: join
+  - from: manager
+    to: join
+  - from: join
+    to: archive
+  - from: archive
+    to: end
