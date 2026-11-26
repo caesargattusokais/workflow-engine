@@ -9,6 +9,12 @@ nodes:
     type: userTask
     name: 提交采购申请
     assignee: "${applicant}"
+    formFields:
+      - key: amount
+        label: 采购金额
+        type: number
+        required: true
+        placeholder: "例如：3000"
   - id: gateway1
     type: exclusiveGateway
     name: 金额判断
@@ -20,9 +26,6 @@ nodes:
     type: userTask
     name: 总监审批
     assignee: director
-  - id: gateway2
-    type: parallelGateway
-    name: 并行
   - id: finance
     type: userTask
     name: 财务审核
@@ -48,14 +51,10 @@ transitions:
     type: conditional
     expr: "amount > 5000"
   - from: manager
-    to: gateway2
-  - from: director
-    to: gateway2
-  - from: gateway2
     to: finance
-  - from: gateway2
-    to: legal
+  - from: director
+    to: finance
   - from: finance
-    to: end
+    to: legal
   - from: legal
     to: end

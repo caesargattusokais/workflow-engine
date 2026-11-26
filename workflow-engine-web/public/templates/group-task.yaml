@@ -26,6 +26,7 @@ nodes:
     type: userTask
     name: 运维组认领处理
     candidateGroups: ["ops", "sre"]
+    boundaryTimer: "PT2H"
     formFields:
       - key: diagnosis
         label: 处理结论
@@ -36,7 +37,6 @@ nodes:
     type: userTask
     name: 超时升级-值班经理
     assignee: manager
-    boundaryTimer: "PT2H"
   - id: verify
     type: userTask
     name: 复核关闭

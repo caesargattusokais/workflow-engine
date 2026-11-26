@@ -32,7 +32,6 @@ nodes:
     type: userTask
     name: P0 立即响应
     assignee: oncall
-    boundaryTimer: "PT15M"
   - id: p1
     type: userTask
     name: P1 当日处理

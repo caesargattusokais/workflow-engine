@@ -9,6 +9,12 @@ nodes:
     type: userTask
     name: 提交请假申请
     assignee: "${applicant}"
+    formFields:
+      - key: days
+        label: 请假天数
+        type: number
+        required: true
+        placeholder: "例如：5"
   - id: gateway
     type: exclusiveGateway
     name: 天数判断
@@ -25,6 +31,10 @@ nodes:
     type: userTask
     name: HR备案
     assignee: hr
+  - id: escalation
+    type: userTask
+    name: 超时升级-总监审批
+    assignee: director
   - id: end
     type: endEvent
     name: 结束

@@ -74,7 +74,16 @@ http.createServer((req, res) => {
     let content;
     if (system.includes('classify text into exactly one category')) {
       const userText = (messages.find(m => m.role === 'user') || {}).content || '';
-      content = /7|long|超过|以上|总监/i.test(userText) ? 'LONG' : 'SHORT';
+      const categoryList = (system.match(/Valid categories: (.+)\./) || [])[1];
+      const options = categoryList ? categoryList.split(/,\s*/).map(s => s.trim()) : [];
+      const isUrgent = /7|long|超过|以上|总监/i.test(userText);
+      // Keep LONG/SHORT prompts deterministic for existing tests; for templates
+      // with domain-specific options, map urgent -> first option, normal -> last.
+      if (options.some(o => o === 'LONG' || o === 'SHORT')) {
+        content = isUrgent ? 'LONG' : 'SHORT';
+      } else {
+        content = options.length ? (isUrgent ? options[0] : options[options.length - 1]) : (isUrgent ? 'LONG' : 'SHORT');
+      }
     } else if (system.includes('extract structured data')) {
       const userText = (messages.find(m => m.role === 'user') || {}).content || '';
       const m = userText.match(/(\d+(?:\.\d+)?)/);
