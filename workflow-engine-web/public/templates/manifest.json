@@ -4,5 +4,6 @@
   { "file": "purchase-order.yaml", "name": "采购审批", "desc": "采购申请 → 5000以内经理批，以上总监批 → 财务+法务并行审核" },
   { "file": "onboarding.yaml", "name": "新员工入职", "desc": "入职前一天定时触发 → HR准备 → IT开账号 → 领导分配mentor" },
   { "file": "contract-review.yaml", "name": "合同审批", "desc": "起草合同 → 合规检查 → 10万以内法务批，以上CEO批，1小时超时升级" },
-  { "file": "ai-expense-claim.yaml", "name": "AI 智能报销", "desc": "提交报销说明 → AI抽金额/类型 → ≤1000经理批、>1000财务批（需先在设置中配置模型）" }
+  { "file": "ai-expense-claim.yaml", "name": "AI 智能报销", "desc": "提交报销说明 → AI抽金额/类型 → ≤1000经理批、>1000财务批（需先在设置中配置模型）" },
+  { "file": "parallel-review.yaml", "name": "三方并行会签", "desc": "提交采购申请 → 财务/法务/技术三方并行审核 → 全部完成后才进入总监终批（并行网关 join 等待所有分支）" }
 ]

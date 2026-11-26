@@ -1,0 +1,86 @@
+id: parallel-review
+name: '三方并行会签'
+version: 1
+nodes:
+  - id: start
+    type: startEvent
+    name: 开始
+  - id: submit
+    type: userTask
+    name: 提交采购申请
+    assignee: "${applicant}"
+    formFields:
+      - key: reason
+        label: 采购事由
+        type: text
+        required: true
+        placeholder: "例如：研发部采购测试服务器"
+      - key: amount
+        label: 采购金额
+        type: number
+        required: true
+        placeholder: "例如：120000"
+  - id: fork
+    type: parallelGateway
+    name: 三方并行分发
+  - id: finance
+    type: userTask
+    name: 财务审预算
+    assignee: finance
+    formFields:
+      - key: financeOpinion
+        label: 财务意见
+        type: textarea
+        required: true
+        placeholder: "预算是否通过"
+  - id: legal
+    type: userTask
+    name: 法务审合同
+    assignee: legal
+    formFields:
+      - key: legalOpinion
+        label: 法务意见
+        type: textarea
+        required: true
+        placeholder: "合同条款是否通过"
+  - id: tech
+    type: userTask
+    name: 技术审方案
+    assignee: tech
+    formFields:
+      - key: techOpinion
+        label: 技术意见
+        type: textarea
+        required: true
+        placeholder: "方案是否可行"
+  - id: join
+    type: parallelGateway
+    name: 会签汇总（等三方全部完成）
+  - id: director
+    type: userTask
+    name: 总监终批
+    assignee: director
+  - id: end
+    type: endEvent
+    name: 结束
+transitions:
+  - from: start
+    to: submit
+  - from: submit
+    to: fork
+  - from: fork
+    to: finance
+  - from: fork
+    to: legal
+  - from: fork
+    to: tech
+  - from: finance
+    to: join
+  - from: legal
+    to: join
+  - from: tech
+    to: join
+  - from: join
+    to: director
+  - from: director
+    to: end
