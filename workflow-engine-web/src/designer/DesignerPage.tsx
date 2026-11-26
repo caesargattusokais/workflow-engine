@@ -30,6 +30,15 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
+  // Debounced edit not yet written to the server. Kept in a ref so switching
+  // drafts can flush it before the graph state is replaced by getDraft().
+  const pendingSave = useRef<{ id: string; nodes: Node[]; edges: Edge[] } | null>(null);
+  // All draft writes are serialised: the server has no version check and
+  // "last write wins", so an older in-flight PUT must never land after a newer one.
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const loadSeq = useRef(0);
 
   const activeDraft = drafts.find(d => d.id === activeId) || null;
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -84,10 +93,15 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     }
   };
 
-  // When switching drafts, load full data
+  // When switching drafts, load full data. Discard responses from a superseded
+  // switch: a slow getDraft(A) resolving after getDraft(B) would otherwise paint
+  // A's graph on B's canvas, and the next autosave would write A's nodes into B.
   useEffect(() => {
     if (!activeId || !loaded) return;
-    getDraft(activeId).then(d => {
+    const requestedId = activeId;
+    const seq = ++loadSeq.current;
+    getDraft(requestedId).then(d => {
+      if (seq !== loadSeq.current || activeIdRef.current !== requestedId) return;
       setNodes(d.nodes || []);
       setEdges(d.edges || []);
       setSelectedNode(null);
@@ -101,22 +115,51 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     }
   }, [nodes, edges, showYaml]);
 
-  // Auto-save to server (debounced 10s, no version bump)
+  // Serial write queue — a stale PUT must never overwrite a newer graph.
+  const enqueueSave = useCallback((id: string, graph: { nodes: Node[]; edges: Edge[] }, version?: number) => {
+    const payload: Record<string, unknown> = { nodes: graph.nodes, edges: graph.edges };
+    if (version != null) payload.version = version;
+    const task = saveChain.current.then(() => updateDraft(id, payload));
+    // Keep the chain alive after a failure; the caller still sees the rejection.
+    saveChain.current = task.catch(() => undefined);
+    return task;
+  }, []);
+
+  // Flush the pending debounced edit immediately. Called before switching
+  // drafts and on manual save, so no edit is lost or written to the wrong id.
+  const flushPendingSave = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    const pending = pendingSave.current;
+    pendingSave.current = null;
+    if (!pending) return;
+    enqueueSave(pending.id, { nodes: pending.nodes, edges: pending.edges })
+      .catch(e => showToast(e.message || 'Auto-save failed', 'error'));
+  }, [enqueueSave]);
+
+  const switchDraft = useCallback((id: string | null) => {
+    if (id === activeIdRef.current) return;
+    flushPendingSave();
+    setActiveId(id);
+  }, [flushPendingSave]);
+
+  // Auto-save to server (debounced 10s, no version bump).
+  // Dependencies include activeId: the effect must re-arm with the *new* draft
+  // id instead of firing an old closure's id/nodes after a switch.
   useEffect(() => {
     if (!activeId || !loaded) return;
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      updateDraft(activeId, { nodes, edges }).catch(e => showToast(e.message, 'error'));
-    }, 10000);
-    return () => clearTimeout(saveTimer.current);
-  }, [nodes, edges]);
+    pendingSave.current = { id: activeId, nodes, edges };
+    saveTimer.current = setTimeout(flushPendingSave, 10000);
+  }, [activeId, nodes, edges, loaded, flushPendingSave]);
 
   const doSave = async () => {
     if (!activeId) return;
     setSaving(true);
     try {
+      clearTimeout(saveTimer.current);
+      pendingSave.current = null; // explicit save supersedes the pending debounce
       const newVersion = (activeDraft?.version || 1) + 1;
-      await updateDraft(activeId, { nodes, edges, version: newVersion });
+      await enqueueSave(activeId, { nodes, edges }, newVersion);
       setDrafts(prev => prev.map(d => d.id === activeId ? {...d, version: newVersion} : d));
       setToast(`${t.designer.savedAs}${newVersion}`);
     } catch (e: any) { showToast(e.message || t.designer.saveFailed, 'error'); }
@@ -128,7 +171,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     try {
       const d = await createDraft(`Draft ${drafts.length + 1}`);
       setDrafts(prev => [...prev, { ...d, nodes: [], edges: [] }]);
-      setActiveId(d.id);
+      switchDraft(d.id);
     } catch (e: any) { showToast(`${t.designer.createFailed}: ` + (e.message || 'server unavailable'), 'error'); }
   };
 
@@ -144,11 +187,16 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   const delDraft = async (id: string) => {
     if (!confirm(t.designer.confirmDelete)) return;
     try { await removeDraft(id); } catch (e: any) { showToast(e.message, 'error'); }
+    if (activeIdRef.current === id) {
+      // This draft is gone; a pending autosave for it would 404 after the switch.
+      clearTimeout(saveTimer.current);
+      pendingSave.current = null;
+    }
     setDrafts(prev => {
       const u = prev.filter(d => d.id !== id);
       if (activeId === id) {
         const next = u.length > 0 ? u[0].id : null;
-        setActiveId(next);
+        switchDraft(next);
       }
       return u;
     });
@@ -194,7 +242,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         const { name, nodes: importedNodes, edges: importedEdges } = yamlToGraph(text);
         const d = await importDraft(name, importedNodes, importedEdges);
         setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
-        setActiveId(d.id);
+        switchDraft(d.id);
         setToast(`Imported: ${name}`);
       } catch (e: any) {
         showToast('Import failed: ' + e.message, 'error');
@@ -220,7 +268,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const { name, nodes: importedNodes, edges: importedEdges } = yamlToGraph(yaml);
       const d = await importDraft(name, importedNodes, importedEdges);
       setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
-      setActiveId(d.id);
+      switchDraft(d.id);
       setShowTemplates(false);
       setToast(`Imported: ${name}`);
     } catch (e: any) { showToast('Import failed: ' + e.message, 'error'); }
@@ -232,7 +280,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       const { name, nodes: genNodes, edges: genEdges } = yamlToGraph(r.yaml);
       const d = await importDraft(r.name || name, genNodes, genEdges);
       setDrafts(prev => [...prev, { ...d, nodes: genNodes, edges: genEdges }]);
-      setActiveId(d.id);
+      switchDraft(d.id);
       setShowAiGenerate(false);
       setToast(`AI: ${r.name || name} (${r.nodeCount ?? genNodes.length} nodes)`);
     } catch (e: any) {
@@ -419,7 +467,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
           draftHasMore={draftHasMore}
           draftLoading={draftLoadingState}
           draftPage={draftPage}
-          onSwitch={setActiveId}
+          onSwitch={switchDraft}
           onNew={newDraft}
           onImport={importYamlAction}
           onLoadTemplates={loadTemplates}

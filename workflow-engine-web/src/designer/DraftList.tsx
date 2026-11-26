@@ -85,6 +85,7 @@ export default function DraftList({ drafts, activeId, instanceSummary,
         }}>
         {drafts.map(d => (
           <div key={d.id}
+            data-draft-id={d.id}
             onClick={() => onSwitch(d.id)}
             onContextMenu={(e) => { e.preventDefault(); setDraftMenu({x:e.clientX, y:e.clientY, draft:d}); }}
             className={`px-2 py-2 cursor-pointer border-b border-gray-800/60 flex justify-between items-center group transition-colors
