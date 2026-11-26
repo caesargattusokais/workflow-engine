@@ -87,6 +87,19 @@ public class JdbcTaskRepository implements TaskRepository {
         if (query.getAssignee() != null) { sql.append(" AND assignee = ?"); params.add(query.getAssignee()); }
         if (query.getInstanceId() != null) { sql.append(" AND instance_id = ?"); params.add(query.getInstanceId()); }
         if (query.getStatus() != null) { sql.append(" AND status = ?"); params.add(query.getStatus().name()); }
+        // Tenant isolation at the storage layer — never rely on the caller to
+        // filter afterwards (that leaks other tenants' rows and breaks paging).
+        // The allowed set is resolved from the instance store by the controller.
+        if (query.getAllowedInstanceIds() != null) {
+            if (query.getAllowedInstanceIds().isEmpty()) return List.of();
+            sql.append(" AND instance_id IN (");
+            for (String id : query.getAllowedInstanceIds()) {
+                sql.append("?,");
+                params.add(id);
+            }
+            sql.setLength(sql.length() - 1);
+            sql.append(")");
+        }
         if (!query.getCandidateGroups().isEmpty()) {
             sql.append(" AND (");
             for (int i = 0; i < query.getCandidateGroups().size(); i++) {

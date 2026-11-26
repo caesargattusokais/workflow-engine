@@ -27,6 +27,42 @@ test.describe('Authentication / X-User-Id', () => {
     expect(res.status).toBe(200);
   });
 
+  test('forged token with admin header is rejected (no header fallback)', async () => {
+    const res = await fetch(`${API_BASE}/drafts`, {
+      headers: { 'X-User-Id': 'admin', 'Authorization': 'Bearer forged.token.invalid' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('task list does not leak other tenants tasks', async ({ api }) => {
+    // testuser starts an instance with a pending task; user-b must not see it.
+    const def = await api.deploy(`id: tenant-task-${Date.now()}
+name: Tenant Task
+nodes:
+  - id: start
+    type: startEvent
+  - id: review
+    type: userTask
+    name: Review
+    assignee: ${TEST_USER}
+  - id: end
+    type: endEvent
+transitions:
+  - from: start
+    to: review
+  - from: review
+    to: end`);
+    const inst = await api.startInstance(def.id);
+    await api.waitForTasks({ instanceId: inst.id, assignee: TEST_USER }, 8000);
+
+    const userB = new ApiClient('user-b');
+    const foreignTasks = await userB.listTasks({ instanceId: inst.id, status: 'PENDING' });
+    expect(foreignTasks, 'user-b must not see testuser task/variables').toHaveLength(0);
+
+    const ownTasks = await api.listTasks({ instanceId: inst.id, status: 'PENDING' });
+    expect(ownTasks.length).toBeGreaterThan(0);
+  });
+
   test('multi-tenant data isolation', async ({ api }) => {
     const draft = await api.createDraft(`user-a-draft-${Date.now()}`);
     const userB = new ApiClient('user-b');

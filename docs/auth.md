@@ -10,8 +10,9 @@ original "any `X-User-Id` header is trusted" behaviour.
   place, independent of the engine and the server.
 - **Embed anywhere**: it auto-configures when on the classpath; the server
   depends on it as a library (single process, no extra deployment).
-- **Backwards compatible**: the legacy `X-User-Id` header still works for
-  service callers (MCP, E2E) via a switch, so existing integrations keep running.
+- **Secure by default**: the legacy `X-User-Id` header is OFF by default — a
+  bare header is not proof of identity. Service callers (MCP, E2E) opt in
+  explicitly with `auth.header-compat-enabled=true` or use a Bearer token.
 
 ## Quick start (default config)
 
@@ -66,7 +67,7 @@ All settings live under `auth.*` (see `application.yml`):
 | `auth.token-ttl` | `8h` | token lifetime (`30m`, `8h`, `7d`, …) |
 | `auth.cookie-name` | `wf_session` | session cookie name |
 | `auth.cookie-secure` | `false` | set `Secure` flag (enable behind HTTPS) |
-| `auth.header-compat-enabled` | `true` | accept legacy `X-User-Id` as identity |
+| `auth.header-compat-enabled` | `false` | accept legacy `X-User-Id` as identity (**off by default — opt in explicitly**) |
 | `auth.registration-enabled` | `true` | allow public self-registration |
 | `auth.default-roles` | `[USER]` | roles granted to registered users |
 | `auth.min-password-length` | `6` | minimum password length on signup |
@@ -86,9 +87,17 @@ All settings live under `auth.*` (see `application.yml`):
          roles: [ADMIN]
    ```
    Generate a hash with any BCrypt tool (e.g. `htpasswd -bnBC 10 "" <password>`).
-2. Set `header-compat-enabled: false` once MCP/E2E callers are migrated to
-   Bearer tokens — then only real logins are accepted.
+2. Leave `header-compat-enabled` at its default `false`. A presented token is
+   authoritative: an invalid/expired token is rejected outright and never falls
+   back to the header, closing the "bad token + `X-User-Id: admin`" escalation.
+   For MCP, set `WF_MCP_TOKEN` to a token issued via `/api/auth/login` (the MCP
+   server sends it as `Authorization: Bearer`); use `WF_MCP_USER` + header compat
+   only in trusted dev/CI. E2E opts in explicitly in `playwright.config.ts`.
 3. Terminate TLS at the proxy and keep `cookie-secure: true`.
+4. WebSocket handshakes (`/ws/**`) are authenticated by `WsAuthInterceptor` —
+   the servlet filter only covers `/api/**`. Browsers send the session cookie on
+   the handshake automatically; service callers use Bearer. Per-instance
+   channels additionally verify the instance belongs to the caller.
 
 ## How it works
 

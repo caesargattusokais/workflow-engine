@@ -20,12 +20,19 @@ public class EngineClient {
 
     public EngineClient(
             @Value("${wf.engine.base-url:http://localhost:8080/api}") String baseUrl,
-            @Value("${wf.engine.user:mcp-agent}") String userId) {
+            @Value("${wf.engine.user:mcp-agent}") String userId,
+            @Value("${wf.engine.token:}") String token) {
         this.userId = userId;
-        this.rest = RestClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader("X-User-Id", userId)
-                .build();
+        var builder = RestClient.builder().baseUrl(baseUrl);
+        if (token != null && !token.isBlank()) {
+            // Preferred: authenticate as a real session token. Works even when
+            // the engine disables the legacy X-User-Id compatibility channel.
+            builder.defaultHeader("Authorization", "Bearer " + token.trim());
+        } else {
+            // Backward compatibility for deployments that opted into header auth.
+            builder.defaultHeader("X-User-Id", userId);
+        }
+        this.rest = builder.build();
     }
 
     public String getUserId() { return userId; }

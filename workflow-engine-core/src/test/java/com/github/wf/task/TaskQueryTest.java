@@ -30,6 +30,19 @@ class TaskQueryTest {
     }
 
     @Test
+    void allowedInstanceIdsRestrictsTenantScope() {
+        Task mine = new Task("t1", "inst-1", "node-1");
+        Task foreign = new Task("t2", "inst-2", "node-1");
+        var q = new TaskQuery().allowedInstanceIds(java.util.Set.of("inst-1"));
+        assertThat(q.matches(mine)).isTrue();
+        assertThat(q.matches(foreign)).isFalse();
+        // Empty allowed set means the caller may see nothing.
+        assertThat(new TaskQuery().allowedInstanceIds(java.util.Set.of()).matches(mine)).isFalse();
+        // No scope set → legacy behaviour (used by internal engine callers).
+        assertThat(new TaskQuery().matches(foreign)).isTrue();
+    }
+
+    @Test
     void chainedBuilder() {
         TaskQuery q = new TaskQuery()
                 .assignee("张三")

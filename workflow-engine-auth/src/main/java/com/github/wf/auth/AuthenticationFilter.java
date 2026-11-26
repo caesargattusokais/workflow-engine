@@ -48,6 +48,9 @@ public class AuthenticationFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (token != null) {
+            // A presented token is authoritative: a forged/expired token must NOT
+            // fall back to the spoofable header. This closes the "bad token +
+            // X-User-Id: admin" privilege-escalation path.
             try {
                 TokenService.Claims claims = authService.verifyToken(token);
                 UserStore.StoredUser stored = findUser(claims.username());
@@ -58,8 +61,10 @@ public class AuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
             } catch (TokenService.InvalidTokenException ignored) {
-                // fall through to header compat / 401
+                // fall through to 401 — never to header compat
             }
+            respondUnauthorized(response);
+            return;
         }
 
         String headerUser = request.getHeader("X-User-Id");
@@ -70,6 +75,10 @@ public class AuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        respondUnauthorized(response);
+    }
+
+    private void respondUnauthorized(HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
         response.setCharacterEncoding("UTF-8");

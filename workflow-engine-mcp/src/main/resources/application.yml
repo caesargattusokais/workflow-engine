@@ -19,8 +19,11 @@ wf:
   engine:
     # Where the workflow-engine-server REST API lives.
     base-url: ${WF_ENGINE_URL:http://localhost:8080/api}
-    # Identity the MCP server acts as inside the engine (X-User-Id header).
-    # Tenant filtering applies to this user exactly as to a human.
+    # Preferred auth: a session token issued by POST /api/auth/login. Set via
+    # WF_MCP_TOKEN; works even when the engine disables header compatibility.
+    token: ${WF_MCP_TOKEN:}
+    # Fallback identity when no token is set (requires auth.header-compat-enabled
+    # on the engine). Tenant filtering applies to this user like a human.
     user: ${WF_MCP_USER:mcp-agent}
 
 logging:

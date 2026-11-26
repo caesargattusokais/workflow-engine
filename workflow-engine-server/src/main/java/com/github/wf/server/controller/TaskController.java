@@ -38,7 +38,18 @@ public class TaskController {
             @Parameter(description = "Filter by task status (PENDING, COMPLETED, REJECTED)")
             @RequestParam(value = "status", required = false) String status) {
 
-        var q = engine.taskQuery();
+        // Tenant scope: a caller sees tasks on instances they own OR tasks
+        // assigned to them (delegation must stay visible to the delegatee).
+        // Resolve IDs up front and push into the store query so no other
+        // tenant's task/variables leak and paging stays correct.
+        var allowedIds = new java.util.HashSet<String>();
+        for (var inst : engine.instanceRepository.findAll()) {
+            if (userId.equals(inst.getVariable("_userId"))) allowedIds.add(inst.getId());
+        }
+        for (var t : engine.taskRepository.query(engine.taskQuery().assignee(userId))) {
+            allowedIds.add(t.getInstanceId());
+        }
+        var q = engine.taskQuery().allowedInstanceIds(allowedIds);
         if (assignee != null) q.assignee(assignee);
         if (candidateGroup != null) q.candidateGroup(candidateGroup);
         if (instanceId != null) q.instanceId(instanceId);

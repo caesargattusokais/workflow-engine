@@ -432,8 +432,14 @@ public class WorkflowEngine {
                         node.getName(), node.getType(), task.getAssignee(), comment));
 
         if (variables != null && !variables.isEmpty()) {
-            instance.setVariables(variables);
-            instanceRepository.update(instance);
+            // Never let a task submission rewrite engine-owned keys (owner,
+            // timer/suspend signals) — that would allow tenant takeover or
+            // forged state transitions.
+            Map<String, Object> clean = InternalVars.stripInternal(variables);
+            if (!clean.isEmpty()) {
+                instance.setVariables(clean);
+                instanceRepository.update(instance);
+            }
         }
 
         // Wake up waiting execution

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SpelExpressionEvaluatorTest {
 
@@ -105,6 +106,40 @@ class SpelExpressionEvaluatorTest {
         // "0123" looks numeric but is an order/case number — must stay a string
         Map<String, Object> normalized = SpelExpressionEvaluator.normalizeVariables(Map.of("code", "0123"));
         assertThat(normalized.get("code")).isEqualTo("0123");
+    }
+
+    @Test
+    void allowsHarmlessStringMethodCalls() {
+        // Real templates use exception.message.contains('timeout')
+        assertThat(evaluator.evaluateToBoolean(
+                "exception.message.contains('timeout')",
+                Map.of("exception", Map.of("message", "read timeout after 3s")))).isTrue();
+        assertThat(evaluator.evaluateToBoolean(
+                "message.startsWith('HTTP 5')", Map.of("message", "HTTP 503"))).isTrue();
+    }
+
+    @Test
+    void rejectsTypeReferenceRce() {
+        // Classic SpEL RCE payload — must never reach Runtime.exec
+        String payload = "T(java.lang.Runtime).getRuntime().exec('calc')";
+        assertThatThrownBy(() -> evaluator.evaluate(payload, Map.of()))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void rejectsConstructorAndReflection() {
+        assertThatThrownBy(() -> evaluator.evaluate("new java.lang.ProcessBuilder('calc')", Map.of()))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> evaluator.evaluate(
+                "message.getClass().getClassLoader()", Map.of("message", "x")))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void rejectsNonWhitelistedMethod() {
+        // wait()/getClass() are not in the allow-list
+        assertThatThrownBy(() -> evaluator.evaluate("message.wait(1000)", Map.of("message", "x")))
+                .isInstanceOf(RuntimeException.class);
     }
 
     @Test

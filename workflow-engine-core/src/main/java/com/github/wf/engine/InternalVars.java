@@ -1,5 +1,7 @@
 package com.github.wf.engine;
 
+import java.util.Map;
+
 /**
  * Names of internal engine variables stored in {@code ProcessInstance.variables}.
  *
@@ -9,6 +11,9 @@ package com.github.wf.engine;
  * built from them.</p>
  */
 public final class InternalVars {
+
+    /** Instance owner key — engine-controlled, never settable via completeTask variables. */
+    public static final String OWNER_KEY = "_userId";
 
     /** Suffix of the per-node key holding the suspension reason message. */
     public static final String SUSPEND_REASON_SUFFIX = "_suspendReason";
@@ -39,9 +44,20 @@ public final class InternalVars {
 
     /** Returns true if the given variable key is engine-internal (any of the suffixes). */
     public static boolean isInternalKey(String key) {
-        return key != null && (key.endsWith(SUSPEND_REASON_SUFFIX)
+        return key != null && (OWNER_KEY.equals(key)
+                || key.endsWith(SUSPEND_REASON_SUFFIX)
                 || key.endsWith(SUSPEND_EXCEPTION_SUFFIX)
                 || key.endsWith(TIMER_FIRED_SUFFIX)
                 || key.endsWith(BOUNDARY_TIMER_FIRED_SUFFIX));
+    }
+
+    /** Strip engine-owned keys from a user-supplied variable map (defensive copy). */
+    public static Map<String, Object> stripInternal(Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return Map.of();
+        Map<String, Object> clean = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : vars.entrySet()) {
+            if (!isInternalKey(e.getKey())) clean.put(e.getKey(), e.getValue());
+        }
+        return clean;
     }
 }

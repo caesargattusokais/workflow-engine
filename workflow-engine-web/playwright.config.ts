@@ -42,6 +42,9 @@ export default defineConfig({
       // write wait on binlog fsync and the suite times out.
       command: 'java -jar ../workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar '
         + '--spring.profiles.active=memory,mock-ldap --server.port=8080 '
+        // E2E API helpers use the legacy X-User-Id header to switch tenants.
+        // Opt in explicitly here; production defaults to header-compat disabled.
+        + '--auth.header-compat-enabled=true '
         + '--ai.base-url=http://127.0.0.1:9999/v1 --ai.api-key=stub --ai.model=stub-model',
       port: 8080,
       timeout: 30000,

@@ -79,6 +79,8 @@ services:
     container_name: wf-app
     environment:
       - SPRING_PROFILES_ACTIVE=redis
+      # E2E/curl callers use the legacy header; browser users use session tokens.
+      - AUTH_HEADER_COMPAT=true
       - REDIS_HOST=redis
       - REDIS_PASSWORD=redis123
       - SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/workflow_engine?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true

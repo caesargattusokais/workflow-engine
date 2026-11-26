@@ -30,9 +30,10 @@ public class AuthProperties {
 
     /**
      * Allow the legacy {@code X-User-Id} header as an authentication mechanism.
-     * Keep enabled for MCP / E2E service callers; disable in a browser-only production deployment.
+     * OFF by default: a bare header is not proof of identity. Service callers
+     * (MCP, E2E) must opt in explicitly via {@code auth.header-compat-enabled=true}.
      */
-    private boolean headerCompatEnabled = true;
+    private boolean headerCompatEnabled = false;
 
     /** Whether login is required at all. Disable only for fully trusted local dev. */
     private boolean enabled = true;
