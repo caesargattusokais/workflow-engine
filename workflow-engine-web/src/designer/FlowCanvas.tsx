@@ -7,7 +7,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from './nodes';
-import { EDGE_STYLES, getEdgeStyle, getEdgeMarker, styleEdgeForType } from './edgeStyles';
+import {
+  EDGE_STYLES, getEdgeStyle, getEdgeMarker, styleEdgeForType,
+  EDGE_SHAPES, getEdgeShape, shapeEdge, DEFAULT_EDGE_SHAPE, type EdgeShape,
+} from './edgeStyles';
 
 interface FlowCanvasProps {
   nodes: Node[];
@@ -33,6 +36,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [locked, setLocked] = useState(false);
+  const [defaultShape, setDefaultShape] = useState<EdgeShape>(DEFAULT_EDGE_SHAPE);
   const rfInstance = useRef<any>(null);
   const { t, lang } = useT();
 
@@ -43,10 +47,11 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     return () => window.removeEventListener('click', close);
   }, []);
 
-  // Normalize every edge's color/arrow from its semantic type. Edges arrive from
-  // template import, loaded drafts and the server graph without a `style`, so
-  // without this pass they all render the same default grey. Only write back
-  // when something actually differs, to avoid a render loop.
+  // Normalize color/arrow (from semantic edgeType) AND shape (from the visual
+  // edgeShape, falling back to the canvas default). Edges arrive from template
+  // import, drafts and the server graph without style/type, so without this
+  // pass they all render the same grey smoothstep. Only write back when
+  // something actually differs, to avoid a render loop.
   useEffect(() => {
     let changed = false;
     const normalized = edges.map(edge => {
@@ -55,26 +60,30 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
       const cur = (edge.style || {}) as Record<string, unknown>;
       const curMarker = edge.markerEnd as any;
       const markerColor = curMarker && typeof curMarker === 'object' ? curMarker.color : undefined;
-      if (cur.stroke === want.stroke && cur.strokeWidth === want.strokeWidth
+      const colorOk = cur.stroke === want.stroke && cur.strokeWidth === want.strokeWidth
           && (cur.strokeDasharray || '') === (want.strokeDasharray || '')
-          && markerColor === want.stroke) return edge;
+          && markerColor === want.stroke;
+      const wantShape = getEdgeShape(edge, defaultShape);
+      if (colorOk && edge.type === wantShape) return edge;
       changed = true;
-      return styleEdgeForType(edge);
+      let next: Edge = colorOk ? edge : styleEdgeForType(edge);
+      if (next.type !== wantShape) next = shapeEdge(next, wantShape);
+      return next;
     });
     if (changed) setEdges(normalized);
-  }, [edges, setEdges]);
+  }, [edges, setEdges, defaultShape]);
 
   const onConnect = useCallback((params: Connection) => {
     if (locked) return;
-    setEdges([...edges, {
+    setEdges([...edges, shapeEdge({
       ...params,
       id: `edge_${Date.now()}`,
       markerEnd: getEdgeMarker('direct'),
       style: getEdgeStyle('direct'),
       interactionWidth: 20,
       data: { edgeType: 'direct' }
-    } as Edge]);
-  }, [edges, setEdges, locked]);
+    } as Edge, defaultShape)]);
+  }, [edges, setEdges, locked, defaultShape]);
 
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     if (locked) return;
@@ -153,6 +162,18 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     setMenu(null);
   }, [edges, setEdges]);
 
+  // Apply a shape to one edge, or to every edge (also becomes the new default
+  // for edges drawn afterwards). Shape is persisted in data for draft reload.
+  const applyShape = useCallback((shape: EdgeShape, edgeId?: string) => {
+    if (edgeId) {
+      setEdges(edges.map(e => e.id === edgeId ? shapeEdge(e, shape) : e));
+    } else {
+      setDefaultShape(shape);
+      setEdges(edges.map(e => shapeEdge(e, shape)));
+    }
+    setMenu(null);
+  }, [edges, setEdges]);
+
   const duplicateNode = useCallback((nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -194,10 +215,11 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
+          type: defaultShape,
           style: getEdgeStyle('direct'),
           markerEnd: getEdgeMarker('direct'),
           interactionWidth: 20,
-          data: { edgeType: 'direct' }
+          data: { edgeType: 'direct', edgeShape: defaultShape }
         }}
         style={{ background: 'transparent' }}
       >
@@ -240,10 +262,28 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
             );
           })}
         </div>
+        <div className="text-[10px] text-gray-600 mt-1.5 pt-1.5 border-t border-gray-700/70">
+          {lang === 'zh' ? '左下角切换线型' : 'Switch shape at bottom-left'}
+        </div>
       </div>
 
       {/* ── Bottom-left tools ─────────────────── */}
-      <div className="absolute bottom-3 left-3 z-10 flex gap-1.5">
+      <div className="absolute bottom-3 left-3 z-10 flex gap-1.5 items-center">
+        {/* Global edge shape switcher */}
+        <div className="flex items-center gap-0.5 bg-gray-800/90 border border-gray-600 rounded px-1 py-0.5 shadow-lg">
+          <span className="text-[10px] text-gray-500 px-1">{lang === 'zh' ? '线型' : 'Shape'}</span>
+          {(Object.keys(EDGE_SHAPES) as EdgeShape[]).map(shape => (
+            <button key={shape} onClick={() => applyShape(shape)}
+              className={`p-1 rounded transition-colors ${defaultShape === shape ? 'bg-indigo-600/70 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'}`}
+              title={`${lang === 'zh' ? '全部连线改为' : 'All edges →'} ${lang === 'zh' ? EDGE_SHAPES[shape].labelZh : EDGE_SHAPES[shape].label}`}>
+              <svg width="20" height="14" viewBox="0 0 22 16" fill="none" aria-label={shape}>
+                <circle cx="2" cy="14" r="1.6" fill="currentColor" />
+                <circle cx="20" cy="2" r="1.6" fill="currentColor" />
+                <path d={EDGE_SHAPES[shape].icon} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          ))}
+        </div>
         <button onClick={() => rfInstance.current?.fitView({ duration: 300 })}
           className="bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-2.5 py-1.5
                      text-gray-300 text-xs transition-colors shadow-lg"
@@ -324,6 +364,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
               };
               const types = allowed[srcType] || ['direct'];
               const curType = edge?.data?.edgeType as string || 'direct';
+              const curShape = getEdgeShape(edge || {});
               const needsExpr = ['conditional','result','exception'].includes(curType);
               return (
               <div>
@@ -340,6 +381,22 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
                   {t === curType ? `● ${t}` : `  ${t}`}
                 </button>
               ))}
+              <div className="px-3 py-1 text-[10px] text-gray-600 border-t border-gray-700 mt-0.5">
+                {lang === 'zh' ? '线型' : 'Shape'}
+              </div>
+              <div className="flex gap-1 px-2 py-1">
+                {(Object.keys(EDGE_SHAPES) as EdgeShape[]).map(shape => (
+                  <button key={shape} onClick={() => applyShape(shape, menu.edgeId!)}
+                    className={`flex-1 p-1 rounded border transition-colors ${curShape === shape ? 'border-indigo-500 bg-indigo-600/30 text-white' : 'border-gray-700 text-gray-400 hover:bg-gray-700'}`}
+                    title={lang === 'zh' ? EDGE_SHAPES[shape].labelZh : EDGE_SHAPES[shape].label}>
+                    <svg width="22" height="16" viewBox="0 0 22 16" fill="none" aria-label={`shape-${shape}`}>
+                      <circle cx="2" cy="14" r="1.6" fill="currentColor" />
+                      <circle cx="20" cy="2" r="1.6" fill="currentColor" />
+                      <path d={EDGE_SHAPES[shape].icon} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
               {needsExpr && (
                 <div className="px-3 py-1" onClick={e => e.stopPropagation()}>
                   <input className="w-full bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-gray-200 text-xs mt-1"

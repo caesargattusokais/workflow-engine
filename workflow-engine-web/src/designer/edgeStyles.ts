@@ -49,3 +49,39 @@ export function styleEdgeForType<T extends { data?: Record<string, unknown>; sty
     markerEnd: getEdgeMarker(type),
   };
 }
+
+/* ── Edge shape (visual) ────────────────────────────────────────────────
+ * Orthogonal to `edgeType` (semantic). Stored in `data.edgeShape` so it
+ * survives draft save/load; ReactFlow's `edge.type` is derived from it.
+ * Values are ReactFlow's built-in edge type names — no custom edge needed.
+ */
+export type EdgeShape = 'smoothstep' | 'default' | 'straight' | 'step';
+
+export const EDGE_SHAPES: Record<EdgeShape, { label: string; labelZh: string; icon: string }> = {
+  smoothstep: { label: 'Rounded', labelZh: '圆角折线', icon: 'M2 14 h5 a3 3 0 0 0 3 -3 v-6 a3 3 0 0 1 3 -3 h5' },
+  default:    { label: 'Curve',    labelZh: '曲线',     icon: 'M2 14 C 9 14, 9 2, 20 2' },
+  straight:   { label: 'Straight', labelZh: '直线',     icon: 'M2 14 L20 2' },
+  step:       { label: 'Elbow',    labelZh: '直角折线', icon: 'M2 14 h8 v-12 h10' },
+};
+
+export const DEFAULT_EDGE_SHAPE: EdgeShape = 'smoothstep';
+
+export function isEdgeShape(v: unknown): v is EdgeShape {
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(EDGE_SHAPES, v);
+}
+
+/** Explicit data.edgeShape wins; otherwise the ReactFlow type, then `fallback`. */
+export function getEdgeShape(
+  edge: { type?: string; data?: Record<string, unknown> },
+  fallback: EdgeShape = DEFAULT_EDGE_SHAPE,
+): EdgeShape {
+  const explicit = edge.data?.edgeShape;
+  if (isEdgeShape(explicit)) return explicit;
+  if (isEdgeShape(edge.type)) return edge.type;
+  return fallback;
+}
+
+/** Return a copy of `edge` whose ReactFlow type + persisted shape are `shape`. */
+export function shapeEdge<T extends { type?: string; data?: Record<string, unknown> }>(edge: T, shape: EdgeShape): T {
+  return { ...edge, type: shape, data: { ...edge.data, edgeShape: shape } };
+}
