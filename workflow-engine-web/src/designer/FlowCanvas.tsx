@@ -1,12 +1,13 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useT } from '../i18n';
 import {
-  ReactFlow, Background, BackgroundVariant, MiniMap,
-  addEdge, Connection, MarkerType,
+  ReactFlow, Background, BackgroundVariant,
+  Connection,
   type Node, type Edge
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { nodeTypes } from './nodes';
+import { EDGE_STYLES, getEdgeStyle, getEdgeMarker, styleEdgeForType } from './edgeStyles';
 
 interface FlowCanvasProps {
   nodes: Node[];
@@ -28,23 +29,12 @@ interface ContextMenuState {
 
 let nodeIdCounter = 0;
 
-function getEdgeStyle(type?: string) {
-  switch (type) {
-    case 'result': return { stroke: '#22c55e', strokeWidth: 2 };
-    case 'exception': return { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' };
-    case 'timeout': return { stroke: '#f97316', strokeWidth: 2, strokeDasharray: '5,5' };
-    case 'conditional': return { stroke: '#e5a50a', strokeWidth: 2 };
-    case 'default': return { stroke: '#8b94a8', strokeWidth: 2, strokeDasharray: '3,3' };
-    default: return { stroke: '#7d879c', strokeWidth: 2 };
-  }
-}
-
 export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, onNodeSelect }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [locked, setLocked] = useState(false);
   const rfInstance = useRef<any>(null);
-  const { t } = useT();
+  const { t, lang } = useT();
 
   // Close menu on any click outside
   useEffect(() => {
@@ -53,13 +43,34 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
     return () => window.removeEventListener('click', close);
   }, []);
 
+  // Normalize every edge's color/arrow from its semantic type. Edges arrive from
+  // template import, loaded drafts and the server graph without a `style`, so
+  // without this pass they all render the same default grey. Only write back
+  // when something actually differs, to avoid a render loop.
+  useEffect(() => {
+    let changed = false;
+    const normalized = edges.map(edge => {
+      const type = (edge.data?.edgeType as string) || 'direct';
+      const want = getEdgeStyle(type);
+      const cur = (edge.style || {}) as Record<string, unknown>;
+      const curMarker = edge.markerEnd as any;
+      const markerColor = curMarker && typeof curMarker === 'object' ? curMarker.color : undefined;
+      if (cur.stroke === want.stroke && cur.strokeWidth === want.strokeWidth
+          && (cur.strokeDasharray || '') === (want.strokeDasharray || '')
+          && markerColor === want.stroke) return edge;
+      changed = true;
+      return styleEdgeForType(edge);
+    });
+    if (changed) setEdges(normalized);
+  }, [edges, setEdges]);
+
   const onConnect = useCallback((params: Connection) => {
     if (locked) return;
     setEdges([...edges, {
       ...params,
       id: `edge_${Date.now()}`,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#7d879c' },
-      style: getEdgeStyle(),
+      markerEnd: getEdgeMarker('direct'),
+      style: getEdgeStyle('direct'),
       interactionWidth: 20,
       data: { edgeType: 'direct' }
     } as Edge]);
@@ -183,8 +194,8 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{
-          style: getEdgeStyle(),
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#7d879c' },
+          style: getEdgeStyle('direct'),
+          markerEnd: getEdgeMarker('direct'),
           interactionWidth: 20,
           data: { edgeType: 'direct' }
         }}
@@ -210,6 +221,26 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
           <div className="text-[11px] text-gray-600">从左侧节点面板拖入开始节点，或点击「AI 生成」描述你的流程</div>
         </div>
       )}
+
+      {/* ── Edge legend (top-right, non-blocking) ── */}
+      <div className="absolute top-3 right-3 z-10 pointer-events-none select-none
+                      bg-gray-900/80 border border-gray-700/80 rounded-lg px-3 py-2 shadow-lg backdrop-blur-sm">
+        <div className="text-[10px] text-gray-500 mb-1.5 font-medium">{lang === 'zh' ? '连线类型' : 'Edge types'}</div>
+        <div className="flex flex-col gap-1">
+          {(Object.keys(EDGE_STYLES) as Array<keyof typeof EDGE_STYLES>).map(k => {
+            const s = EDGE_STYLES[k];
+            return (
+              <div key={k} className="flex items-center gap-2">
+                <svg width="22" height="8" className="shrink-0">
+                  <line x1="1" y1="4" x2="21" y2="4" stroke={s.stroke} strokeWidth={s.strokeWidth}
+                    strokeDasharray={s.strokeDasharray} />
+                </svg>
+                <span className="text-[10px] text-gray-400">{lang === 'zh' ? s.labelZh : s.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Bottom-left tools ─────────────────── */}
       <div className="absolute bottom-3 left-3 z-10 flex gap-1.5">
@@ -301,7 +332,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
                 <button key={t} onClick={() => {
                   const style = getEdgeStyle(t);
                   setEdges(edges.map(e => e.id === menu.edgeId ? {
-                    ...e, data: { ...e.data, edgeType: t }, style, markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke as string }
+                    ...e, data: { ...e.data, edgeType: t }, style, markerEnd: getEdgeMarker(t)
                   } : e));
                   setMenu(null);
                 }}
