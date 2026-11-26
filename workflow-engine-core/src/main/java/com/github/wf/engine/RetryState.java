@@ -16,5 +16,8 @@ public enum RetryState {
     TIMER_PENDING,
 
     /** Service task failed — retry scheduled via the delay queue. */
-    RETRY_PENDING
+    RETRY_PENDING,
+
+    /** Task rejected — this token is terminal and must not recreate the task or block a join. */
+    REJECTED
 }

@@ -82,7 +82,7 @@ public class InclusiveGatewayRunner implements NodeRunner {
 
         boolean allArrived = siblings.stream().allMatch(sibling ->
                 sibling.getId().equals(exec.getId()) ||
-                        sibling.isCompleted() ||
+                        sibling.isTerminal() ||
                         sibling.getCurrentNodeId().equals(node.getId()));
 
         if (allArrived) {

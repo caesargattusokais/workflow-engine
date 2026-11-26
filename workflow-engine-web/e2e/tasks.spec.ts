@@ -72,8 +72,8 @@ test.describe('Tasks API', () => {
     const tasks = await api.waitForTasks({ instanceId: inst.id, assignee: 'reviewer' });
     expect(tasks.length).toBeGreaterThan(0);
     await api.rejectTask(tasks[0].id, 'Not acceptable');
-    // Task should be rejected — verify by checking the task is no longer PENDING
-    // (rejectTask marks task as REJECTED but does not suspend the instance)
+    // Task should be rejected — the token becomes terminal but the instance
+    // stays RUNNING (other parallel branches may still be working).
     const instAfter = await api.getInstance(inst.id);
     expect(instAfter.status).toBe('RUNNING');
   });

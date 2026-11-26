@@ -96,6 +96,18 @@ public class AiTaskRunner implements NodeRunner {
                     return true;
                 }
             }
+            // No result/direct edge matched: suspending is the only safe outcome.
+            // Returning true with the token still ACTIVE here caused a tight loop.
+            String reason = "No outgoing transition matched after AI task " + node.getId();
+            log.error(reason);
+            exec.setStatus(ExecutionStatus.WAITING);
+            exec.setRetryState(RetryState.SUSPENDED.name());
+            exec.setRetryAttempt(0);
+            exec.setNextRetryAt(0);
+            repo.updateExecution(exec);
+            instance.setVariable(InternalVars.suspendReasonKey(node.getId()), reason);
+            instance.setVariable(InternalVars.suspendExceptionKey(node.getId()), "RoutingException");
+            repo.update(instance);
             return true;
 
         } catch (Exception e) {
@@ -110,6 +122,7 @@ public class AiTaskRunner implements NodeRunner {
                     && shouldRetry(rc.getRetryOn(), vars, context)) {
                 long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
                 repo.update(instance);
+                exec.setNextRetryAt(System.currentTimeMillis() + delay);
                 if (scheduler != null) {
                     scheduler.accept(exec.getInstanceId(), delay);
                     log.info("Scheduling AI retry for instance " + exec.getInstanceId()

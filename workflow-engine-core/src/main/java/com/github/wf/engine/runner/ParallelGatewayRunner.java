@@ -47,9 +47,11 @@ public class ParallelGatewayRunner implements NodeRunner {
         InstanceRepository repo = context.getInstanceRepository();
         List<Execution> siblings = repo.findExecutionsByParentId(exec.getParentExecutionId());
 
+        // Rejected tokens are terminal for join purposes — otherwise one
+        // rejected branch keeps every other branch waiting forever.
         boolean allArrived = siblings.stream().allMatch(sibling ->
                 sibling.getId().equals(exec.getId()) ||
-                        (sibling.isCompleted() || sibling.getCurrentNodeId().equals(node.getId())));
+                        (sibling.isTerminal() || sibling.getCurrentNodeId().equals(node.getId())));
 
         if (allArrived) {
             Execution parent = repo.findExecutionById(exec.getParentExecutionId());

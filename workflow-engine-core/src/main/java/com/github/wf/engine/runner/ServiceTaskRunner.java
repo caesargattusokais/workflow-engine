@@ -124,6 +124,23 @@ public class ServiceTaskRunner implements NodeRunner {
                 }
             }
 
+            if (!matched) {
+                // Success with no matching outgoing edge used to return true with
+                // the token still ACTIVE on the same node — a tight infinite loop.
+                String reason = "No outgoing transition matched after service task " + node.getId();
+                log.error(reason);
+                exec.setStatus(ExecutionStatus.WAITING);
+                exec.setRetryState(com.github.wf.engine.RetryState.SUSPENDED.name());
+                exec.setRetryAttempt(0);
+                exec.setNextRetryAt(0);
+                repo.updateExecution(exec);
+                instance.setVariable(com.github.wf.engine.InternalVars.suspendReasonKey(node.getId()), reason);
+                instance.setVariable(com.github.wf.engine.InternalVars.suspendExceptionKey(node.getId()),
+                        "RoutingException");
+                repo.update(instance);
+                return true;
+            }
+
             return true;
 
         } catch (Exception e) {
@@ -139,6 +156,7 @@ public class ServiceTaskRunner implements NodeRunner {
                 if (shouldRetry(rc.getRetryOn(), variables, context)) {
                     long delay = rc.calculateDelay(exec.getRetryAttempt() - 1);
                     repo.update(instance);
+                    exec.setNextRetryAt(System.currentTimeMillis() + delay);
                     if (scheduler != null) {
                         scheduler.accept(exec.getInstanceId(), delay);
                         log.info("Scheduling retry for instance " + exec.getInstanceId() + " in " + delay + "ms");

@@ -65,6 +65,12 @@ public class UserTaskRunner implements NodeRunner {
         Execution exec = context.getExecution();
         Map<String, Object> variables = context.getVariables();
 
+        // A rejected token is terminal — never recreate the rejected task.
+        if (exec.isRejected()) {
+            log.info("Skipping rejected execution at node=" + node.getId() + " instance=" + exec.getInstanceId());
+            return false;
+        }
+
         // Check if re-entering after boundary timer timeout
         String timerKey = com.github.wf.engine.InternalVars.boundaryTimerFiredKey(node.getId());
         ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
@@ -192,6 +198,9 @@ public class UserTaskRunner implements NodeRunner {
                 if (delayMs > 0) {
                     log.info("Scheduling boundary timer for node=" + node.getId() + " delay=" + delayMs + "ms");
                     // Note: timerKey is NOT set here — it will be set by trigger() when the timer actually fires
+                    // Persist the due time so unrelated triggers/recover() cannot wake it early.
+                    exec.setNextRetryAt(System.currentTimeMillis() + delayMs);
+                    context.getInstanceRepository().updateExecution(exec);
                     scheduler.accept(exec.getInstanceId(), delayMs);
                     exec.setRetryState(com.github.wf.engine.RetryState.TIMER_PENDING.name());
                 }

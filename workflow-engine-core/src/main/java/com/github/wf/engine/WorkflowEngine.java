@@ -118,18 +118,35 @@ public class WorkflowEngine {
         lockManager.writeLock("__recover__");
         try {
             log.warn("Starting recovery scan...");
-            int count = 0;
+            int deferred = 0;
+            long now = System.currentTimeMillis();
+            Set<String> instancesToTrigger = new LinkedHashSet<>();
             List<Execution> pending = instanceRepository.findPendingTimerRetry();
-            for (Execution exec : pending) {
+            for (Execution stored : pending) {
+                // Re-read: an earlier trigger in this scan may already have advanced
+                // another execution belonging to the same instance.
+                Execution exec = instanceRepository.findExecutionById(stored.getId());
+                if (exec == null || !exec.isWaiting()
+                        || !(exec.isRetryPending() || exec.isTimerPending())) continue;
+
+                long dueAt = exec.getNextRetryAt();
+                if (dueAt > now) {
+                    // Do not fire an unexpired timer just because the process restarted.
+                    // Re-arm the daemon with the remaining delay instead.
+                    delayScheduler.schedule(exec.getInstanceId(), dueAt - now);
+                    deferred++;
+                    continue;
+                }
+
                 log.warn("Recovering pending execution: instance=" + exec.getInstanceId()
                         + " node=" + exec.getCurrentNodeId() + " state=" + exec.getRetryState());
-                exec.setStatus(ExecutionStatus.ACTIVE);
-                exec.setRetryState(null);
-                instanceRepository.updateExecution(exec);
-                trigger(exec.getInstanceId());
-                count++;
+                instancesToTrigger.add(exec.getInstanceId());
             }
-            log.warn("Recovery complete: " + count + " executions re-triggered");
+            // Leave state mutation to trigger(): it owns the boundary-timer fired
+            // signal and the due-time check, so recovery cannot bypass either.
+            for (String instanceId : instancesToTrigger) trigger(instanceId);
+            log.warn("Recovery complete: " + instancesToTrigger.size() + " instances re-triggered, "
+                    + deferred + " unexpired timers re-scheduled");
         } finally {
             lockManager.writeUnlock("__recover__");
         }
@@ -256,10 +273,22 @@ public class WorkflowEngine {
             ProcessDefinition def = resolveDefinition(instance);
             if (def == null) return;
 
-            // Reactivate pending executions BEFORE the loop (only from daemon wake-ups)
+            // Reactivate pending executions BEFORE the loop — but only those
+            // whose persisted due time has actually elapsed. A trigger caused by
+            // an unrelated branch must never fire somebody else's 30-minute timer.
+            long now = System.currentTimeMillis();
             List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
             for (Execution exec : executions) {
                 if (exec.isWaiting() && (exec.isRetryPending() || exec.isTimerPending())) {
+                    long dueAt = exec.getNextRetryAt();
+                    if (dueAt > now) {
+                        // Early wake-up (e.g. MQ delay-level truncation): re-arm the
+                        // remaining time instead of losing the pending timer.
+                        if (dueAt - now > 1000) {
+                            delayScheduler.schedule(instanceId, dueAt - now);
+                        }
+                        continue;
+                    }
                     // Signal boundary timer expiry before reactivating, so UserTaskRunner can detect it
                     if (exec.isTimerPending()) {
                         String timerKey = InternalVars.boundaryTimerFiredKey(exec.getCurrentNodeId());
@@ -268,11 +297,13 @@ public class WorkflowEngine {
                     }
                     exec.setStatus(ExecutionStatus.ACTIVE);
                     exec.setRetryState(null);
+                    exec.setNextRetryAt(0);
                     instanceRepository.updateExecution(exec);
                 }
             }
 
             boolean advanced;
+            int steps = 0;
             do {
                 advanced = false;
                 executions = instanceRepository.findActiveExecutions(instanceId);
@@ -294,9 +325,31 @@ public class WorkflowEngine {
                     if (runner != null) {
                         ExecutionContext ctx = new ExecutionContext(def, exec,
                                 expressionEvaluator, instanceRepository);
+                        String nodeBefore = exec.getCurrentNodeId();
+                        ExecutionStatus statusBefore = exec.getStatus();
                         try {
                             if (runner.run(node, ctx)) {
                                 advanced = true;
+                                // A runner returning true must either move the token or
+                                // park it in WAITING/COMPLETED. Otherwise the same node
+                                // would spin forever inside this loop.
+                                if (statusBefore == ExecutionStatus.ACTIVE
+                                        && exec.isActive()
+                                        && nodeBefore.equals(exec.getCurrentNodeId())) {
+                                    String reason = "Runner made no progress at node "
+                                            + node.getId() + " (" + node.getType() + ")";
+                                    log.error(reason);
+                                    exec.setRetryState(RetryState.SUSPENDED.name());
+                                    exec.setStatus(ExecutionStatus.WAITING);
+                                    exec.setNextRetryAt(0);
+                                    instanceRepository.updateExecution(exec);
+                                    instance = instanceRepository.findById(instanceId);
+                                    instance.setVariable(InternalVars.suspendReasonKey(node.getId()), reason);
+                                    instance.setStatus(InstanceStatus.SUSPENDED);
+                                    instanceRepository.update(instance);
+                                    notifyStateListeners(instanceId);
+                                    return;
+                                }
                                 instanceRepository.updateExecution(exec);
                                 instanceRepository.saveHistoricActivity(
                                         HistoricActivity.nodeEnter(instanceId, node.getId(),
@@ -350,6 +403,16 @@ public class WorkflowEngine {
                             }
                         }
                     }
+                }
+                if (++steps >= 1000) {
+                    String reason = "Trigger loop exceeded 1000 steps — suspending to prevent an infinite loop";
+                    log.error(reason);
+                    instance = instanceRepository.findById(instanceId);
+                    instance.setVariable(InternalVars.suspendReasonKey("engine"), reason);
+                    instance.setStatus(InstanceStatus.SUSPENDED);
+                    instanceRepository.update(instance);
+                    notifyStateListeners(instanceId);
+                    return;
                 }
             } while (advanced);
 
@@ -423,14 +486,6 @@ public class WorkflowEngine {
             }
         }
 
-        task.setStatus(TaskStatus.COMPLETED);
-        task.setVariables(variables);
-        taskRepository.update(task);
-
-        instanceRepository.saveHistoricActivity(
-                HistoricActivity.taskCompleted(instance.getId(), node.getId(),
-                        node.getName(), node.getType(), task.getAssignee(), comment));
-
         if (variables != null && !variables.isEmpty()) {
             // Never let a task submission rewrite engine-owned keys (owner,
             // timer/suspend signals) — that would allow tenant takeover or
@@ -442,39 +497,58 @@ public class WorkflowEngine {
             }
         }
 
-        // Wake up waiting execution
+        // Resolve the route BEFORE completing the task. A definition with no
+        // matching outgoing edge is a modelling error: throwing here keeps the
+        // task pending instead of silently recreating it at the same node forever.
         List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+        Execution targetExec = null;
         for (Execution exec : executions) {
             if (exec.isWaiting() && exec.getCurrentNodeId().equals(task.getNodeId())) {
-                // Clear any pending timer/retry state — user completed manually
-                log.info("Clearing retry state for node=" + exec.getCurrentNodeId());
-                exec.setRetryState(null);
-                instance.removeVariable(InternalVars.boundaryTimerFiredKey(task.getNodeId()));
-                instanceRepository.update(instance);
-
-                // Check for dynamic router
-                if (node instanceof UserTask) {
-                    UserTask ut = (UserTask) node;
-                    if (ut.getDynamicRouter() != null) {
-                        String nextNodeId = invokeDynamicRouter(ut.getDynamicRouter(),
-                                instance.getId(), node.getId(), instance.getVariables());
-                        exec.setCurrentNodeId(nextNodeId);
-                    } else {
-                        // Route via outgoing transitions: direct → conditional (evaluated) → default
-                        List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
-                        com.github.wf.model.Transition picked = TransitionSelector.select(outgoing,
-                                c -> ConditionResolver.evaluate(c, instance.getVariables(), expressionEvaluator),
-                                true);
-                        if (picked != null) exec.setCurrentNodeId(picked.getTo());
-                    }
-                } else {
-                    List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
-                    if (!outgoing.isEmpty()) exec.setCurrentNodeId(outgoing.get(0).getTo());
-                }
-                exec.setStatus(com.github.wf.model.ExecutionStatus.ACTIVE);
-                instanceRepository.updateExecution(exec);
+                targetExec = exec;
                 break;
             }
+        }
+        String nextNodeId = null;
+        if (targetExec != null) {
+            if (node instanceof UserTask ut && ut.getDynamicRouter() != null) {
+                nextNodeId = invokeDynamicRouter(ut.getDynamicRouter(),
+                        instance.getId(), node.getId(), instance.getVariables());
+            } else {
+                List<com.github.wf.model.Transition> outgoing = def.getOutgoingTransitions(node.getId());
+                com.github.wf.model.Transition picked = TransitionSelector.select(outgoing,
+                        c -> ConditionResolver.evaluate(c, instance.getVariables(), expressionEvaluator),
+                        true);
+                if (picked == null) {
+                    throw new IllegalStateException("No outgoing transition matched for task node: "
+                            + node.getId() + " in instance " + instanceId);
+                }
+                nextNodeId = picked.getTo();
+            }
+            if (nextNodeId == null) {
+                throw new IllegalStateException("Dynamic router returned no target for node: " + node.getId());
+            }
+        }
+
+        task.setStatus(TaskStatus.COMPLETED);
+        task.setVariables(variables);
+        taskRepository.update(task);
+
+        instanceRepository.saveHistoricActivity(
+                HistoricActivity.taskCompleted(instance.getId(), node.getId(),
+                        node.getName(), node.getType(), task.getAssignee(), comment));
+
+        if (targetExec != null) {
+            // Clear any pending timer/retry state — user completed manually
+            log.info("Clearing retry state for node=" + targetExec.getCurrentNodeId());
+            targetExec.setRetryState(null);
+            targetExec.setNextRetryAt(0);
+            instance.removeVariable(InternalVars.boundaryTimerFiredKey(task.getNodeId()));
+            instance.removeVariable(InternalVars.timerFiredKey(task.getNodeId()));
+            instanceRepository.update(instance);
+
+            targetExec.setCurrentNodeId(nextNodeId);
+            targetExec.setStatus(ExecutionStatus.ACTIVE);
+            instanceRepository.updateExecution(targetExec);
         }
         } finally {
             lockManager.unlock(instanceId);
@@ -486,6 +560,7 @@ public class WorkflowEngine {
     public void rejectTask(String taskId, String comment) {
         Task task = taskRepository.findById(taskId);
         if (task == null) throw new IllegalArgumentException("Task not found: " + taskId);
+        if (!task.isPending()) throw new IllegalStateException("Task is not pending: " + taskId);
         String instanceId = task.getInstanceId();
 
         lockManager.lock(instanceId);
@@ -500,10 +575,51 @@ public class WorkflowEngine {
                     HistoricActivity.taskRejected(instance.getId(), node.getId(),
                             node.getName(), node.getType(), task.getAssignee(), comment));
 
+            // Rejection is terminal for this token. Without this, a rejected branch
+            // stays at the user task forever and any parallel join waiting for all
+            // siblings deadlocks. It must also not resurrect the rejected task.
+            List<Execution> executions = instanceRepository.findActiveExecutions(instanceId);
+            Execution rejectedExec = null;
+            for (Execution exec : executions) {
+                if (!exec.isRejected() && exec.getCurrentNodeId().equals(task.getNodeId())) {
+                    rejectedExec = exec;
+                    break;
+                }
+            }
+            if (rejectedExec != null) {
+                rejectedExec.setStatus(ExecutionStatus.WAITING);
+                rejectedExec.setRetryState(RetryState.REJECTED.name());
+                rejectedExec.setNextRetryAt(0);
+                instance.removeVariable(InternalVars.boundaryTimerFiredKey(task.getNodeId()));
+                instance.removeVariable(InternalVars.timerFiredKey(task.getNodeId()));
+                instanceRepository.update(instance);
+                instanceRepository.updateExecution(rejectedExec);
+            }
+
+            // A sibling already parked at a join/end needs one more evaluation
+            // now that the rejected token is terminal.
+            for (Execution exec : executions) {
+                if (rejectedExec != null && (exec.getId().equals(rejectedExec.getId())
+                        || exec.getId().equals(rejectedExec.getParentExecutionId()))) continue;
+                if (exec.isTerminal() || !exec.isWaiting()) continue;
+                Node current = def.getNodes().get(exec.getCurrentNodeId());
+                if (current == null) continue;
+                // Only re-evaluate a JOIN (incoming > 1), never a fork — waking a
+                // parent parked at a fork would fork the whole branch again.
+                boolean waitingAtJoin = (current.getType() == NodeType.PARALLEL_GATEWAY
+                        || current.getType() == NodeType.INCLUSIVE_GATEWAY)
+                        && def.getIncomingTransitions(current.getId()).size() > 1;
+                if (waitingAtJoin || current.getType() == NodeType.END_EVENT) {
+                    exec.setStatus(ExecutionStatus.ACTIVE);
+                    instanceRepository.updateExecution(exec);
+                }
+            }
+
             notifyStateListeners(instanceId);
         } finally {
             lockManager.unlock(instanceId);
         }
+        trigger(instanceId);
     }
 
     public void delegateTask(String taskId, String newAssignee) {

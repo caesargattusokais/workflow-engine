@@ -49,7 +49,7 @@ public class EndEventRunner implements NodeRunner {
             // each ending at an EndEvent. We must wait for all of them.
             List<Execution> siblings = repo.findActiveExecutions(exec.getInstanceId());
             boolean isLast = siblings.stream()
-                .allMatch(e -> e.getId().equals(exec.getId()) || e.isCompleted());
+                .allMatch(e -> e.getId().equals(exec.getId()) || e.isTerminal());
             if (!isLast) {
                 exec.setStatus(ExecutionStatus.COMPLETED);
                 repo.updateExecution(exec);
@@ -144,7 +144,7 @@ public class EndEventRunner implements NodeRunner {
             if (parent != null) {
                 List<Execution> siblings = repo.findExecutionsByParentId(exec.getParentExecutionId());
                 boolean allDone = siblings.stream()
-                        .allMatch(e -> e.getId().equals(exec.getId()) || e.isCompleted());
+                        .allMatch(e -> e.getId().equals(exec.getId()) || e.isTerminal());
                 if (allDone) {
                     // All child executions reached their end — complete the parent too
                     parent.setStatus(ExecutionStatus.COMPLETED);

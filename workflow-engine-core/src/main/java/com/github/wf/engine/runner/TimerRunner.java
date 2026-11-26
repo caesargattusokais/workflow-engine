@@ -29,38 +29,55 @@ public class TimerRunner implements NodeRunner {
         log.info("timer node " +node.getId() +" fired");
         TimerNode timer = (TimerNode) node;
         Execution exec = context.getExecution();
-        ProcessInstance instance = context.getInstanceRepository().findById(context.getInstanceId());
+        com.github.wf.spi.InstanceRepository repo = context.getInstanceRepository();
+        ProcessInstance instance = repo.findById(context.getInstanceId());
 
         String firedKey = com.github.wf.engine.InternalVars.timerFiredKey(node.getId());
         // If re-entering after daemon wake-up, advance immediately
         if (Boolean.TRUE.equals(instance.getVariable(firedKey))) {
             instance.removeVariable(firedKey);
-            context.getInstanceRepository().update(instance);
+            repo.update(instance);
             List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
-            if (!outgoing.isEmpty()) {
-                exec.setCurrentNodeId(outgoing.get(0).getTo());
-            }
+            if (outgoing.isEmpty()) return suspendNoRoute(node, exec, instance, repo);
+            exec.setCurrentNodeId(outgoing.get(0).getTo());
+            exec.setNextRetryAt(0);
             return true;
         }
 
         long delayMs = computeDelay(timer);
         if (delayMs <= 0) {
             List<Transition> outgoing = context.getDefinition().getOutgoingTransitions(node.getId());
-            if (!outgoing.isEmpty()) {
-                exec.setCurrentNodeId(outgoing.get(0).getTo());
-            }
+            if (outgoing.isEmpty()) return suspendNoRoute(node, exec, instance, repo);
+            exec.setCurrentNodeId(outgoing.get(0).getTo());
+            exec.setNextRetryAt(0);
             log.info("next node " + exec.getCurrentNodeId() + " in");
             return true;
         }
 
-        // First entry: mark and schedule
+        // First entry: mark and schedule. The due time MUST be persisted —
+        // recover() and trigger() use it to avoid firing an unexpired timer.
         instance.setVariable(firedKey, true);
-        context.getInstanceRepository().update(instance);
+        repo.update(instance);
+        exec.setNextRetryAt(System.currentTimeMillis() + delayMs);
+        repo.updateExecution(exec);
         if (scheduler != null) {
             scheduler.accept(exec.getInstanceId(), delayMs);
         }
         exec.setStatus(ExecutionStatus.WAITING);
         exec.setRetryState(com.github.wf.engine.RetryState.TIMER_PENDING.name());
+        return true;
+    }
+
+    private boolean suspendNoRoute(Node node, Execution exec, ProcessInstance instance,
+                                   com.github.wf.spi.InstanceRepository repo) {
+        String reason = "Timer node has no outgoing transition: " + node.getId();
+        log.error(reason);
+        exec.setStatus(ExecutionStatus.WAITING);
+        exec.setRetryState(com.github.wf.engine.RetryState.SUSPENDED.name());
+        exec.setNextRetryAt(0);
+        repo.updateExecution(exec);
+        instance.setVariable(com.github.wf.engine.InternalVars.suspendReasonKey(node.getId()), reason);
+        repo.update(instance);
         return true;
     }
 

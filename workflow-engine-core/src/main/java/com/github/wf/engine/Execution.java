@@ -60,4 +60,8 @@ public class Execution {
     public boolean isTimerPending() { return RetryState.TIMER_PENDING.name().equals(retryState); }
     /** True when a service-task retry is waiting for a daemon wake-up. */
     public boolean isRetryPending() { return RetryState.RETRY_PENDING.name().equals(retryState); }
+    /** True when the token was rejected and is terminal for join/end evaluation. */
+    public boolean isRejected() { return RetryState.REJECTED.name().equals(retryState); }
+    /** True when this token can no longer advance on its own. */
+    public boolean isTerminal() { return isCompleted() || isRejected(); }
 }
