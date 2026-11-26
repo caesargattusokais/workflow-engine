@@ -205,7 +205,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   const loadTemplates = async () => {
     try {
-      const res = await fetch('/templates/manifest.json');
+      // no-store: nginx serves static files without Cache-Control, so browsers
+      // may keep a stale manifest and hide newly added templates.
+      const res = await fetch('/templates/manifest.json', { cache: 'no-store' });
       setTemplates(await res.json());
       setShowTemplates(true);
     } catch { showToast(t.designer.loadTemplatesFailed, 'error'); }
