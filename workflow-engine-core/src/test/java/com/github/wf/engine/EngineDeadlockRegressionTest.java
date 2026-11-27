@@ -244,6 +244,135 @@ class EngineDeadlockRegressionTest {
         assertThat(onlyExecution(instance.getId()).isRejected()).isTrue();
     }
 
+    /**
+     * Redis/JDBC repositories return deserialized COPIES from their queries, so
+     * objects the engine holds are not the same references the repository
+     * stores. When the parallel join releases, it completes the sibling COPIES
+     * but the trigger loop still holds an ACTIVE exec parked at the join — and
+     * the no-progress guard then wrongly suspends it, overwriting the
+     * COMPLETED write and killing the instance (reproduced on wf-app; the
+     * reference-sharing InMemory repo masked the bug). The join must mark the
+     * in-memory exec completed too.
+     */
+    @Test
+    void parallelJoinWithRejectReleasesUnderCopySemanticsRepos() {
+        WorkflowEngine copyEngine = engineWithCopySemanticsInstanceRepo();
+
+        List<Node> nodes = List.of(new StartEvent("start"),
+                new ParallelGateway("fork"),
+                new UserTask("finance", "财务审批", "finance", null, null, null, null),
+                new UserTask("legal", "法务审批", "legal", null, null, null, null),
+                new UserTask("tech", "技术审批", "tech", null, null, null, null),
+                new ParallelGateway("join"),
+                new UserTask("director", "总监终批", "director", null, null, null, null),
+                new EndEvent("end"));
+        processRepo().save(new ProcessDefinition("parallel-review", "parallel-review", 1, nodes,
+                List.of(Transition.direct("start", "fork"),
+                        Transition.direct("fork", "finance"),
+                        Transition.direct("fork", "legal"),
+                        Transition.direct("fork", "tech"),
+                        Transition.direct("finance", "join"),
+                        Transition.direct("legal", "join"),
+                        Transition.direct("tech", "join"),
+                        Transition.direct("join", "director"),
+                        Transition.direct("director", "end"))));
+
+        ProcessInstance instance = copyEngine.start("parallel-review", Map.of());
+        for (String node : List.of("finance", "legal")) {
+            copyEngine.completeTask(pendingTasks(instance.getId(), node).get(0).getId(), Map.of(), "ok");
+        }
+        // finance and legal are both parked at the join now; reject the third.
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "tech").get(0).getId(), "方案不行");
+
+        // The join must release despite the rejected branch: the director task
+        // appears, nothing is suspended, and the instance stays RUNNING.
+        assertThat(pendingTasks(instance.getId(), "director")).hasSize(1);
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.RUNNING);
+        assertThat(copyEngine.instanceRepository.findActiveExecutions(instance.getId()))
+                .noneMatch(Execution::isSuspended);
+
+        copyEngine.completeTask(pendingTasks(instance.getId(), "director").get(0).getId(), Map.of(), "终批");
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.COMPLETED);
+    }
+
+    @Test
+    void inclusiveJoinWithRejectReleasesUnderCopySemanticsRepos() {
+        WorkflowEngine copyEngine = engineWithCopySemanticsInstanceRepo();
+
+        List<Node> nodes = List.of(new StartEvent("start"),
+                new InclusiveGateway("fork"),
+                new UserTask("a", "A", "a", null, null, null, null),
+                new UserTask("b", "B", "b", null, null, null, null),
+                new UserTask("c", "C", "c", null, null, null, null),
+                new InclusiveGateway("join"),
+                new EndEvent("end"));
+        processRepo().save(new ProcessDefinition("inclusive-review", "inclusive-review", 1, nodes,
+                List.of(Transition.direct("start", "fork"),
+                        Transition.conditional("fork", Condition.expression("1 == 1")).withTo("a"),
+                        Transition.conditional("fork", Condition.expression("1 == 1")).withTo("b"),
+                        Transition.conditional("fork", Condition.expression("1 == 1")).withTo("c"),
+                        Transition.direct("a", "join"),
+                        Transition.direct("b", "join"),
+                        Transition.direct("c", "join"),
+                        Transition.direct("join", "end"))));
+
+        ProcessInstance instance = copyEngine.start("inclusive-review", Map.of());
+        for (String node : List.of("a", "b")) {
+            copyEngine.completeTask(pendingTasks(instance.getId(), node).get(0).getId(), Map.of(), "ok");
+        }
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "c").get(0).getId(), "不行");
+
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.COMPLETED);
+        assertThat(copyEngine.instanceRepository.findActiveExecutions(instance.getId()))
+                .noneMatch(Execution::isSuspended);
+    }
+
+    /** Builds a second engine whose instance repo returns COPIES on every read, like Redis/JDBC do. */
+    private WorkflowEngine engineWithCopySemanticsInstanceRepo() {
+        InstanceRepository base = engine.instanceRepository;
+        InstanceRepository copying = new InstanceRepository() {
+            public void save(ProcessInstance i) { base.save(i); }
+            public ProcessInstance findById(String id) { return base.findById(id); }
+            public void update(ProcessInstance i) { base.update(i); }
+            public List<ProcessInstance> findByDefinitionId(String d) { return base.findByDefinitionId(d); }
+            public List<ProcessInstance> findAll() { return base.findAll(); }
+            public void saveExecution(Execution e) { base.saveExecution(e); }
+            public Execution findExecutionById(String id) {
+                Execution e = base.findExecutionById(id);
+                return e == null ? null : copyOf(e);
+            }
+            public List<Execution> findActiveExecutions(String i) {
+                return base.findActiveExecutions(i).stream().map(this::copyOf).toList();
+            }
+            public List<Execution> findExecutionsByParentId(String p) {
+                return base.findExecutionsByParentId(p).stream().map(this::copyOf).toList();
+            }
+            public void updateExecution(Execution e) { base.updateExecution(e); }
+            public void saveHistoricActivity(HistoricActivity h) { base.saveHistoricActivity(h); }
+            public List<HistoricActivity> findHistory(String i) { return base.findHistory(i); }
+            private Execution copyOf(Execution e) {
+                Execution c = new Execution(e.getId(), e.getInstanceId(), e.getCurrentNodeId(), e.getParentExecutionId());
+                c.setStatus(e.getStatus());
+                c.setRetryState(e.getRetryState());
+                c.setRetryAttempt(e.getRetryAttempt());
+                c.setNextRetryAt(e.getNextRetryAt());
+                return c;
+            }
+        };
+        return WorkflowEngine.builder()
+                .processRepository(processRepo())
+                .instanceRepository(copying)
+                .taskRepository(new TaskRepository() {
+                    public void save(Task t) { tasks.put(t.getId(), t); }
+                    public Task findById(String id) { return tasks.get(id); }
+                    public void update(Task t) { tasks.put(t.getId(), t); }
+                    public List<Task> query(com.github.wf.task.TaskQuery q) {
+                        return tasks.values().stream().filter(q::matches).toList();
+                    }
+                })
+                .build();
+    }
+
     @Test
     void serviceTaskWithoutMatchingRouteSuspendsInsteadOfSpinning() {
         deploy("svc-no-route",

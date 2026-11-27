@@ -70,6 +70,12 @@ public class ParallelGatewayRunner implements NodeRunner {
                     repo.updateExecution(s);
                 }
             }
+            // Keep the in-memory exec object consistent with the sibling write
+            // above. Repos like Redis/JDBC return deserialized COPIES, so `exec`
+            // is not the same object as its entry in `siblings` — without this
+            // it still reads ACTIVE@join and the trigger loop's no-progress
+            // guard wrongly suspends it (overwriting the COMPLETED write).
+            exec.setStatus(ExecutionStatus.COMPLETED);
             return true;
         } else {
             exec.setStatus(ExecutionStatus.WAITING);

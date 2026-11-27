@@ -101,6 +101,10 @@ public class InclusiveGatewayRunner implements NodeRunner {
                     repo.updateExecution(s);
                 }
             }
+            // Same copy semantics as the parallel join: `exec` is not the same
+            // object as its sibling entry, so mark it completed in place too —
+            // otherwise the trigger loop's no-progress guard suspends it.
+            exec.setStatus(ExecutionStatus.COMPLETED);
         } else {
             exec.setStatus(ExecutionStatus.WAITING);
             repo.updateExecution(exec);
