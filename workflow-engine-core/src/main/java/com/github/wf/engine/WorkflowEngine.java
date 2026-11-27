@@ -209,6 +209,9 @@ public class WorkflowEngine {
         if (def == null) throw new IllegalArgumentException("Process definition not found: " + definitionId);
 
         ProcessInstance instance = new ProcessInstance(null, definitionId, def.getVersion(), variables);
+        // Engine-owned flag: always present so `${_hasReject}` conditions on
+        // reject-routing edges evaluate safely on instances that never reject.
+        instance.setVariable(InternalVars.HAS_REJECT, Boolean.FALSE);
         instanceRepository.save(instance);
 
         Node startNode = def.getStartNode();
@@ -574,6 +577,11 @@ public class WorkflowEngine {
             instanceRepository.saveHistoricActivity(
                     HistoricActivity.taskRejected(instance.getId(), node.getId(),
                             node.getName(), node.getType(), task.getAssignee(), comment));
+
+            // Sticky reject flag for conditional reject-routing edges (e.g. an
+            // inclusive join sending partially-rejected instances to a reject end).
+            instance.setVariable(InternalVars.HAS_REJECT, Boolean.TRUE);
+            instanceRepository.update(instance);
 
             // Rejection is terminal for this token. Without this, a rejected branch
             // stays at the user task forever and any parallel join waiting for all

@@ -6,7 +6,7 @@
   { "file": "contract-review.yaml", "name": "合同审批", "desc": "起草合同（填金额）→ 10万以内法务批，以上CEO批 → 盖章归档；法务1小时超时升级CEO" },
   { "file": "ai-expense-claim.yaml", "name": "AI 智能报销", "desc": "提交报销说明 → AI抽金额/类型 → ≤1000经理批、>1000财务批（需先在设置中配置模型）" },
   { "file": "parallel-review.yaml", "name": "三方并行会签", "desc": "提交采购申请 → 财务/法务/技术三方并行审核 → 全部完成后才进入总监终批（并行网关 join 等待所有分支）" },
-  { "file": "inclusive-review.yaml", "name": "包容网关分级会签", "desc": "提交合同 → 按金额/类型动态选派法务、财务、经理（可多条同时命中）→ 全部汇总后归档（inclusiveGateway + default 兜底分支）" },
+  { "file": "inclusive-review.yaml", "name": "包容网关分级会签", "desc": "提交合同 → 按金额/类型动态选派法务、财务、经理（可多条同时命中）→ 汇总后按 _hasReject 路由：有否决直接终止不归档，否则归档（inclusiveGateway + default 兜底分支）" },
   { "file": "http-integration.yaml", "name": "HTTP 集成与异常路由", "desc": "调用引擎自身 /api/auth/status（127.0.0.1 开箱即跑）→ 成功走 result，异常或鉴权关闭走 exception/default 降级 → 超时边终止" },
   { "file": "ai-ticket-triage.yaml", "name": "AI 工单智能分派", "desc": "提交工单 → AI 判定 P0/P1/P2 → result 边分派给对应处理人（需先在设置中配置 AI 模型）" },
   { "file": "group-task.yaml", "name": "候选组任务与认领", "desc": "提交故障单 → 运维组候选任务任意人可认领（2小时超时升级经理）→ QA 组复核关闭" }

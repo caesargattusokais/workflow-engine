@@ -1,5 +1,6 @@
 package com.github.wf.engine.runner;
 
+import com.github.wf.engine.ConditionResolver;
 import com.github.wf.engine.ExecutionContext;
 import com.github.wf.engine.Execution;
 import com.github.wf.model.*;
@@ -57,9 +58,17 @@ public class ParallelGatewayRunner implements NodeRunner {
             Execution parent = repo.findExecutionById(exec.getParentExecutionId());
             if (parent != null) {
                 parent.setStatus(ExecutionStatus.ACTIVE);
-                // Use the JOIN node's outgoing transitions, not the parent's (which is still at fork)
+                // Route like the exclusive gateway does: first direct or
+                // matching conditional edge, default as fallback. Taking
+                // get(0) blindly skipped conditional reject-routing edges
+                // (e.g. `_hasReject` routing to a dedicated reject end).
                 List<Transition> afterJoin = context.getDefinition().getOutgoingTransitions(node.getId());
-                if (!afterJoin.isEmpty()) {
+                Transition picked = com.github.wf.engine.TransitionSelector.select(afterJoin,
+                        c -> ConditionResolver.evaluate(c, context.getVariables(), context.getExpressionEvaluator()),
+                        false);
+                if (picked != null) {
+                    parent.setCurrentNodeId(picked.getTo());
+                } else if (!afterJoin.isEmpty()) {
                     parent.setCurrentNodeId(afterJoin.get(0).getTo());
                 }
                 repo.updateExecution(parent);

@@ -76,6 +76,26 @@ test.describe('Extended templates', () => {
     expect(archive.length).toBeGreaterThan(0);
   });
 
+  test('inclusive gateway: rejecting one branch routes to the reject end, not archive', async ({ api }) => {
+    // amount=150000 -> legal + finance both fire. finance completes, legal
+    // rejects — the join releases (rejected token counts as arrived) and the
+    // outcome gateway must route on _hasReject=true to the reject end, so no
+    // archive task ever appears.
+    const def = await api.deploy(uniqueYamlId(load('inclusive-review.yaml')));
+    const inst = await api.startInstance(def.id, { applicant: 'sunqi', amount: 150000, category: '技术' });
+    const submit = await api.waitForTasks({ instanceId: inst.id, assignee: 'sunqi' }, 10000);
+    await api.completeTask(submit[0].id, { amount: 150000, category: '技术' });
+
+    const finance = await api.waitForTasks({ instanceId: inst.id, assignee: 'finance' }, 10000);
+    const legal = await api.waitForTasks({ instanceId: inst.id, assignee: 'legal' }, 10000);
+    await api.completeTask(finance[0].id, { financeOpinion: '预算通过' });
+    await api.rejectTask(legal[0].id, '条款有风险');
+
+    expect(await api.listTasks({ instanceId: inst.id, assignee: 'admin' })).toHaveLength(0);
+    expect((await api.getInstance(inst.id)).status).toBe('COMPLETED');
+    expect((await api.getInstance(inst.id)).variables._hasReject).toBe(true);
+  });
+
   test('HTTP serviceTask result route takes success branch (self-call /api/auth/status)', async ({ api }) => {
     const def = await api.deploy(uniqueYamlId(load('http-integration.yaml')));
     const inst = await api.startInstance(def.id, { applicant: 'wangwu', systemId: 'order-service' });

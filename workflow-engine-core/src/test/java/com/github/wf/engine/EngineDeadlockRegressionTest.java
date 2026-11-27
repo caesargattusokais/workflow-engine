@@ -422,8 +422,64 @@ class EngineDeadlockRegressionTest {
     }
 
     @Test
-    void serviceTaskWithoutMatchingRouteSuspendsInsteadOfSpinning() {
-        deploy("svc-no-route",
+    void rejectFlagsInstanceWithHasRejectVariable() {
+        deploy("linear-reject-flag",
+                List.of(new StartEvent("start"),
+                        new UserTask("review", "审批", "reviewer", null, null, null, null),
+                        new EndEvent("end")),
+                List.of(Transition.direct("start", "review"), Transition.direct("review", "end")));
+
+        ProcessInstance instance = engine.start("linear-reject-flag", Map.of());
+        // Always present from start, so `${_hasReject}` edges evaluate safely.
+        assertThat(instance.getVariable(InternalVars.HAS_REJECT)).isEqualTo(Boolean.FALSE);
+
+        engine.rejectTask(pendingTasks(instance.getId(), "review").get(0).getId(), "驳回");
+        assertThat(instances.get(instance.getId()).getVariable(InternalVars.HAS_REJECT)).isEqualTo(Boolean.TRUE);
+    }
+
+    /**
+     * Inclusive tiered countersign: one branch rejected, another completed —
+     * the join releases (rejected token counts as arrived), and an exclusive
+     * gateway routing on _hasReject sends the instance to a dedicated reject
+     * end instead of letting it complete through the normal archive path.
+     * (Joins must keep a single outgoing edge — use a gateway to fan out.)
+     */
+    @Test
+    void inclusiveJoinRoutesToRejectEndWhenBranchRejected() {
+        WorkflowEngine copyEngine = engineWithCopySemanticsInstanceRepo();
+
+        List<Node> nodes = List.of(new StartEvent("start"),
+                new InclusiveGateway("fork"),
+                new UserTask("a", "A", "a", null, null, null, null),
+                new UserTask("b", "B", "b", null, null, null, null),
+                new InclusiveGateway("join"),
+                new ExclusiveGateway("outcome"),
+                new EndEvent("reject-end"),
+                new EndEvent("end"));
+        processRepo().save(new ProcessDefinition("inclusive-reject-route", "inclusive-reject-route", 1, nodes,
+                List.of(Transition.direct("start", "fork"),
+                        Transition.conditional("fork", Condition.expression("1 == 1")).withTo("a"),
+                        Transition.conditional("fork", Condition.expression("1 == 1")).withTo("b"),
+                        Transition.direct("a", "join"),
+                        Transition.direct("b", "join"),
+                        Transition.direct("join", "outcome"),
+                        Transition.conditional("outcome", Condition.expression("_hasReject == true")).withTo("reject-end"),
+                        Transition.direct("outcome", "end"))));
+
+        ProcessInstance instance = copyEngine.start("inclusive-reject-route", Map.of());
+        copyEngine.completeTask(pendingTasks(instance.getId(), "a").get(0).getId(), Map.of(), "ok");
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "b").get(0).getId(), "不行");
+
+        // Join released, then routed to the reject end — instance completes,
+        // but with the sticky flag set so callers can tell the outcome apart.
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.COMPLETED);
+        assertThat(instances.get(instance.getId()).getVariable(InternalVars.HAS_REJECT)).isEqualTo(Boolean.TRUE);
+        assertThat(copyEngine.instanceRepository.findActiveExecutions(instance.getId()))
+                .noneMatch(Execution::isSuspended);
+    }
+
+    @Test
+    void serviceTaskWithoutMatchingRouteSuspendsInsteadOfSpinning() {        deploy("svc-no-route",
                 List.of(new StartEvent("start"),
                         new ServiceTask("svc", "无路由", "com.test.NoRouteHandler", null),
                         new EndEvent("end")),

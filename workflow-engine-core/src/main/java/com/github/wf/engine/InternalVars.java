@@ -15,6 +15,15 @@ public final class InternalVars {
     /** Instance owner key — engine-controlled, never settable via completeTask variables. */
     public static final String OWNER_KEY = "_userId";
 
+    /**
+     * Flag set to {@code true} the first time any task on the instance is
+     * rejected (initialized to {@code false} at start). Lets process models
+     * route on "has something been rejected" — e.g. an inclusive join sending
+     * partially-rejected instances to a dedicated reject end instead of
+     * completing them as if everything passed.
+     */
+    public static final String HAS_REJECT = "_hasReject";
+
     /** Suffix of the per-node key holding the suspension reason message. */
     public static final String SUSPEND_REASON_SUFFIX = "_suspendReason";
     /** Suffix of the per-node key holding the suspension exception class name. */
@@ -45,6 +54,7 @@ public final class InternalVars {
     /** Returns true if the given variable key is engine-internal (any of the suffixes). */
     public static boolean isInternalKey(String key) {
         return key != null && (OWNER_KEY.equals(key)
+                || HAS_REJECT.equals(key)
                 || key.endsWith(SUSPEND_REASON_SUFFIX)
                 || key.endsWith(SUSPEND_EXCEPTION_SUFFIX)
                 || key.endsWith(TIMER_FIRED_SUFFIX)

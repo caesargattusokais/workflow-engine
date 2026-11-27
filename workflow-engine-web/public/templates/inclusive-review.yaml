@@ -51,10 +51,16 @@ nodes:
   - id: join
     type: inclusiveGateway
     name: 汇总所有被激活的评审
+  - id: outcome
+    type: exclusiveGateway
+    name: 按是否有否决分流
   - id: archive
     type: userTask
     name: 合同归档
     assignee: admin
+  - id: rejectedEnd
+    type: endEvent
+    name: 有否决 · 终止（不归档）
   - id: end
     type: endEvent
     name: 结束
@@ -83,6 +89,14 @@ transitions:
   - from: manager
     to: join
   - from: join
+    to: outcome
+  # 任一评审驳回时引擎写入 _hasReject=true —— 驳回实例不归档，直接终止
+  - from: outcome
+    to: rejectedEnd
+    type: conditional
+    expr: "_hasReject == true"
+  - from: outcome
     to: archive
+    type: default
   - from: archive
     to: end
