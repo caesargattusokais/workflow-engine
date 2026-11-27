@@ -17,6 +17,7 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
 }) {
   const { t } = useT();
   const [diagnosis, setDiagnosis] = useState<AiDiagnosis | null>(null);
+  const [expandedVars, setExpandedVars] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,12 +151,24 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
         <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{t.designer.variables}</span>
       </div>
       {Object.keys(inst.variables || {}).length > 0
-        ? Object.entries(inst.variables||{}).map(([k,v]) => (
-          <div key={k} className="text-[11px] text-gray-500 mb-0.5 ml-5 flex gap-1.5">
-            <code className="text-blue-400/90 font-mono truncate max-w-[80px]">{k}</code>
-            <span className="text-gray-400 truncate flex-1">{String(v)}</span>
-          </div>
-        ))
+        ? Object.entries(inst.variables||{}).map(([k,v]) => {
+          const text = typeof v === 'string' ? v : JSON.stringify(v);
+          const expanded = expandedVars.has(k);
+          return (
+            <div key={k} className="text-[11px] text-gray-500 mb-0.5 ml-5 flex gap-1.5">
+              <code className="text-blue-400/90 font-mono truncate max-w-[80px] shrink-0" title={k}>{k}</code>
+              <span
+                className={`text-gray-400 flex-1 min-w-0 cursor-pointer hover:text-gray-200 ${expanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}
+                title={expanded ? undefined : text}
+                onClick={() => setExpandedVars(prev => {
+                  const next = new Set(prev);
+                  if (next.has(k)) next.delete(k); else next.add(k);
+                  return next;
+                })}
+              >{text}</span>
+            </div>
+          );
+        })
         : <div className="text-gray-600 ml-5 text-[11px]">none</div>}
 
       <div className="flex items-center gap-2 mb-2 mt-4">
