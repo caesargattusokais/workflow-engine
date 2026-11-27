@@ -43,16 +43,34 @@ class GroupServiceTest {
     }
 
     @Test
-    void onlyGlobalAdminCanCreateAndDeleteGroups() {
-        assertThatThrownBy(() -> service.create(member, "g2", "G2", ""))
-                .isInstanceOf(GroupException.class).extracting("status").isEqualTo(403);
-        assertThatThrownBy(() -> service.create(outsider, "g2", "G2", ""))
-                .isInstanceOf(GroupException.class).extracting("status").isEqualTo(403);
-
-        GroupInfo created = service.create(admin, "g2", "Group Two", "desc");
+    void anySignedInUserCanCreateGroupAndBecomesItsAdmin() {
+        GroupInfo created = service.create(member, "g2", "Group Two", "desc");
         assertThat(created.id()).isEqualTo("g2");
         assertThat(created.name()).isEqualTo("Group Two");
-        assertThat(created.createdBy()).isEqualTo("admin");
+        assertThat(created.createdBy()).isEqualTo("member");
+
+        AuthUser stored = users.findByUsername("member").orElseThrow().user();
+        assertThat(stored.getGroups()).contains("g2");
+        assertThat(stored.getAdminGroups()).contains("g2");
+        // The creator can manage members immediately, without a global admin.
+        service.addMember(member, "g2", "outsider");
+        assertThat(users.findByUsername("outsider").orElseThrow().user().getGroups()).contains("g2");
+    }
+
+    @Test
+    void onlyCreatorOrGlobalAdminCanDeleteGroup() {
+        service.create(member, "g3", "G3", "");
+        assertThat(errorOf(() -> service.delete(outsider, "g3")).status()).isEqualTo(403);
+        assertThat(errorOf(() -> service.delete(groupAdmin, "g3")).status()).isEqualTo(403);
+
+        // The creator must leave first: they are automatically a group admin/member.
+        service.leave(member, "g3");
+        service.delete(admin, "g3"); // global admin may delete another user's group
+
+        service.create(outsider, "g4", "G4", "");
+        service.leave(outsider, "g4");
+        service.delete(outsider, "g4"); // creator may delete their own empty group
+        assertThat(service.list(outsider)).isEmpty();
     }
 
     @Test
@@ -131,6 +149,7 @@ class GroupServiceTest {
         assertThat(withMembers.status()).isEqualTo(409);
         assertThat(withMembers.getMessage()).contains("成员");
 
+        service.leave(admin, "g2"); // creator auto-joined; empty the group first
         usedGroups.add("g2");
         GroupException withData = errorOf(() -> service.delete(admin, "g2"));
         assertThat(withData.status()).isEqualTo(409);

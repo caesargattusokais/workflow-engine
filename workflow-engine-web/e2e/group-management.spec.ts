@@ -3,8 +3,8 @@ import { test, expect, request as pwRequest, type APIRequestContext } from '@pla
 /**
  * Group administration API. The E2E server runs the memory profile with
  * bootstrap users admin (role ADMIN, groups alpha/beta) and testuser.
- * Tokens are used here instead of X-User-Id headers because group management
- * checks the global ADMIN role, which the header-compat principal does not carry.
+ * Tokens are used here instead of X-User-Id headers because group admin rights
+ * are read from the store, which the header-compat principal does not carry.
  */
 const API = (process.env.E2E_API_BASE || 'http://localhost:8080/api').replace(/\/api$/, '');
 
@@ -28,23 +28,33 @@ async function register(ctx: APIRequestContext, username: string) {
   if (!res.ok()) throw new Error(`register ${username} failed (${res.status()}): ${await res.text()}`);
 }
 
-test('only global admin can create groups', async () => {
+test('any signed-in user can create a group; anonymous cannot', async () => {
   const anon = await api();
-  const userToken = await login(anon, 'testuser', 'test123');
-  const user = await api(userToken);
-  const id = `g-deny-${Date.now().toString(36)}`;
+  const id = `g-open-${Date.now().toString(36)}`;
 
-  const denied = await user.post('/api/groups', { data: { id, name: 'Nope' } });
-  expect(denied.status()).toBe(403);
+  // Must run before login: the login response sets a cookie on this context.
+  expect([401, 403]).toContain((await anon.post('/api/groups', { data: { id, name: 'Nope' } })).status());
 
-  const adminToken = await login(anon, 'admin', 'admin123');
-  const admin = await api(adminToken);
-  const created = await admin.post('/api/groups', { data: { id, name: 'Allowed', description: 'e2e' } });
+  const user = await api(await login(anon, 'testuser', 'test123'));
+  const created = await user.post('/api/groups', { data: { id, name: 'Mine', description: 'e2e' } });
   expect(created.status()).toBe(201);
   expect((await created.json()).id).toBe(id);
 
-  const duplicate = await admin.post('/api/groups', { data: { id, name: 'Dup' } });
+  // The creator becomes the group's first admin and can manage members.
+  const mine: any[] = await (await user.get('/api/groups')).json();
+  expect(mine.find(v => v.group.id === id)?.groupAdmin).toBe(true);
+  const duplicate = await user.post('/api/groups', { data: { id, name: 'Dup' } });
   expect(duplicate.status()).toBe(409);
+
+  // Only the creator or a global admin may delete; an unrelated user may not.
+  const otherName = `oth${Date.now().toString(36)}`;
+  await register(anon, otherName);
+  const other = await api(await login(anon, otherName));
+  expect((await other.delete(`/api/groups/${id}`)).status()).toBe(403);
+
+  // The creator must leave their own group before deleting it.
+  expect((await user.post(`/api/groups/${id}/leave`)).status()).toBe(200);
+  expect((await user.delete(`/api/groups/${id}`)).status()).toBe(200);
 });
 
 test('group admin manages members; members can only leave', async () => {
@@ -83,7 +93,8 @@ test('group admin manages members; members can only leave', async () => {
   expect((await memApi.post(`/api/groups/${id}/leave`)).status()).toBe(404);
   expect((await gmApi.post(`/api/groups/${id}/leave`)).status()).toBe(200);
 
-  // Empty group can now be removed.
+  // Empty group can now be removed (the creator auto-joined, so leave first).
+  expect((await admin.post(`/api/groups/${id}/leave`)).status()).toBe(200);
   expect((await admin.delete(`/api/groups/${id}`)).status()).toBe(200);
   const remaining: any[] = await (await admin.get('/api/groups')).json();
   expect(remaining.some(g => g.group.id === id)).toBe(false);

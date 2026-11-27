@@ -13,7 +13,9 @@ import java.util.Set;
  * Group administration rules.
  *
  * <ul>
- *   <li>Global ADMIN: create/delete groups, appoint group admins, manage every group.</li>
+ *   <li>Any signed-in user: create a group and become its first group admin.</li>
+ *   <li>Creator or global ADMIN: delete a group once it is empty (no members/data).</li>
+ *   <li>Global ADMIN: appoint/revoke group admins, manage every group.</li>
  *   <li>Group admin: add/remove ordinary members of their own group only.</li>
  *   <li>Member: see the group and its members, leave voluntarily.</li>
  * </ul>
@@ -55,8 +57,9 @@ public class GroupService {
         if (isAdmin(actor)) {
             for (GroupInfo g : groups.listAll()) mine.add(g.id());
         } else {
-            mine.addAll(lower(actor.getGroups()));
-            mine.addAll(lower(actor.getAdminGroups()));
+            AuthUser current = fresh(actor);
+            mine.addAll(lower(current.getGroups()));
+            mine.addAll(lower(current.getAdminGroups()));
         }
         Map<String, List<AuthUser>> byGroup = membersByGroup();
         List<GroupView> out = new ArrayList<>();
@@ -82,10 +85,10 @@ public class GroupService {
         return out;
     }
 
-    // ── Group lifecycle (global ADMIN only) ──────────────────────────────
+    // ── Group lifecycle (any signed-in user may create) ──────────────────
 
     public GroupInfo create(AuthUser actor, String id, String name, String description) {
-        requireAdmin(actor);
+        requireAuthenticated(actor);
         String normalized = normalize(id);
         if (!normalized.matches(ID_PATTERN)) {
             throw GroupException.badRequest("群 ID 只能包含字母、数字、点、下划线、连字符（1-64 位）");
@@ -96,14 +99,26 @@ public class GroupService {
                 description == null ? "" : description.trim(),
                 actor.getUsername(), System.currentTimeMillis());
         groups.create(info);
+        // The creator becomes the first group admin. Membership is read from the
+        // store, not the request principal, just like leave() does.
+        Stored creator = requireUser(actor.getUsername());
+        List<String> gs = new ArrayList<>(lower(creator.user().getGroups()));
+        List<String> ag = new ArrayList<>(lower(creator.user().getAdminGroups()));
+        if (!gs.contains(normalized)) gs.add(normalized);
+        if (!ag.contains(normalized)) ag.add(normalized);
+        update(actor.getUsername(), gs, ag);
         return info;
     }
 
     public void delete(AuthUser actor, String groupId) {
-        requireAdmin(actor);
+        requireAuthenticated(actor);
         String id = normalize(groupId);
-        if (groups.find(id).isEmpty()) throw GroupException.notFound("群不存在: " + id);
-        long memberCount = members(actor, id).size();
+        GroupInfo info = groups.find(id).orElseThrow(() -> GroupException.notFound("群不存在: " + id));
+        boolean creator = normalizeUser(info.createdBy()).equals(normalizeUser(actor.getUsername()));
+        if (!isAdmin(actor) && !creator) {
+            throw GroupException.forbidden("只有建群者或全局管理员可以删除该群");
+        }
+        long memberCount = memberCount(id);
         if (memberCount > 0) {
             throw GroupException.conflict("群内仍有 " + memberCount + " 名成员，请先移除成员");
         }
@@ -193,6 +208,14 @@ public class GroupService {
         }
     }
 
+    /** Raw member count — no visibility check: the creator may have already left. */
+    private long memberCount(String groupId) {
+        return users.listAll().stream()
+                .filter(u -> lower(u.getGroups()).contains(groupId)
+                        || lower(u.getAdminGroups()).contains(groupId))
+                .count();
+    }
+
     private Map<String, List<AuthUser>> membersByGroup() {
         Map<String, List<AuthUser>> byGroup = new LinkedHashMap<>();
         for (AuthUser u : users.listAll()) {
@@ -209,12 +232,21 @@ public class GroupService {
         return actor.getRoles().stream().anyMatch(r -> GLOBAL_ADMIN_ROLE.equalsIgnoreCase(r));
     }
 
+    private AuthUser fresh(AuthUser actor) {
+        if (actor == null) return null;
+        return users.findByUsername(actor.getUsername())
+                .map(UserStore.StoredUser::user).orElse(actor);
+    }
+
     private boolean isGroupAdmin(AuthUser actor, String groupId) {
-        return isAdmin(actor) || lower(actor.getAdminGroups()).contains(groupId);
+        if (isAdmin(actor)) return true;
+        // Read membership from the store: the request principal can be a stale
+        // snapshot right after a create/add/remove in the same session.
+        return lower(fresh(actor).getAdminGroups()).contains(groupId);
     }
 
     private boolean isMember(AuthUser actor, String groupId) {
-        return isGroupAdmin(actor, groupId) || lower(actor.getGroups()).contains(groupId);
+        return isGroupAdmin(actor, groupId) || lower(fresh(actor).getGroups()).contains(groupId);
     }
 
     private void requireAuthenticated(AuthUser actor) {

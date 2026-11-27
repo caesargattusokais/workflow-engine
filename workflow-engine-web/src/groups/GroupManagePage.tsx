@@ -95,9 +95,8 @@ export default function GroupManagePage({ currentUser, onMembershipChanged }: Pr
           </button>
         </div>
 
-        {/* Global-admin-only creation */}
-        {isGlobalAdmin && (
-          <div className="mb-5 rounded-lg border border-gray-700 bg-gray-850/60 p-4">
+        {/* Any signed-in user can create a group and becomes its first admin */}
+        <div className="mb-5 rounded-lg border border-gray-700 bg-gray-850/60 p-4">
             <h2 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
               <Plus size={14} className="text-emerald-400" />{t.groups.create}
             </h2>
@@ -123,8 +122,7 @@ export default function GroupManagePage({ currentUser, onMembershipChanged }: Pr
               </button>
             </div>
             <p className="text-[10px] text-slate-500 mt-2">{t.groups.idHint}</p>
-          </div>
-        )}
+        </div>
 
         {groups.length === 0 && (
           <div className="rounded-lg border border-dashed border-gray-700 p-10 text-center text-sm text-slate-400">
@@ -198,7 +196,7 @@ export default function GroupManagePage({ currentUser, onMembershipChanged }: Pr
                           <LogOut size={12} />{t.groups.leave}
                         </button>
                       )}
-                      {isGlobalAdmin && (
+                      {(isGlobalAdmin || g.group.createdBy?.toLowerCase() === currentUser.username?.toLowerCase()) && (
                         <button disabled={busy} onClick={() => {
                           if (!window.confirm(t.groups.deleteConfirm)) return;
                           run(() => deleteGroup(g.group.id), t.groups.deleted);
