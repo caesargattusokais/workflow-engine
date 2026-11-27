@@ -1,5 +1,6 @@
 package com.github.wf.server.config;
 
+import com.github.wf.auth.GroupException;
 import com.github.wf.engine.InstanceLockManager;
 import com.github.wf.memory.DefinitionRepository;
 import com.github.wf.memory.DraftRepository;
@@ -148,8 +149,10 @@ public class RepositoryConfig {
                         + (definitions != null ? definitions : 0)
                         + (drafts != null ? drafts : 0) > 0;
             } catch (Exception e) {
-                // Tables may not exist yet during bootstrap; membership check still applies.
-                return false;
+                // Fail closed: an unavailable usage check must never allow group deletion.
+                GroupException failure = new GroupException(500, "检查群占用失败，请稍后重试");
+                failure.initCause(e);
+                throw failure;
             }
         };
     }
