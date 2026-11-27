@@ -7,6 +7,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class InMemoryDraftRepository implements DraftRepository {
     private final List<Map<String, Object>> drafts = new CopyOnWriteArrayList<>();
 
+    /** Same predicate as JdbcDraftRepository.visibility(): owner OR any caller group. */
+    private static boolean visible(Map<String, Object> d, String userId, List<String> groupIds) {
+        if (userId.equals(d.get("_userId"))) return true;
+        Object groupId = d.get("_groupId");
+        return groupId != null && groupIds != null && groupIds.contains(groupId.toString());
+    }
+
     public List<Map<String, Object>> listByUser(String userId) {
         return drafts.stream().filter(d -> userId.equals(d.get("_userId"))).toList();
     }
@@ -14,10 +21,13 @@ public class InMemoryDraftRepository implements DraftRepository {
         return drafts.stream().filter(d -> id.equals(d.get("id")) && userId.equals(d.get("_userId")))
             .findFirst().orElseThrow(() -> new RuntimeException("Draft not found: " + id));
     }
-    public Map<String, Object> create(String userId, String name) {
+    public Map<String, Object> create(String userId, String name) { return create(userId, null, name); }
+
+    @Override
+    public Map<String, Object> create(String userId, String groupId, String name) {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("id", UUID.randomUUID().toString().substring(0, 8));
-        d.put("_userId", userId); d.put("name", name);
+        d.put("_userId", userId); d.put("_groupId", groupId); d.put("name", name);
         d.put("nodes", List.of()); d.put("edges", List.of());
         d.put("version", 1); d.put("createdAt", System.currentTimeMillis());
         drafts.add(d); return d;
@@ -26,13 +36,15 @@ public class InMemoryDraftRepository implements DraftRepository {
         var orig = findById(userId, originalId);
         Map<String, Object> d = new LinkedHashMap<>(orig);
         d.put("id", UUID.randomUUID().toString().substring(0, 8));
+        // JdbcDraftRepository.copy() inserts with no group_id — copies stay private.
+        d.put("_groupId", null);
         d.put("name", newName); d.put("version", 1); d.put("createdAt", System.currentTimeMillis());
         drafts.add(d); return d;
     }
     public Map<String, Object> importDraft(String userId, String name, List<?> nodes, List<?> edges) {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("id", UUID.randomUUID().toString().substring(0, 8));
-        d.put("_userId", userId); d.put("name", name);
+        d.put("_userId", userId); d.put("_groupId", null); d.put("name", name);
         d.put("nodes", nodes); d.put("edges", edges);
         d.put("version", 1); d.put("createdAt", System.currentTimeMillis());
         drafts.add(d); return d;
@@ -55,5 +67,35 @@ public class InMemoryDraftRepository implements DraftRepository {
     public void delete(String userId, String id) { drafts.removeIf(d -> id.equals(d.get("id"))); }
     public boolean nameExists(String userId, String name, String excludeId) {
         return drafts.stream().anyMatch(d -> userId.equals(d.get("_userId")) && name.equals(d.get("name")) && !d.get("id").equals(excludeId));
+    }
+
+    // ── Group sharing ────────────────────────────────────────────────────
+    @Override
+    public List<Map<String, Object>> listVisible(String userId, List<String> groupIds) {
+        return drafts.stream().filter(d -> visible(d, userId, groupIds))
+                .sorted(Comparator.comparing((Map<String, Object> d) -> (Long) d.get("createdAt")).reversed())
+                .toList();
+    }
+
+    @Override
+    public long countVisible(String userId, List<String> groupIds) {
+        return drafts.stream().filter(d -> visible(d, userId, groupIds)).count();
+    }
+
+    @Override
+    public Map<String, Object> findVisibleById(String userId, List<String> groupIds, String id) {
+        return drafts.stream().filter(d -> id.equals(d.get("id")) && visible(d, userId, groupIds))
+                .findFirst().orElse(null);
+    }
+
+    @Override
+    public void updateName(String userId, List<String> groupIds, String id, String name) {
+        Map<String, Object> d = findVisibleById(userId, groupIds, id);
+        if (d != null) d.put("name", name);
+    }
+
+    @Override
+    public void deleteVisible(String userId, List<String> groupIds, String id) {
+        drafts.removeIf(d -> id.equals(d.get("id")) && visible(d, userId, groupIds));
     }
 }
