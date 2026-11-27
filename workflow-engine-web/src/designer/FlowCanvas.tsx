@@ -240,7 +240,7 @@ export default function FlowCanvas({ nodes, edges, onNodesChange, onEdgesChange,
             </svg>
           </div>
           <div className="text-[13px] font-medium text-gray-400 mb-1.5">{t.designer.dragHint}</div>
-          <div className="text-[11px] text-gray-600">从左侧节点面板拖入开始节点，或点击「AI 生成」描述你的流程</div>
+          <div className="text-[11px] text-gray-600">{lang === 'zh' ? '从左侧节点面板拖入开始节点，或点击「AI 生成」描述你的流程' : t.designer.dragHintDetail}</div>
         </div>
       )}
 

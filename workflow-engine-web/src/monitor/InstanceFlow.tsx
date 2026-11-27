@@ -69,7 +69,7 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
     return (
       <div className="flex-1 flex items-center justify-center" style={{ minHeight: 300, background: 'radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
         <div className="text-center">
-          <div className="text-red-400 text-sm mb-2">Failed to load flow</div>
+          <div className="text-red-400 text-sm mb-2">{t.monitor.loadFlowFailed}</div>
           <div className="text-gray-500 text-xs">{error}</div>
         </div>
       </div>
@@ -81,8 +81,8 @@ export default memo(function InstanceFlow({ nodes, edges, error }: { nodes: Node
       <div className="flex-1 flex flex-col" style={{ minHeight: 300, background: 'radial-gradient(circle at 50% 42%, rgba(109,116,232,0.09), transparent 55%), radial-gradient(ellipse at 50% 35%, #1b2130 0%, #171c27 55%, #12161e 100%)' }}>
         <EmptyStateArt
           art="flow"
-          title="Select an instance to view its flow"
-          hint="从左侧实例列表选择一个，实时查看它走过的节点路径与当前停留位置。"
+          title={t.monitor.selectInstance}
+          hint={t.monitor.selectInstanceHint}
         />
       </div>
     );

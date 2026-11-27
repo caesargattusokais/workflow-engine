@@ -7,6 +7,7 @@ export function KvEditor({ label, entries, onChange, keyPlaceholder, valPlacehol
     keyPlaceholder: string; valPlaceholder: string;
     emptyText?: string;
 }) {
+  const { t } = useT();
   const add = () => onChange([...entries, { key: '', value: '' }]);
   const remove = (i: number) => onChange(entries.filter((_, idx) => idx !== i));
   const updateKey = (i: number, k: string) => onChange(entries.map((e, idx) => idx === i ? { ...e, key: k } : e));
@@ -16,9 +17,9 @@ export function KvEditor({ label, entries, onChange, keyPlaceholder, valPlacehol
     <div className="mb-3">
       <div className="flex items-center justify-between mb-1">
         <span className="text-gray-400 text-xs">{label}</span>
-        <button onClick={add} className="text-xs text-teal-400 hover:text-teal-300">+ Add</button>
+        <button onClick={add} className="text-xs text-teal-400 hover:text-teal-300">+ {t.designer.addParam}</button>
       </div>
-      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">{emptyText || 'No params yet'}</div>}
+      {entries.length === 0 && <div className="text-[10px] text-gray-600 mb-1">{emptyText || t.designer.noParams}</div>}
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1 mb-1">
           <input className="flex-1 bg-gray-900/70 border border-gray-700 rounded-md px-2 py-1 text-white text-xs font-mono"

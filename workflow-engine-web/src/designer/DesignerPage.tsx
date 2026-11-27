@@ -39,6 +39,11 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   // "last write wins", so an older in-flight PUT must never land after a newer one.
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const loadSeq = useRef(0);
+  // Which draft the canvas content actually belongs to. Between switchDraft()
+  // and the getDraft() resolution the canvas still shows the PREVIOUS draft's
+  // graph; auto-save must not arm in that window or it would write the old
+  // graph (old node positions included) into the new draft.
+  const canvasDraftId = useRef<string | null>(null);
 
   const activeDraft = drafts.find(d => d.id === activeId) || null;
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -86,7 +91,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         setDrafts(prev => [...prev, ...mapped]);
       }
       setDraftPage(page);
-    } catch (e: any) { showToast(e.message || 'Failed to load drafts', 'error'); } finally {
+    } catch (e: any) { showToast(e.message || t.designer.loadFailed, 'error'); } finally {
       draftLoading.current = false;
       setDraftLoadingState(false);
       setLoaded(true);
@@ -102,6 +107,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     const seq = ++loadSeq.current;
     getDraft(requestedId).then(d => {
       if (seq !== loadSeq.current || activeIdRef.current !== requestedId) return;
+      canvasDraftId.current = requestedId;
       setNodes(d.nodes || []);
       setEdges(d.edges || []);
       setSelectedNode(null);
@@ -116,25 +122,27 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   }, [nodes, edges, showYaml]);
 
   // Serial write queue — a stale PUT must never overwrite a newer graph.
-  const enqueueSave = useCallback((id: string, graph: { nodes: Node[]; edges: Edge[] }, version?: number) => {
+  const enqueueSave = useCallback((id: string, graph: { nodes: Node[]; edges: Edge[] }, version?: number, keepalive = false) => {
     const payload: Record<string, unknown> = { nodes: graph.nodes, edges: graph.edges };
     if (version != null) payload.version = version;
-    const task = saveChain.current.then(() => updateDraft(id, payload));
+    const task = saveChain.current.then(() => updateDraft(id, payload, keepalive));
     // Keep the chain alive after a failure; the caller still sees the rejection.
     saveChain.current = task.catch(() => undefined);
     return task;
   }, []);
 
   // Flush the pending debounced edit immediately. Called before switching
-  // drafts and on manual save, so no edit is lost or written to the wrong id.
-  const flushPendingSave = useCallback(() => {
+  // drafts, on manual save, when leaving the page and when the tab is hidden,
+  // so no edit (node drags included) is lost or written to the wrong id.
+  // Unload-time flushes pass keepalive so the PUT survives navigation.
+  const flushPendingSave = useCallback((keepalive = false) => {
     clearTimeout(saveTimer.current);
     const pending = pendingSave.current;
     pendingSave.current = null;
     if (!pending) return;
-    enqueueSave(pending.id, { nodes: pending.nodes, edges: pending.edges })
-      .catch(e => showToast(e.message || 'Auto-save failed', 'error'));
-  }, [enqueueSave]);
+    enqueueSave(pending.id, { nodes: pending.nodes, edges: pending.edges }, undefined, keepalive)
+      .catch(e => showToast(e.message || t.designer.autosaveFailed, 'error'));
+  }, [enqueueSave, t]);
 
   const switchDraft = useCallback((id: string | null) => {
     if (id === activeIdRef.current) return;
@@ -144,13 +152,32 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
 
   // Auto-save to server (debounced 10s, no version bump).
   // Dependencies include activeId: the effect must re-arm with the *new* draft
-  // id instead of firing an old closure's id/nodes after a switch.
+  // id instead of firing an old closure's id/nodes after a switch. It stays
+  // disarmed while the canvas still shows another draft's graph (switch window).
   useEffect(() => {
     if (!activeId || !loaded) return;
+    if (canvasDraftId.current !== activeId) return;
     clearTimeout(saveTimer.current);
     pendingSave.current = { id: activeId, nodes, edges };
-    saveTimer.current = setTimeout(flushPendingSave, 10000);
+    saveTimer.current = setTimeout(() => flushPendingSave(), 10000);
   }, [activeId, nodes, edges, loaded, flushPendingSave]);
+
+  // Leaving this page must not lose the pending debounced edit — a node drag
+  // that never reached the server would snap back to its old position when the
+  // designer is re-entered ("position revert"). Flush on unmount (switching to
+  // the monitor/dashboard tab), on reload/close (pagehide, keepalive) and when
+  // the tab is hidden; all flush the same consistent pending snapshot.
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === 'hidden') flushPendingSave(true); };
+    const onPageHide = () => flushPendingSave(true);
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onPageHide);
+      flushPendingSave();
+    };
+  }, [flushPendingSave]);
 
   const doSave = async () => {
     if (!activeId) return;
@@ -169,7 +196,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
   // ── Draft actions ─────────────────────
   const newDraft = async () => {
     try {
-      const d = await createDraft(`Draft ${drafts.length + 1}`);
+      const d = await createDraft(t.designer.draftN.replace('{n}', String(drafts.length + 1)));
       setDrafts(prev => [...prev, { ...d, nodes: [], edges: [] }]);
       switchDraft(d.id);
     } catch (e: any) { showToast(`${t.designer.createFailed}: ` + (e.message || 'server unavailable'), 'error'); }
@@ -227,7 +254,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     const yaml = graphToYaml(d.nodes, d.edges, d.id, d.name);
     setDeployedYaml(yaml);
     setShowYaml(true);
-    setToast(`YAML for: ${draft.name}`);
+    setToast(`${t.designer.yamlFor}: ${draft.name}`);
   };
 
   const importYamlAction = () => {
@@ -243,9 +270,9 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         const d = await importDraft(name, importedNodes, importedEdges);
         setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
         switchDraft(d.id);
-        setToast(`Imported: ${name}`);
+        setToast(`${t.designer.imported}: ${name}`);
       } catch (e: any) {
-        showToast('Import failed: ' + e.message, 'error');
+        showToast(`${t.designer.importFailed}: ` + e.message, 'error');
       }
     };
     input.click();
@@ -270,8 +297,8 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setDrafts(prev => [...prev, { ...d, nodes: importedNodes, edges: importedEdges }]);
       switchDraft(d.id);
       setShowTemplates(false);
-      setToast(`Imported: ${name}`);
-    } catch (e: any) { showToast('Import failed: ' + e.message, 'error'); }
+      setToast(`${t.designer.imported}: ${name}`);
+    } catch (e: any) { showToast(`${t.designer.importFailed}: ` + e.message, 'error'); }
   };
 
   const handleAiGenerate = async (prompt: string) => {
@@ -282,7 +309,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       setDrafts(prev => [...prev, { ...d, nodes: genNodes, edges: genEdges }]);
       switchDraft(d.id);
       setShowAiGenerate(false);
-      setToast(`AI: ${r.name || name} (${r.nodeCount ?? genNodes.length} nodes)`);
+      setToast(`${t.designer.aiGenerated}: ${r.name || name} (${t.designer.nodesCount.replace('{n}', String(r.nodeCount ?? genNodes.length))})`);
     } catch (e: any) {
       showToast(e.message || t.designer.aiGenerateFailed, 'error');
     }
@@ -323,7 +350,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
         fetchInstanceSummary().then(setInstanceSummary).catch(e => showToast(e.message, 'error'));
       } catch {
         setDeployedInstanceId(null);
-        setToast(`${t.designer.deployOnly}${result.id} (auto-start failed)`);
+        setToast(`${t.designer.deployOnly}${result.id} (${t.designer.autoStartFailed})`);
       }
     } catch (e: any) { showToast(t.designer.deployFailed + e.message, 'error'); }
   };
@@ -334,12 +361,12 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
     for (const node of nodes) {
       if (node.type === 'startEvent') {
         for (const v of (node.data.initialVars as Array<{key:string;value:string}>) || []) {
-          if (v.key) vars.push({ name: v.key, source: v.value ? `Start (${t.designer.defaultVar}: ${v.value})` : 'Start' });
+          if (v.key) vars.push({ name: v.key, source: v.value ? `${t.designer.startVar} (${t.designer.defaultVar}: ${v.value})` : t.designer.startVar });
         }
       }
       if (node.type === 'serviceTask') {
         const hc = node.data.handlerClass as string;
-        const label = hc ? (hc.split('.').pop() || 'Code') : ((node.data.httpMode as boolean) ? 'HTTP' : 'Code');
+        const label = hc ? (hc.split('.').pop() || 'Code') : ((node.data.httpMode as boolean) ? 'HTTP' : t.designer.codeLabel);
         const nodeName = (node.data.name as string) || node.id;
         for (const rv of (node.data.returnValues as Array<{key:string;type:string}>) || []) {
           if (rv.key) vars.push({ name: `${node.id}_${rv.key}`, source: `「${nodeName}」${label} → ${rv.type}` });
@@ -348,14 +375,14 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
       if (node.type === 'aiTask') {
         const label = (node.data.mode as string) || 'AI';
         const nodeName = (node.data.name as string) || node.id;
-        vars.push({ name: `${node.id}_text`, source: `「${nodeName}」AI · ${label} → 原始输出` });
-        vars.push({ name: `${node.id}_result`, source: `「${nodeName}」AI · ${label} → 完整结果` });
-        if (node.data.mode === 'classify') vars.push({ name: `${node.id}_category`, source: `「${nodeName}」AI 分类结果` });
-        if (node.data.outputVar) vars.push({ name: String(node.data.outputVar), source: `「${nodeName}」AI 输出变量` });
+        vars.push({ name: `${node.id}_text`, source: `「${nodeName}」AI · ${label} → ${t.designer.aiRawOutput}` });
+        vars.push({ name: `${node.id}_result`, source: `「${nodeName}」AI · ${label} → ${t.designer.aiFullResult}` });
+        if (node.data.mode === 'classify') vars.push({ name: `${node.id}_category`, source: `「${nodeName}」${t.designer.aiCategoryVar}` });
+        if (node.data.outputVar) vars.push({ name: String(node.data.outputVar), source: `「${nodeName}」${t.designer.aiOutputVar}` });
       }
       if (node.type === 'userTask') {
         const m = ((node.data.assignee as string) || '').match(/\$\{(\w+)\}/);
-        if (m && m[1]) vars.push({ name: m[1], source: 'Assignee' });
+        if (m && m[1]) vars.push({ name: m[1], source: t.designer.assigneeVar });
       }
     }
     return vars;
@@ -385,7 +412,7 @@ export default function DesignerPage({ onNavigate }: { onNavigate?: (t: 'designe
             className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5
               ${showVars ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}`}>
             <Braces size={13} strokeWidth={2} />
-            Variables ({allVars.length})
+            {t.designer.variables} ({allVars.length})
           </button>
         </div>
         <button onClick={handleDeploy} className="btn-success !text-[13px] !px-4">

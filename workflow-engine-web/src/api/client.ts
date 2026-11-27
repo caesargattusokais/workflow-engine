@@ -44,11 +44,14 @@ async function apiPost(path: string, body?: unknown) {
   return text ? JSON.parse(text) : null;
 }
 
-async function apiPut(path: string, body: unknown) {
+async function apiPut(path: string, body: unknown, keepalive = false) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'same-origin',
+    // keepalive lets an unload-time flush (pagehide / tab hidden) survive
+    // navigation instead of being cancelled mid-flight.
+    keepalive,
     body: JSON.stringify(body)
   });
   if (!res.ok) { checkUnauthorized(res); throw await parseError(res, path); }
@@ -102,8 +105,8 @@ export async function getDraft(id: string) { return apiGet(`/drafts/${id}`); }
 export async function createDraft(name: string) {
   return apiPost('/drafts', { name, nodes: [], edges: [] });
 }
-export async function updateDraft(id: string, data: Record<string, unknown>) {
-  return apiPut(`/drafts/${id}`, data);
+export async function updateDraft(id: string, data: Record<string, unknown>, keepalive = false) {
+  return apiPut(`/drafts/${id}`, data, keepalive);
 }
 export async function deleteDraft(id: string) { return apiDelete(`/drafts/${id}`); }
 
