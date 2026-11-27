@@ -175,10 +175,8 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
         <History size={11} className="text-gray-600" />
         <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{t.monitor.history} ({history.length})</span>
       </div>
-      <div className="ml-5 space-y-2">
-        {history
-          .filter((h: any) => !['enter', 'leave'].includes(h.action))
-          .slice(-10).reverse().map((h:any,i:number) => {
+      <div className="ml-5 space-y-2 max-h-80 overflow-y-auto pr-1">
+        {history.slice().reverse().map((h:any,i:number) => {
           const actCls = h.action === 'complete' ? 'text-emerald-400'
             : (h.action === 'reject' || h.action === 'terminate') ? 'text-red-400'
             : h.action === 'delegate' ? 'text-amber-400'
