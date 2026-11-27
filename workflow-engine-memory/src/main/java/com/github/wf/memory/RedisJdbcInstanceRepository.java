@@ -354,7 +354,7 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
             StringBuilder vis = new StringBuilder();
             List<Object> visParams = new ArrayList<>();
             JdbcInstanceRepository.visibilityWhere(userId, groupIds, vis, visParams);
-            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            sql.append(" AND").append(vis.substring(vis.indexOf("WHERE") + 5));
             params.addAll(visParams);
         } else {
             JdbcInstanceRepository.visibilityWhere(userId, groupIds, sql, params);

@@ -38,10 +38,25 @@ class RedisJdbcInstanceRepositoryGroupVisibilityTest {
         ProcessInstance shared = repo.findVisible("qianmeng", List.of("group-fengye"), null).get(0);
         assertThat(shared.getVariable(InternalVars.GROUP_KEY)).isEqualTo("group-fengye");
 
-        // JDBC repository applies the same group-variable backfill when mapping DB rows.
+        // definitionId-filtered visibility — regression for the missing AND in the SQL predicate.
+        // Dashboard passes a draft id here; without the AND the query is a 500.
+        assertThat(repo.findVisible("qianmeng", List.of("group-fengye"), "def-shared"))
+                .extracting(ProcessInstance::getId).containsExactly("i-shared");
+        assertThat(repo.findVisiblePaginated("qianmeng", List.of("group-fengye"), "def-shared", 1, 10, null))
+                .extracting(ProcessInstance::getId).containsExactly("i-shared");
+        assertThat(repo.findVisiblePaginated("qianmeng", List.of("group-fengye"), "def-shared", 1, 10, "RUNNING"))
+                .extracting(ProcessInstance::getId).containsExactly("i-shared");
+        assertThat(repo.countVisible("qianmeng", List.of("group-fengye"), "def-shared", null)).isEqualTo(1);
+        assertThat(repo.getVisibleStats("qianmeng", List.of("group-fengye"), "def-shared").getTotal()).isEqualTo(1);
+        assertThat(repo.findVisiblePaginated("qianmeng", List.of("group-fengye"), "def-other", 1, 10, null)).isEmpty();
+
+        // JDBC repository applies the same group-variable backfill and definitionId filter.
         JdbcInstanceRepository jdbcRepo = new JdbcInstanceRepository(jdbc);
         assertThat(jdbcRepo.findById("i-shared").getVariable(InternalVars.GROUP_KEY))
                 .isEqualTo("group-fengye");
+        assertThat(jdbcRepo.findVisiblePaginated("qianmeng", List.of("group-fengye"), "def-shared", 1, 10, null))
+                .extracting(ProcessInstance::getId).containsExactly("i-shared");
+        assertThat(jdbcRepo.countVisible("qianmeng", List.of("group-fengye"), "def-shared", null)).isEqualTo(1);
     }
 
     private static void createSchema(JdbcTemplate jdbc) {

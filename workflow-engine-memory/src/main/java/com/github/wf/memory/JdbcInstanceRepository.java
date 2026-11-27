@@ -431,7 +431,7 @@ public class JdbcInstanceRepository implements InstanceRepository {
             StringBuilder vis = new StringBuilder();
             java.util.List<Object> visParams = new java.util.ArrayList<>();
             visibilityWhere(userId, groupIds, vis, visParams);
-            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            sql.append(" AND").append(vis.substring(vis.indexOf("WHERE") + 5));
             params.addAll(visParams);
         } else {
             visibilityWhere(userId, groupIds, sql, params);
@@ -457,7 +457,7 @@ public class JdbcInstanceRepository implements InstanceRepository {
             StringBuilder vis = new StringBuilder();
             java.util.List<Object> visParams = new java.util.ArrayList<>();
             visibilityWhere(userId, groupIds, vis, visParams);
-            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            sql.append(" AND").append(vis.substring(vis.indexOf("WHERE") + 5));
             params.addAll(visParams);
         } else {
             visibilityWhere(userId, groupIds, sql, params);
