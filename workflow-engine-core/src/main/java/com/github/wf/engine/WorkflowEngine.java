@@ -615,6 +615,26 @@ public class WorkflowEngine {
                 }
             }
 
+            // If every token is now terminal and no pending task remains, the
+            // instance has nowhere left to go — e.g. the last active branch
+            // (a join output such as the final approver) was rejected. Without
+            // this the instance stays RUNNING forever with no way to finish.
+            boolean anyAlive = false;
+            for (Execution exec : executions) {
+                if (!exec.isTerminal()) { anyAlive = true; break; }
+            }
+            if (!anyAlive && taskRepository.query(taskQuery()
+                    .instanceId(instanceId)
+                    .status(TaskStatus.PENDING)).isEmpty()) {
+                instance.setStatus(InstanceStatus.TERMINATED);
+                instance.setActiveNodeIds(Set.of());
+                instanceRepository.update(instance);
+                instanceRepository.saveHistoricActivity(new HistoricActivity(null,
+                        instance.getId(), node.getId(), node.getName(), node.getType(),
+                        "system", "terminate", null,
+                        "All branches rejected — instance auto-terminated"));
+            }
+
             notifyStateListeners(instanceId);
         } finally {
             lockManager.unlock(instanceId);

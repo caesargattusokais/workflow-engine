@@ -238,10 +238,58 @@ class EngineDeadlockRegressionTest {
         Task task = pendingTasks(instance.getId(), "review").get(0);
         engine.rejectTask(task.getId(), "驳回");
 
-        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.RUNNING);
+        // The only token is now terminal — the instance ends automatically
+        // instead of lingering RUNNING with no way to finish.
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.TERMINATED);
+        // Later triggers must not resurrect the rejected task.
         engine.trigger(instance.getId());
         assertThat(pendingTasks(instance.getId(), "review")).isEmpty();
-        assertThat(onlyExecution(instance.getId()).isRejected()).isTrue();
+    }
+
+    /**
+     * Reproduced on wf-app (three-party countersign template): after one branch
+     * was rejected the join released and the director task appeared, but
+     * rejecting the director left every token terminal while the instance
+     * stayed RUNNING forever — the user had to terminate it manually.
+     */
+    @Test
+    void rejectingTheFinalApproverEndsTheInstanceUnderCopySemanticsRepos() {
+        WorkflowEngine copyEngine = engineWithCopySemanticsInstanceRepo();
+
+        List<Node> nodes = List.of(new StartEvent("start"),
+                new ParallelGateway("fork"),
+                new UserTask("finance", "财务审批", "finance", null, null, null, null),
+                new UserTask("legal", "法务审批", "legal", null, null, null, null),
+                new UserTask("tech", "技术审批", "tech", null, null, null, null),
+                new ParallelGateway("join"),
+                new UserTask("director", "总监终批", "director", null, null, null, null),
+                new EndEvent("end"));
+        processRepo().save(new ProcessDefinition("parallel-review", "parallel-review", 1, nodes,
+                List.of(Transition.direct("start", "fork"),
+                        Transition.direct("fork", "finance"),
+                        Transition.direct("fork", "legal"),
+                        Transition.direct("fork", "tech"),
+                        Transition.direct("finance", "join"),
+                        Transition.direct("legal", "join"),
+                        Transition.direct("tech", "join"),
+                        Transition.direct("join", "director"),
+                        Transition.direct("director", "end"))));
+
+        ProcessInstance instance = copyEngine.start("parallel-review", Map.of());
+        copyEngine.completeTask(pendingTasks(instance.getId(), "finance").get(0).getId(), Map.of(), "ok");
+        copyEngine.completeTask(pendingTasks(instance.getId(), "legal").get(0).getId(), Map.of(), "ok");
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "tech").get(0).getId(), "方案不行");
+
+        // One rejected branch out of three: the join still releases, the
+        // director decides — instance stays alive at this point.
+        assertThat(pendingTasks(instance.getId(), "director")).hasSize(1);
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.RUNNING);
+
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "director").get(0).getId(), "不予批准");
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.TERMINATED);
+        assertThat(copyEngine.instanceRepository.findActiveExecutions(instance.getId()))
+                .allMatch(Execution::isTerminal);
+        assertThat(pendingTasks(instance.getId(), "director")).isEmpty();
     }
 
     /**

@@ -292,6 +292,15 @@ const en: Translations = {
     loadFlowFailed: 'Failed to load flow',
     selectInstance: 'Select an instance to view its flow',
     selectInstanceHint: 'Pick an instance on the left to see its node path and current position in real time.',
+    approvalTrail: 'Approval trail',
+    approvalTrailEmpty: 'No approval records yet',
+    actionApproved: 'Approved',
+    actionRejected: 'Rejected',
+    actionDelegated: 'Delegated',
+    actionTerminated: 'Terminated',
+    actionEnter: 'Enter',
+    actionLeave: 'Leave',
+    trailLoadFailed: 'Failed to load approval trail',
   },
 };
 

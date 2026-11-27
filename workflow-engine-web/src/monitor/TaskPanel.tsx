@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
-import { CheckCircle2, XCircle, ChevronDown, ChevronRight, ClipboardList, AlertCircle, UserRound } from 'lucide-react';
+import { apiGet } from '../api/client';
+import { CheckCircle2, XCircle, ChevronDown, ChevronRight, ClipboardList, AlertCircle, UserRound, CornerDownRight } from 'lucide-react';
 
 interface FormField {
   key: string;
@@ -13,12 +14,25 @@ interface FormField {
 
 interface TaskInfo {
   id: string;
+  instanceId: string;
   nodeId: string;
   assignee: string;
   status: string;
   formFields?: FormField[];
   variables?: Record<string, unknown>;
 }
+
+interface HistoricEntry {
+  nodeId: string;
+  nodeName?: string;
+  executor: string;
+  action: string;
+  comment?: string;
+  timestamp?: string;
+}
+
+/** Only human-meaningful actions; enter/leave noise is filtered out. */
+const TRAIL_ACTIONS = ['complete', 'reject', 'delegate', 'terminate'];
 
 export default function TaskPanel({ tasks, onComplete, onReject }:
     {
@@ -31,6 +45,9 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Approval trail per instanceId, cached while the panel stays mounted.
+  const [trails, setTrails] = useState<Record<string, HistoricEntry[] | null>>({});
+  const [trailErrors, setTrailErrors] = useState<Record<string, string>>({});
 
   if (tasks.length === 0) return (
     <div className="bg-gray-800 border-t border-gray-700/70 px-4 py-4 text-[11px] text-gray-600 text-center">
@@ -38,6 +55,28 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
       {t.monitor.noTasks}
     </div>
   );
+
+  const loadTrail = (instanceId: string) => {
+    if (trails[instanceId] !== undefined) return;
+    setTrails(prev => ({ ...prev, [instanceId]: null }));
+    apiGet(`/instances/${instanceId}/history`)
+      .then((h: any[]) => {
+        const entries = (Array.isArray(h) ? h : [])
+          .filter(e => TRAIL_ACTIONS.includes(e.action))
+          .slice(-20);
+        setTrails(prev => ({ ...prev, [instanceId]: entries }));
+      })
+      .catch(() => setTrailErrors(prev => ({ ...prev, [instanceId]: t.monitor.trailLoadFailed })));
+  };
+
+  const actionLabel = (action: string): string =>
+    action === 'complete' ? t.monitor.actionApproved
+      : action === 'reject' ? t.monitor.actionRejected
+      : action === 'delegate' ? t.monitor.actionDelegated
+      : action === 'terminate' ? t.monitor.actionTerminated
+      : action === 'enter' ? t.monitor.actionEnter
+      : action === 'leave' ? t.monitor.actionLeave
+      : action;
 
   const fieldValue = (task: TaskInfo, f: FormField): string => {
     if (values[task.id] && values[task.id][f.key] !== undefined) return values[task.id][f.key];
@@ -75,6 +114,39 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
     'text-xs text-gray-200 placeholder:text-gray-600 hover:border-gray-600 ' +
     'focus:border-blue-500 transition-colors';
 
+  const trailCls = (action: string) =>
+    action === 'complete' ? 'text-emerald-400'
+      : action === 'reject' ? 'text-red-400'
+      : action === 'terminate' ? 'text-red-400/80'
+      : 'text-amber-400';
+
+  const Trail = ({ instanceId }: { instanceId: string }) => {
+    const trail = trails[instanceId];
+    const err = trailErrors[instanceId];
+    if (err) return <div className="text-[11px] text-red-400/80 flex items-center gap-1.5"><AlertCircle size={11} /> {err}</div>;
+    if (!trail) return <div className="text-[11px] text-gray-600 py-1">…</div>;
+    if (trail.length === 0) return <div className="text-[11px] text-gray-600 py-1">{t.monitor.approvalTrailEmpty}</div>;
+    return (
+      <div className="space-y-1.5">
+        {trail.map((h, i) => (
+          <div key={i} className="flex items-start gap-2 text-[11px]">
+            <span className={`shrink-0 inline-flex items-center gap-1 ${trailCls(h.action)}`}>
+              {h.action === 'reject' || h.action === 'terminate'
+                ? <XCircle size={11} strokeWidth={2} />
+                : <CheckCircle2 size={11} strokeWidth={2} />}
+              {actionLabel(h.action)}
+            </span>
+            <span className="text-gray-300 shrink-0">{h.nodeName || h.nodeId}</span>
+            <span className="text-gray-600 shrink-0 flex items-center gap-0.5">
+              <CornerDownRight size={10} /> {h.executor}
+            </span>
+            {h.comment && <span className="text-gray-500 truncate" title={h.comment}>“{h.comment}”</span>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-gray-800 border-t border-gray-700/70 p-3">
       <div className="flex items-center gap-2 mb-2 px-1">
@@ -93,7 +165,11 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
               <div className="flex items-center gap-3 px-3 py-2">
                 <button
                   className="flex items-center gap-1.5 text-xs text-gray-200 font-medium hover:text-white min-w-0"
-                  onClick={() => hasForm && setOpenId(expanded ? null : task.id)}
+                  onClick={() => {
+                    const next = expanded ? null : task.id;
+                    setOpenId(next);
+                    if (next && task.instanceId) loadTrail(task.instanceId);
+                  }}
                 >
                   {hasForm
                     ? (expanded ? <ChevronDown size={13} className="text-cyan-400 shrink-0" /> : <ChevronRight size={13} className="text-cyan-400 shrink-0" />)
@@ -106,7 +182,11 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
                 </span>
                 <div className="flex gap-1.5">
                   {hasForm && (
-                    <button onClick={() => setOpenId(expanded ? null : task.id)}
+                    <button onClick={() => {
+                      const next = expanded ? null : task.id;
+                      setOpenId(next);
+                      if (next && task.instanceId) loadTrail(task.instanceId);
+                    }}
                       className="btn-ghost !bg-cyan-900/40 !text-cyan-300 hover:!bg-cyan-700 hover:!text-white">
                       {t.monitor.fillForm}
                     </button>
@@ -124,6 +204,14 @@ export default function TaskPanel({ tasks, onComplete, onReject }:
                   </button>
                 </div>
               </div>
+              {expanded && task.instanceId && (
+                <div className="px-3 py-2.5 bg-gray-900/40 border-t border-gray-700/60 mb-2">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                    {t.monitor.approvalTrail}
+                  </div>
+                  <Trail instanceId={task.instanceId} />
+                </div>
+              )}
               {hasForm && expanded && (
                 <div className="px-3 py-3 bg-gray-900/40 border-t border-gray-700/60 space-y-3">
                   {fields.map((f, i) => (

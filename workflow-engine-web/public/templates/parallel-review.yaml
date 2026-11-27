@@ -60,6 +60,12 @@ nodes:
     type: userTask
     name: 总监终批
     assignee: director
+    formFields:
+      - key: directorOpinion
+        label: 总监意见
+        type: textarea
+        required: true
+        placeholder: "汇总三方意见后给出终批结论"
   - id: end
     type: endEvent
     name: 结束

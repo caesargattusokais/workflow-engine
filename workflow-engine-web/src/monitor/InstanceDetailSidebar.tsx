@@ -163,12 +163,31 @@ export default function InstanceDetailSidebar({ inst, nodeNames, history }: {
         <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{t.monitor.history} ({history.length})</span>
       </div>
       <div className="ml-5 space-y-2">
-        {history.slice(-10).reverse().map((h:any,i:number) => (
+        {history
+          .filter((h: any) => !['enter', 'leave'].includes(h.action))
+          .slice(-10).reverse().map((h:any,i:number) => {
+          const actCls = h.action === 'complete' ? 'text-emerald-400'
+            : (h.action === 'reject' || h.action === 'terminate') ? 'text-red-400'
+            : h.action === 'delegate' ? 'text-amber-400'
+            : 'text-gray-600';
+          const actLabel = h.action === 'complete' ? t.monitor.actionApproved
+            : h.action === 'reject' ? t.monitor.actionRejected
+            : h.action === 'delegate' ? t.monitor.actionDelegated
+            : h.action === 'terminate' ? t.monitor.actionTerminated
+            : h.action === 'enter' ? t.monitor.actionEnter
+            : h.action === 'leave' ? t.monitor.actionLeave
+            : h.action;
+          return (
           <div key={i} className="pl-2.5 border-l border-gray-700">
             <div className="text-gray-300 text-[11px]">{nodeNames[h.nodeId] || h.nodeId}</div>
-            <div className="text-[10px] text-gray-600 mt-0.5">{h.action} · {h.executor}</div>
+            <div className="text-[10px] mt-0.5 flex items-center gap-1.5">
+              <span className={actCls}>{actLabel}</span>
+              <span className="text-gray-600">· {h.executor}</span>
+            </div>
+            {h.comment && <div className="text-[10px] text-gray-500 mt-0.5 break-words">“{h.comment}”</div>}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

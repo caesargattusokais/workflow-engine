@@ -290,6 +290,15 @@ const zh = {
     loadFlowFailed: '流程加载失败',
     selectInstance: '选择一个实例查看流程',
     selectInstanceHint: '从左侧实例列表选择一个，实时查看它走过的节点路径与当前停留位置。',
+    approvalTrail: '审批轨迹',
+    approvalTrailEmpty: '暂无审批记录',
+    actionApproved: '通过',
+    actionRejected: '驳回',
+    actionDelegated: '转办',
+    actionTerminated: '终止',
+    actionEnter: '进入',
+    actionLeave: '离开',
+    trailLoadFailed: '审批轨迹加载失败',
   },
 };
 
