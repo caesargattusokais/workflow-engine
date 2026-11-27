@@ -10,6 +10,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -100,24 +101,42 @@ public class JdbcUserStore implements UserStore {
         }
     }
 
+    private static final String USER_COLUMNS =
+            "SELECT username, display_name, email, roles, groups, admin_groups, enabled, password_hash FROM auth_user ";
+
+    private StoredUser mapUser(ResultSet rs, int n) throws java.sql.SQLException {
+        String rolesCsv = rs.getString("roles");
+        List<String> roles = rolesCsv == null || rolesCsv.isBlank()
+                ? List.of() : List.of(rolesCsv.split(","));
+        AuthUser u = new AuthUser(
+                rs.getString("username"), rs.getString("display_name"),
+                rs.getString("email"), roles,
+                csv(rs.getString("groups")), csv(rs.getString("admin_groups")),
+                rs.getBoolean("enabled"));
+        return new StoredUser(u, rs.getString("password_hash"));
+    }
+
     @Override
     public Optional<StoredUser> findByUsername(String username) {
         if (username == null) return Optional.empty();
-        List<StoredUser> rows = jdbc.query(
-                "SELECT username, display_name, email, roles, groups, admin_groups, enabled, password_hash " +
-                "FROM auth_user WHERE username = ?",
-                (rs, n) -> {
-                    String rolesCsv = rs.getString("roles");
-                    List<String> roles = rolesCsv == null || rolesCsv.isBlank()
-                            ? List.of() : List.of(rolesCsv.split(","));
-                    AuthUser u = new AuthUser(
-                            rs.getString("username"), rs.getString("display_name"),
-                            rs.getString("email"), roles,
-                            csv(rs.getString("groups")), csv(rs.getString("admin_groups")),
-                            rs.getBoolean("enabled"));
-                    return new StoredUser(u, rs.getString("password_hash"));
-                }, username.toLowerCase());
+        List<StoredUser> rows = jdbc.query(USER_COLUMNS + "WHERE username = ?",
+                this::mapUser, username.toLowerCase());
         return rows.stream().findFirst();
+    }
+
+    @Override
+    public List<AuthUser> listAll() {
+        return jdbc.query(USER_COLUMNS + "ORDER BY username", this::mapUser)
+                .stream().map(StoredUser::user).toList();
+    }
+
+    @Override
+    public boolean updateMembership(String username, List<String> groups, List<String> adminGroups) {
+        if (username == null) return false;
+        String g = groups == null ? "" : String.join(",", groups);
+        String a = adminGroups == null ? "" : String.join(",", adminGroups);
+        return jdbc.update("UPDATE auth_user SET groups = ?, admin_groups = ? WHERE username = ?",
+                g, a, username.toLowerCase(Locale.ROOT)) > 0;
     }
 
     @Override

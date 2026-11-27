@@ -41,6 +41,17 @@ public class InMemoryDraftRepository implements DraftRepository {
     public void updateNodes(String userId, String id, Object nodes) { findById(userId, id).put("nodes", nodes); }
     public void updateEdges(String userId, String id, Object edges) { findById(userId, id).put("edges", edges); }
     public void updateVersion(String userId, String id, int version) { findById(userId, id).put("version", version); }
+
+    // The by-id variants are used by controllers that already passed the
+    // visibility check; the interface defaults throw, so implement them here.
+    private Map<String, Object> findAnyById(String id) {
+        return drafts.stream().filter(d -> id.equals(d.get("id"))).findFirst()
+                .orElseThrow(() -> new RuntimeException("Draft not found: " + id));
+    }
+    @Override public void updateNodesById(String id, Object nodes) { findAnyById(id).put("nodes", nodes); }
+    @Override public void updateEdgesById(String id, Object edges) { findAnyById(id).put("edges", edges); }
+    @Override public void updateVersionById(String id, int version) { findAnyById(id).put("version", version); }
+
     public void delete(String userId, String id) { drafts.removeIf(d -> id.equals(d.get("id"))); }
     public boolean nameExists(String userId, String name, String excludeId) {
         return drafts.stream().anyMatch(d -> userId.equals(d.get("_userId")) && name.equals(d.get("name")) && !d.get("id").equals(excludeId));

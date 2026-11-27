@@ -4,7 +4,7 @@ import * as path from 'path';
 
 // ── Test User ──
 export const TEST_USER = 'testuser';
-export const API_BASE = 'http://localhost:8080/api';
+export const API_BASE = process.env.E2E_API_BASE || 'http://localhost:8080/api';
 
 // ── API Client ──
 export class ApiClient {

@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Allow the API server to run on a spare port when 8080 is occupied by a
+// separate deployment (e.g. the docker-compose stack used for manual checks).
+const API_PORT = Number(process.env.E2E_API_PORT || 8080);
+const UI_PORT = Number(process.env.E2E_UI_PORT || 3000);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -20,7 +25,7 @@ export default defineConfig({
         // and without this Chromium inherits the OS locale (zh-CN on dev
         // machines), breaking the English text selectors most specs rely on.
         locale: 'en',
-        baseURL: 'http://localhost:3000',
+        baseURL: `http://localhost:${UI_PORT}`,
         storageState: 'e2e/.auth.json',
       },
     },
@@ -41,18 +46,18 @@ export default defineConfig({
       // not persistence. Pointing them at a MySQL-backed server makes every
       // write wait on binlog fsync and the suite times out.
       command: 'java -jar ../workflow-engine-server/target/workflow-engine-server-1.0.0-SNAPSHOT.jar '
-        + '--spring.profiles.active=memory,mock-ldap --server.port=8080 '
+        + `--spring.profiles.active=memory,mock-ldap --server.port=${API_PORT} `
         // E2E API helpers use the legacy X-User-Id header to switch tenants.
         // Opt in explicitly here; production defaults to header-compat disabled.
         + '--auth.header-compat-enabled=true '
         + '--ai.base-url=http://127.0.0.1:9999/v1 --ai.api-key=stub --ai.model=stub-model',
-      port: 8080,
+      port: API_PORT,
       timeout: 30000,
       reuseExistingServer: !process.env.CI,
     },
     {
       command: 'npm run dev',
-      port: 3000,
+      port: UI_PORT,
       timeout: 15000,
       reuseExistingServer: !process.env.CI,
     },

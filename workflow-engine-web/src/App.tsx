@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
-import { GitBranch, Activity, BarChart3, Settings2, Sparkles, LogOut } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { GitBranch, Activity, BarChart3, Settings2, Sparkles, LogOut, Users } from 'lucide-react';
 import LanguageSwitcher, { useT } from './i18n';
 import DesignerPage from './designer/DesignerPage';
 import MonitorPage from './monitor/MonitorPage';
 import Dashboard from './monitor/Dashboard';
 import AiConfigModal from './designer/AiConfigModal';
+import GroupManagePage from './groups/GroupManagePage';
 import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import { useToasts, ToastContainer, showToast } from './api/toast';
 import { getAiConfig, getAuthMe, getAuthStatus, logout, onUnauthorized, currentGroup, setCurrentGroup, type LoginUser } from './api/client';
 
 export default function App() {
-  const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
+  const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard' | 'groups'>('designer');
   const [monitorDefId, setMonitorDefId] = useState<string | null>(null);
   const [monitorInstId, setMonitorInstId] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
@@ -33,8 +34,8 @@ export default function App() {
     getAuthStatus().then(s => setRegistrationEnabled(!!s.registrationEnabled)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    getAuthMe().then(me => {
+  const refreshMe = useCallback(() => {
+    return getAuthMe().then(me => {
       if (me.authenticated && me.user) {
         setCurrentUser(me.user);
         const groups = me.user.groups || [];
@@ -51,6 +52,8 @@ export default function App() {
         : null);
     });
   }, []);
+
+  useEffect(() => { refreshMe(); }, [refreshMe]);
 
   // Any 401 from the API drops us back to the login screen.
   useEffect(() => {
@@ -119,6 +122,12 @@ export default function App() {
           <BarChart3 size={14} strokeWidth={2} />
           {t.app.dashboard}
         </button>
+        <button onClick={() => setTab('groups')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium transition-colors
+            ${tab === 'groups' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800'}`}>
+          <Users size={14} strokeWidth={2} />
+          {t.groups.title}
+        </button>
         <div className="flex-1" />
         {/* Data-sharing group selector */}
         {!!currentUser.groups?.length && (
@@ -158,6 +167,7 @@ export default function App() {
         {tab === 'designer' && <DesignerPage onNavigate={handleNavigate} />}
         {tab === 'monitor' && <MonitorPage initialDefId={monitorDefId} initialInstId={monitorInstId} />}
         {tab === 'dashboard' && <Dashboard />}
+        {tab === 'groups' && <GroupManagePage currentUser={currentUser} onMembershipChanged={refreshMe} />}
       </main>
       {showAiConfig && (
         <AiConfigModal

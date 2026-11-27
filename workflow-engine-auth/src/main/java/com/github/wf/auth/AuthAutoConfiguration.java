@@ -1,6 +1,7 @@
 package com.github.wf.auth;
 
 import jakarta.servlet.Filter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -33,6 +34,33 @@ public class AuthAutoConfiguration {
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(AuthController.class)
     public AuthController authController(AuthService authService, AuthProperties props) {
         return new AuthController(authService, props);
+    }
+
+    // ── Group administration ────────────────────────────────────────────
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(GroupStore.class)
+    public GroupStore groupStore(AuthProperties props, UserStore userStore,
+                                 ObjectProvider<javax.sql.DataSource> dataSource) {
+        // Match the user-store flavour: JDBC users get JDBC groups, in-memory
+        // users get in-memory groups.
+        if (userStore instanceof JdbcUserStore && dataSource.getIfAvailable() != null) {
+            return new JdbcGroupStore(new org.springframework.jdbc.core.JdbcTemplate(dataSource.getObject()), props);
+        }
+        return new InMemoryGroupStore(props);
+    }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(GroupService.class)
+    public GroupService groupService(UserStore userStore, GroupStore groupStore,
+                                     ObjectProvider<GroupUsageChecker> usageChecker) {
+        return new GroupService(userStore, groupStore, usageChecker.getIfAvailable());
+    }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(GroupController.class)
+    public GroupController groupController(GroupService groupService) {
+        return new GroupController(groupService);
     }
 
     @Bean

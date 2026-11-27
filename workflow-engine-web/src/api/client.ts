@@ -251,4 +251,27 @@ function checkUnauthorized(res: Response) {
   if (res.status === 401 && unauthorizedHandler) unauthorizedHandler();
 }
 
+// ── Group administration ────────────────────────────────────────────────
+export interface GroupInfo { id: string; name: string; description: string; createdBy: string; createdAt: number }
+export interface GroupView { group: GroupInfo; memberCount: number; member: boolean; groupAdmin: boolean }
+export interface GroupMember { username: string; displayName: string; groupAdmin: boolean }
+
+export function listGroups() { return apiGet('/groups') as Promise<GroupView[]>; }
+export function listGroupMembers(id: string) { return apiGet(`/groups/${encodeURIComponent(id)}/members`) as Promise<GroupMember[]>; }
+export function listGroupCandidates() { return apiGet('/groups/candidates') as Promise<{ username: string; displayName: string }[]>; }
+export function createGroup(id: string, name: string, description: string) {
+  return apiPost('/groups', { id, name, description }) as Promise<GroupInfo>;
+}
+export function deleteGroup(id: string) { return apiDelete(`/groups/${encodeURIComponent(id)}`); }
+export function addGroupMember(id: string, username: string) {
+  return apiPost(`/groups/${encodeURIComponent(id)}/members`, { username });
+}
+export function removeGroupMember(id: string, username: string) {
+  return apiDelete(`/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(username)}`);
+}
+export function leaveGroup(id: string) { return apiPost(`/groups/${encodeURIComponent(id)}/leave`); }
+export function setGroupAdmin(id: string, username: string, admin: boolean) {
+  return apiPut(`/groups/${encodeURIComponent(id)}/admin`, { username, admin });
+}
+
 export { userId, authHeaders, apiGet, apiPost };

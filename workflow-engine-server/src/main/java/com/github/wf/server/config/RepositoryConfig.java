@@ -131,4 +131,26 @@ public class RepositoryConfig {
                                                       com.github.wf.auth.AuthProperties authProps) {
         return new com.github.wf.auth.JdbcUserStore(new JdbcTemplate(dataSource), authProps);
     }
+
+    /** Guards group deletion: a group owning instances, definitions or drafts cannot be removed. */
+    @Bean @Profile("!memory")
+    public com.github.wf.auth.GroupUsageChecker groupUsageChecker(DataSource dataSource) {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        return groupId -> {
+            try {
+                Integer instances = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM process_instance WHERE group_id = ?", Integer.class, groupId);
+                Integer definitions = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM definition WHERE group_id = ?", Integer.class, groupId);
+                Integer drafts = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM draft WHERE group_id = ?", Integer.class, groupId);
+                return (instances != null ? instances : 0)
+                        + (definitions != null ? definitions : 0)
+                        + (drafts != null ? drafts : 0) > 0;
+            } catch (Exception e) {
+                // Tables may not exist yet during bootstrap; membership check still applies.
+                return false;
+            }
+        };
+    }
 }

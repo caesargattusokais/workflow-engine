@@ -5,8 +5,8 @@ export default async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  // Set localStorage userId for auth
-  await page.goto('http://localhost:3000');
+  // Set localStorage userId for auth (respect the configured UI port)
+  await page.goto((config.projects[0].use.baseURL as string) || 'http://localhost:3000');
   await page.evaluate(() => localStorage.setItem('userId', 'testuser'));
   await page.context().storageState({ path: storageState as string });
 
