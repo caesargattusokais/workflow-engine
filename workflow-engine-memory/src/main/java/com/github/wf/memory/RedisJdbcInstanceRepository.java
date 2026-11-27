@@ -439,9 +439,10 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
 
     private void writeToDb(ProcessInstance instance) {
         int updated = jdbc.update(
-            "UPDATE process_instance SET status=?, user_id=?, variables_json=?, active_node_ids_json=?, " +
+            "UPDATE process_instance SET status=?, user_id=?, group_id=?, variables_json=?, active_node_ids_json=?, " +
             "parent_instance_id=?, parent_execution_id=?, completed_at=? WHERE id=?",
-            instance.getStatus().name(), JdbcInstanceRepository.userIdOf(instance), gson.toJson(instance.getVariables()),
+            instance.getStatus().name(), JdbcInstanceRepository.userIdOf(instance),
+            JdbcInstanceRepository.groupIdOf(instance), gson.toJson(instance.getVariables()),
             gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
             instance.getParentInstanceId(),
             instance.getParentExecutionId(),
@@ -450,11 +451,12 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
         if (updated == 0) {
             jdbc.update(
                 "INSERT INTO process_instance (id, definition_id, definition_version, status, " +
-                "user_id, variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
+                "user_id, group_id, variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
                 "created_at, completed_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
-                instance.getStatus().name(), JdbcInstanceRepository.userIdOf(instance), gson.toJson(instance.getVariables()),
+                instance.getStatus().name(), JdbcInstanceRepository.userIdOf(instance),
+                JdbcInstanceRepository.groupIdOf(instance), gson.toJson(instance.getVariables()),
                 gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
                 instance.getParentInstanceId(),
                 instance.getParentExecutionId(),

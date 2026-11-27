@@ -56,6 +56,10 @@ public class AuthProperties {
         private String displayName;
         private String email;
         private List<String> roles = new ArrayList<>();
+        /** Data-sharing groups this bootstrap user belongs to. */
+        private List<String> groups = new ArrayList<>();
+        /** Groups this bootstrap user administers (may terminate/recover shared instances). */
+        private List<String> adminGroups = new ArrayList<>();
         private boolean enabled = true;
 
         public String getUsername() { return username; }
@@ -70,6 +74,10 @@ public class AuthProperties {
         public void setEmail(String email) { this.email = email; }
         public List<String> getRoles() { return roles; }
         public void setRoles(List<String> roles) { this.roles = roles; }
+        public List<String> getGroups() { return groups; }
+        public void setGroups(List<String> groups) { this.groups = groups; }
+        public List<String> getAdminGroups() { return adminGroups; }
+        public void setAdminGroups(List<String> adminGroups) { this.adminGroups = adminGroups; }
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }

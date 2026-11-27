@@ -4,6 +4,8 @@ import com.github.wf.engine.Execution;
 import com.github.wf.model.HistoricActivity;
 import com.github.wf.model.InstanceStats;
 import com.github.wf.model.ProcessInstance;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -116,6 +118,76 @@ public interface InstanceRepository {
         Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
         for (ProcessInstance i : findAll()) {
             if (userId != null && !userId.equals(i.getVariable("_userId"))) continue;
+            result.computeIfAbsent(i.getDefinitionId(), k -> {
+                var m = new java.util.LinkedHashMap<String, Long>();
+                m.put("running", 0L); m.put("total", 0L);
+                return m;
+            });
+            var m = result.get(i.getDefinitionId());
+            m.put("total", m.get("total") + 1);
+            if (i.isRunning()) m.put("running", m.get("running") + 1);
+        }
+        return result;
+    }
+
+    // ── Group-shared visibility ──────────────────────────────────────────
+    // An instance is visible when owned by the caller OR tagged with one of
+    // the caller's groups. JDBC implementations override these to push the
+    // predicate into SQL; defaults keep InMemory/tests working.
+
+    default boolean isVisibleTo(ProcessInstance i, String userId, Collection<String> groupIds) {
+        if (i == null) return false;
+        if (userId != null && userId.equals(i.getVariable(com.github.wf.engine.InternalVars.OWNER_KEY))) return true;
+        Object group = i.getVariable(com.github.wf.engine.InternalVars.GROUP_KEY);
+        return group != null && groupIds != null && groupIds.contains(group.toString());
+    }
+
+    default List<ProcessInstance> findVisible(String userId, Collection<String> groupIds, String definitionId) {
+        List<ProcessInstance> out = new ArrayList<>();
+        for (ProcessInstance i : findAll()) {
+            if (definitionId != null && !definitionId.equals(i.getDefinitionId())) continue;
+            if (isVisibleTo(i, userId, groupIds)) out.add(i);
+        }
+        return out;
+    }
+
+    default List<ProcessInstance> findVisiblePaginated(String userId, Collection<String> groupIds,
+                                                       String definitionId, int page, int size, String status) {
+        return findVisible(userId, groupIds, definitionId).stream()
+                .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+                .skip((long) (page - 1) * size).limit(size).toList();
+    }
+
+    default long countVisible(String userId, Collection<String> groupIds, String definitionId, String status) {
+        return findVisible(userId, groupIds, definitionId).stream()
+                .filter(i -> status == null || status.isEmpty() || i.getStatus().name().equals(status))
+                .count();
+    }
+
+    default InstanceStats getVisibleStats(String userId, Collection<String> groupIds, String definitionId) {
+        InstanceStats s = new InstanceStats();
+        for (ProcessInstance i : findVisible(userId, groupIds, definitionId)) {
+            s.setTotal(s.getTotal() + 1);
+            switch (i.getStatus()) {
+                case RUNNING: s.setRunning(s.getRunning() + 1); break;
+                case COMPLETED: s.setCompleted(s.getCompleted() + 1); break;
+                case SUSPENDED: s.setSuspended(s.getSuspended() + 1); break;
+                case TERMINATED: s.setTerminated(s.getTerminated() + 1); break;
+            }
+            s.getByDefinition().computeIfAbsent(i.getDefinitionId(), k -> new java.util.LinkedHashMap<>())
+                .merge(i.getStatus().name(), 1L, Long::sum);
+            if (i.getCompletedAt() != null) {
+                long dur = i.getCompletedAt().toEpochMilli() - i.getCreatedAt().toEpochMilli();
+                double old = s.getAvgDurationMs();
+                s.setAvgDurationMs(old == 0 ? dur : (old + dur) / 2);
+            }
+        }
+        return s;
+    }
+
+    default Map<String, Map<String, Long>> getVisibleSummary(String userId, Collection<String> groupIds) {
+        Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
+        for (ProcessInstance i : findVisible(userId, groupIds, null)) {
             result.computeIfAbsent(i.getDefinitionId(), k -> {
                 var m = new java.util.LinkedHashMap<String, Long>();
                 m.put("running", 0L); m.put("total", 0L);

@@ -22,6 +22,13 @@ public class TaskController {
 
     public TaskController(WorkflowEngine engine) { this.engine = engine; }
 
+    /** Backward-compatible overloads for in-process callers/tests (no HTTP scope). */
+    public List<Map<String, Object>> list(String userId, String assignee, String candidateGroup,
+                                          String instanceId, String status) {
+        return list(userId, null, assignee, candidateGroup, instanceId, status);
+    }
+    public void complete(String userId, String id, CompleteTaskRequest req) { complete(userId, null, id, req); }
+
     @GetMapping
     @Operation(summary = "List tasks", description = "Query user tasks with optional filters for assignee, candidate group, instance, and status. Defaults to PENDING when no status is specified.")
     @ApiResponse(responseCode = "200", description = "List of matching tasks",
@@ -29,6 +36,7 @@ public class TaskController {
     public List<Map<String, Object>> list(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Filter by assignee user ID")
             @RequestParam(value = "assignee", required = false) String assignee,
             @Parameter(description = "Filter by candidate group name")
@@ -43,8 +51,9 @@ public class TaskController {
         // Resolve IDs up front and push into the store query so no other
         // tenant's task/variables leak and paging stays correct.
         var allowedIds = new java.util.HashSet<String>();
-        for (var inst : engine.instanceRepository.findAll()) {
-            if (userId.equals(inst.getVariable("_userId"))) allowedIds.add(inst.getId());
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        for (var inst : engine.instanceRepository.findVisible(userId, groups, null)) {
+            allowedIds.add(inst.getId());
         }
         for (var t : engine.taskRepository.query(engine.taskQuery().assignee(userId))) {
             allowedIds.add(t.getInstanceId());
@@ -82,9 +91,10 @@ public class TaskController {
     public void complete(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody CompleteTaskRequest req) {
-        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         engine.completeTask(id, req.getVariables(), req.getComment());
     }
 
@@ -97,10 +107,11 @@ public class TaskController {
     public String completeGet(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @Parameter(description = "Completion comment")
             @RequestParam(value = "comment", defaultValue = "飞书审批通过") String comment) {
-        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         engine.completeTask(id, Map.of("source", "feishu"), comment);
         return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:green'>✓ 已通过</h2><p>审批完成</p></body></html>";
     }
@@ -112,9 +123,10 @@ public class TaskController {
     public void reject(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         engine.rejectTask(id, body.getOrDefault("comment", ""));
     }
 
@@ -127,10 +139,11 @@ public class TaskController {
     public String rejectGet(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @Parameter(description = "Rejection comment")
             @RequestParam(value = "comment", defaultValue = "飞书驳回") String comment) {
-        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         engine.rejectTask(id, comment);
         return "<html><body style='font-family:sans-serif;text-align:center;padding:40px'><h2 style='color:red'>✗ 已驳回</h2><p>任务已驳回</p></body></html>";
     }
@@ -143,9 +156,10 @@ public class TaskController {
     public void delegate(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Task ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireTaskAccess(engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         engine.delegateTask(id, body.get("newAssignee"));
     }
 }

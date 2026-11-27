@@ -40,10 +40,19 @@ public class DefinitionController {
     public ProcessDefinition deploy(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @RequestBody DeployRequest req) {
         ProcessDefinition def = engine.deploy(req.getYaml());
-        repo.save(userId, def, req.getPositions());
+        repo.save(userId, com.github.wf.server.web.GroupScope.currentGroup(request), def, req.getPositions());
         return def;
+    }
+
+    /** Backward-compatible overloads for in-process callers/tests (no HTTP scope). */
+    public ProcessDefinition deploy(String userId, DeployRequest req) { return deploy(userId, null, req); }
+    public GraphResponse graph(String userId, String id, int version) {
+        ProcessDefinition def = engine.processRepository.findByIdAndVersion(id, version);
+        if (def == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
+        return com.github.wf.server.dto.DefinitionGraphMapper.fromDef(def, Map.of());
     }
 
     @GetMapping
@@ -53,15 +62,17 @@ public class DefinitionController {
     public Map<String, Object> list(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Page number (1-based)")
             @RequestParam(value = "page", defaultValue = "1") int page,
             @Parameter(description = "Page size")
             @RequestParam(value = "size", defaultValue = "10") int size) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("items", repo.listLatestByUserPaginated(userId, page, size));
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        result.put("items", repo.listLatestVisiblePaginated(userId, groups, page, size));
         result.put("page", page);
         result.put("size", size);
-        result.put("total", repo.countByUser(userId));
+        result.put("total", repo.countVisible(userId, groups));
         return result;
     }
 
@@ -73,8 +84,10 @@ public class DefinitionController {
     public ProcessDefinition get(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Process definition ID") @PathVariable("id") String id) {
-        ProcessDefinition def = repo.findByUserAndId(userId, id);
+        ProcessDefinition def = repo.findVisibleByUserAndId(userId,
+                com.github.wf.server.web.GroupScope.groups(request), id);
         if (def == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
         return def;
     }
@@ -87,19 +100,18 @@ public class DefinitionController {
     public GraphResponse graph(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Process definition ID") @PathVariable("id") String id,
             @Parameter(description = "Specific version (omit for latest)")
             @RequestParam(value = "version", required = false) Integer version) {
-        ProcessDefinition def;
-        if (version != null) {
-            def = engine.processRepository.findAllVersions(id).stream()
-                .filter(d -> d.getVersion() == version).findFirst().orElse(null);
-        } else {
-            def = engine.processRepository.findLatestById(id);
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        ProcessDefinition def = repo.findVisibleByUserAndId(userId, groups, id);
+        if (def == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
+        if (version != null && def.getVersion() != version) {
+            throw new com.github.wf.server.web.NotFoundException("Not found: " + id + " v" + version);
         }
-        if (def == null) def = engine.processRepository.findLatestById(id);
-        if (def == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id + (version != null ? " v" + version : ""));
-        return com.github.wf.server.dto.DefinitionGraphMapper.fromDef(def, repo.findPositions(userId, id, version));
+        return com.github.wf.server.dto.DefinitionGraphMapper.fromDef(
+                def, repo.findVisiblePositions(userId, groups, id, version));
     }
 
     @DeleteMapping("/{id}")
@@ -109,7 +121,12 @@ public class DefinitionController {
     public void delete(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Process definition ID") @PathVariable("id") String id) {
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        if (repo.findVisibleByUserAndId(userId, groups, id) == null) {
+            throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
+        }
         repo.delete(userId, id);
     }
 }

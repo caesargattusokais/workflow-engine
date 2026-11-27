@@ -30,13 +30,20 @@ public class InstanceController {
     public InstanceDetailResponse start(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @RequestBody StartInstanceRequest req) {
         Map<String, Object> vars = req.getVariables() != null
                 ? new HashMap<>(req.getVariables()) : new HashMap<>();
         vars.put("_userId", userId);
+        String group = com.github.wf.server.web.GroupScope.currentGroup(request);
+        if (group != null) vars.put(com.github.wf.engine.InternalVars.GROUP_KEY, group);
         ProcessInstance inst = engine.start(req.getDefinitionId(), vars);
         return new InstanceDetailResponse(inst);
     }
+
+    /** Backward-compatible overloads for in-process callers/tests (no HTTP scope). */
+    public InstanceDetailResponse start(String userId, StartInstanceRequest req) { return start(userId, null, req); }
+    public InstanceDetailResponse get(String userId, String id) { return get(userId, null, id); }
 
     @GetMapping
     @Operation(summary = "List instances", description = "Return a paginated list of process instances, optionally filtered by status and definition ID")
@@ -45,6 +52,7 @@ public class InstanceController {
     public Map<String, Object> list(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Filter by instance status (e.g. RUNNING, COMPLETED, SUSPENDED)")
             @RequestParam(value = "status", required = false) String status,
             @Parameter(description = "Filter by process definition ID")
@@ -53,17 +61,11 @@ public class InstanceController {
             @RequestParam(value = "page", defaultValue = "1") int page,
             @Parameter(description = "Page size")
             @RequestParam(value = "size", defaultValue = "50") int size) {
-        // Filter by owner in the query itself (SQL WHERE user_id) BEFORE pagination —
-        // slicing first and filtering after hid small tenants behind a large tenant's page-1 rows.
-        java.util.List<com.github.wf.model.ProcessInstance> all;
-        long total;
-        if (definitionId != null && !definitionId.isEmpty()) {
-            all = engine.instanceRepository.findByDefinitionIdPaginated(definitionId, page, size, status, userId);
-            total = engine.instanceRepository.countByDefinitionId(definitionId, userId);
-        } else {
-            all = engine.instanceRepository.findAllPaginated(page, size, status, userId);
-            total = engine.instanceRepository.count(status, userId);
-        }
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        // Filter by owner OR group in the query itself BEFORE pagination.
+        java.util.List<com.github.wf.model.ProcessInstance> all =
+                engine.instanceRepository.findVisiblePaginated(userId, groups, definitionId, page, size, status);
+        long total = engine.instanceRepository.countVisible(userId, groups, definitionId, status);
         var filtered = all.stream()
                 .map(InstanceDetailResponse::new)
                 .toList();
@@ -83,8 +85,10 @@ public class InstanceController {
     public InstanceDetailResponse get(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        ProcessInstance inst = com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
+        ProcessInstance inst = com.github.wf.server.web.TenantGuard.requireOwnedInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         return new InstanceDetailResponse(inst);
     }
 
@@ -94,9 +98,10 @@ public class InstanceController {
             content = @Content(schema = @Schema(implementation = Map.class)))
     public Map<String, Map<String, Long>> summary(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
-            @RequestHeader("X-User-Id") String userId) {
-        Map<String, Map<String, Long>> scoped = engine.instanceRepository.getSummary(userId);
-        return scoped;
+            @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request) {
+        return engine.instanceRepository.getVisibleSummary(
+                userId, com.github.wf.server.web.GroupScope.groups(request));
     }
 
     @GetMapping("/{id}/history")
@@ -107,8 +112,10 @@ public class InstanceController {
     public List<HistoricActivity> history(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.groups(request), id);
         return engine.history(id);
     }
 
@@ -129,8 +136,10 @@ public class InstanceController {
     public InstanceDetailResponse resume(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireAdminInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.adminGroups(request), id);
         engine.resume(id);
         return new InstanceDetailResponse(engine.instanceRepository.findById(id));
     }
@@ -142,9 +151,11 @@ public class InstanceController {
     public void terminate(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Instance ID") @PathVariable("id") String id,
             @RequestBody Map<String, String> body) {
-        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
+        com.github.wf.server.web.TenantGuard.requireAdminInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.adminGroups(request), id);
         engine.terminate(id, body.getOrDefault("reason", "terminated by user"));
     }
 
@@ -156,8 +167,10 @@ public class InstanceController {
     public void delete(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Instance ID") @PathVariable("id") String id) {
-        var inst = com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, id);
+        var inst = com.github.wf.server.web.TenantGuard.requireAdminInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.adminGroups(request), id);
         if (inst.isRunning()) throw new IllegalStateException("Cannot delete running instance");
         engine.instanceRepository.deleteById(id);
     }

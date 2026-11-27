@@ -15,4 +15,28 @@ public interface DefinitionRepository {
     ProcessDefinition findByUserAndId(String userId, String id);
     Map<String, Map<String, Double>> findPositions(String userId, String id, Integer version);
     void delete(String userId, String id);
+
+    // ── Group sharing ────────────────────────────────────────────────────
+    // Defaults keep InMemory/test repos private; JDBC repos override to
+    // include rows shared with any of the caller's groups.
+    default void save(String userId, String groupId, ProcessDefinition def,
+                      Map<String, Map<String, Double>> positions) {
+        save(userId, def, positions);
+    }
+    default List<ProcessDefinition> listLatestVisible(String userId, List<String> groupIds) {
+        return listLatestByUser(userId);
+    }
+    default List<ProcessDefinition> listLatestVisiblePaginated(String userId, List<String> groupIds,
+                                                               int page, int size) {
+        return listLatestVisible(userId, groupIds).stream()
+                .skip((long) (page - 1) * size).limit(size).toList();
+    }
+    default long countVisible(String userId, List<String> groupIds) { return listLatestVisible(userId, groupIds).size(); }
+    default ProcessDefinition findVisibleByUserAndId(String userId, List<String> groupIds, String id) {
+        return findByUserAndId(userId, id);
+    }
+    default Map<String, Map<String, Double>> findVisiblePositions(String userId, List<String> groupIds,
+                                                                  String id, Integer version) {
+        return findPositions(userId, id, version);
+    }
 }

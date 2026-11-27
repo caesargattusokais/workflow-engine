@@ -21,7 +21,8 @@ public class InMemoryUserStore implements UserStore {
                     : (u.getPassword() != null ? encoder.encode(u.getPassword()) : null);
             if (hash == null) continue;
             AuthUser principal = new AuthUser(
-                    u.getUsername(), u.getDisplayName(), u.getEmail(), u.getRoles(), u.isEnabled());
+                    u.getUsername(), u.getDisplayName(), u.getEmail(), u.getRoles(),
+                    u.getGroups(), u.getAdminGroups(), u.isEnabled());
             users.put(u.getUsername().toLowerCase(), new StoredUser(principal, hash));
         }
     }

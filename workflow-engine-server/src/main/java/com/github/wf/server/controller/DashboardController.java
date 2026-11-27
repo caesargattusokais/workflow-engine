@@ -31,18 +31,19 @@ public class DashboardController {
     public Map<String, Object> stats(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Filter stats by process definition ID")
             @RequestParam(value = "definitionId", required = false) String definitionId) {
-        Map<String, Object> result;
-        if (definitionId != null && !definitionId.isEmpty()) {
-            result = engine.instanceRepository.getStatsByDefinition(definitionId, userId).toMap();
-        } else {
-            result = engine.instanceRepository.getStats(userId).toMap();
-        }
-        // Add pending task count — scoped to instances owned by this user
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        Map<String, Object> result = engine.instanceRepository
+                .getVisibleStats(userId, groups, definitionId == null || definitionId.isEmpty() ? null : definitionId)
+                .toMap();
+        // Pending tasks — instances visible to this user (owned or shared via group)
+        var visibleIds = engine.instanceRepository.findVisible(userId, groups, null).stream()
+                .map(i -> i.getId()).collect(java.util.stream.Collectors.toSet());
         long pendingTasks = engine.queryTasks(
                 new com.github.wf.task.TaskQuery().status(com.github.wf.task.TaskStatus.PENDING)).stream()
-                .filter(t -> userId.equals(ownerOf(t.getInstanceId())))
+                .filter(t -> visibleIds.contains(t.getInstanceId()))
                 .count();
         result.put("pendingTasks", pendingTasks);
         return result;
@@ -61,8 +62,10 @@ public class DashboardController {
     public List<Map<String, Object>> timeline(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Process instance ID") @PathVariable("instanceId") String instanceId) {
-        com.github.wf.server.web.TenantGuard.requireOwnedInstance(engine, userId, instanceId);
+        com.github.wf.server.web.TenantGuard.requireOwnedInstance(
+                engine, userId, com.github.wf.server.web.GroupScope.groups(request), instanceId);
         List<HistoricActivity> history = engine.history(instanceId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (int i = 0; i < history.size(); i++) {

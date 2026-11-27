@@ -16,6 +16,12 @@ public final class InternalVars {
     public static final String OWNER_KEY = "_userId";
 
     /**
+     * Data-sharing group of the instance, chosen from the creator's groups at
+     * start time. Instances with the same group are visible to all its members.
+     */
+    public static final String GROUP_KEY = "_groupId";
+
+    /**
      * Flag set to {@code true} the first time any task on the instance is
      * rejected (initialized to {@code false} at start). Lets process models
      * route on "has something been rejected" — e.g. an inclusive join sending
@@ -54,6 +60,7 @@ public final class InternalVars {
     /** Returns true if the given variable key is engine-internal (any of the suffixes). */
     public static boolean isInternalKey(String key) {
         return key != null && (OWNER_KEY.equals(key)
+                || GROUP_KEY.equals(key)
                 || HAS_REJECT.equals(key)
                 || key.endsWith(SUSPEND_REASON_SUFFIX)
                 || key.endsWith(SUSPEND_EXCEPTION_SUFFIX)

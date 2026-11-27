@@ -119,4 +119,105 @@ public class JdbcDefinitionRepository implements DefinitionRepository {
     public void delete(String userId, String id) {
         jdbc.update("DELETE FROM definition WHERE user_id = ? AND id = ?", userId, id);
     }
+
+    // ── Group sharing ────────────────────────────────────────────────────
+
+    private static String visibility(String alias, String userId, List<String> groups, List<Object> params) {
+        String prefix = alias == null || alias.isEmpty() ? "" : alias + ".";
+        StringBuilder sb = new StringBuilder("(").append(prefix).append("user_id = ?");
+        params.add(userId);
+        if (groups != null && !groups.isEmpty()) {
+            sb.append(" OR ").append(prefix).append("group_id IN (")
+              .append(String.join(",", Collections.nCopies(groups.size(), "?"))).append(")");
+            params.addAll(groups);
+        }
+        return sb.append(")").toString();
+    }
+
+    @Override
+    public void save(String userId, String groupId, ProcessDefinition def,
+                     Map<String, Map<String, Double>> positions) {
+        String posJson = positions != null ? gson.toJson(positions) : null;
+        int updated = jdbc.update(
+            "UPDATE definition SET name = ?, positions_json = ?, group_id = ? WHERE user_id = ? AND id = ? AND version = ?",
+            def.getName(), posJson, groupId, userId, def.getId(), def.getVersion());
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO definition (id, version, user_id, group_id, name, positions_json) VALUES (?, ?, ?, ?, ?, ?)",
+                def.getId(), def.getVersion(), userId, groupId, def.getName(), posJson);
+        }
+    }
+
+    @Override
+    public List<ProcessDefinition> listLatestVisiblePaginated(String userId, List<String> groupIds,
+                                                              int page, int size) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility("d", userId, groupIds, params);
+        // One copy of the visibility predicates for the inner latest-version subquery.
+        List<Object> innerParams = new ArrayList<>();
+        String innerVis = visibility(null, userId, groupIds, innerParams);
+        params.addAll(innerParams);
+        params.add(size);
+        params.add((long) (page - 1) * size);
+        return jdbc.query(
+            "SELECT d.id, d.version, d.name, p.nodes_json, p.transitions_json FROM definition d " +
+            "INNER JOIN (SELECT id, MAX(version) mv FROM definition WHERE " + innerVis + " GROUP BY id) latest " +
+            "ON d.id = latest.id AND d.version = latest.mv " +
+            "LEFT JOIN process_definition p ON d.id = p.id AND d.version = p.version " +
+            "WHERE " + vis + " ORDER BY d.id LIMIT ? OFFSET ?",
+            (rs, rowNum) -> {
+                String nodesJson = rs.getString("nodes_json");
+                if (nodesJson != null) {
+                    return JdbcProcessRepository.buildDefStatic(rs.getString("id"), rs.getInt("version"),
+                        rs.getString("name"), nodesJson, rs.getString("transitions_json"));
+                }
+                return new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                    rs.getInt("version"), List.of(), List.of());
+            }, params.toArray());
+    }
+
+    @Override
+    public long countVisible(String userId, List<String> groupIds) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility("d", userId, groupIds, params);
+        Long c = jdbc.queryForObject(
+            "SELECT COUNT(DISTINCT d.id) FROM definition d WHERE " + vis, Long.class, params.toArray());
+        return c != null ? c : 0;
+    }
+
+    @Override
+    public ProcessDefinition findVisibleByUserAndId(String userId, List<String> groupIds, String id) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility("d", userId, groupIds, params);
+        params.add(id);
+        List<ProcessDefinition> list = jdbc.query(
+            "SELECT d.id, d.version, d.name, p.nodes_json, p.transitions_json " +
+            "FROM definition d LEFT JOIN process_definition p ON d.id = p.id AND d.version = p.version " +
+            "WHERE " + vis + " AND d.id = ? ORDER BY d.version DESC LIMIT 1",
+            (rs, rowNum) -> {
+                String nodesJson = rs.getString("nodes_json");
+                if (nodesJson != null) {
+                    return JdbcProcessRepository.buildDefStatic(rs.getString("id"), rs.getInt("version"),
+                        rs.getString("name"), nodesJson, rs.getString("transitions_json"));
+                }
+                return new ProcessDefinition(rs.getString("id"), rs.getString("name"),
+                    rs.getInt("version"), List.of(), List.of());
+            }, params.toArray());
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    @Override
+    public Map<String, Map<String, Double>> findVisiblePositions(String userId, List<String> groupIds,
+                                                                 String id, Integer version) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility("d", userId, groupIds, params);
+        params.add(id);
+        String sql = "SELECT d.positions_json FROM definition d WHERE " + vis + " AND d.id = ?" +
+            (version != null ? " AND d.version = ?" : " ORDER BY d.version DESC LIMIT 1");
+        if (version != null) params.add(version);
+        List<String> list = jdbc.query(sql, (rs, rowNum) -> rs.getString("positions_json"), params.toArray());
+        String json = list.isEmpty() ? null : list.get(0);
+        if (json == null) return null;
+        return gson.fromJson(json, new TypeToken<Map<String, Map<String, Double>>>() {}.getType());
+    }
 }

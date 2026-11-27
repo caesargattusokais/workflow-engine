@@ -3,6 +3,7 @@ package com.github.wf.auth;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 /** Authentication business logic: verify credentials and mint/revoke tokens. */
@@ -49,7 +50,7 @@ public class AuthService {
         AuthUser user = new AuthUser(uname,
                 displayName == null || displayName.isBlank() ? uname : displayName.trim(),
                 email == null || email.isBlank() ? null : email.trim(),
-                props.getDefaultRoles(), true);
+                props.getDefaultRoles(), List.of(), List.of(), true);
         if (!store.create(user, password)) throw new DuplicateUsernameException();
         return user;
     }

@@ -35,13 +35,15 @@ public class DraftController {
     public Map<String, Object> list(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Page number (1-based)") @RequestParam(value = "page", defaultValue = "1") int page,
             @Parameter(description = "Page size") @RequestParam(value = "size", defaultValue = "100") int size) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("items", repo.listByUserPaginated(userId, page, size));
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        result.put("items", repo.listVisiblePaginated(userId, groups, page, size));
         result.put("page", page);
         result.put("size", size);
-        result.put("total", repo.countByUser(userId));
+        result.put("total", repo.countVisible(userId, groups));
         return result;
     }
 
@@ -53,8 +55,11 @@ public class DraftController {
     public Map<String, Object> get(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Draft ID") @PathVariable("id") String id) {
-        return repo.findById(userId, id);
+        var d = repo.findVisibleById(userId, com.github.wf.server.web.GroupScope.groups(request), id);
+        if (d == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
+        return d;
     }
 
     @PostMapping
@@ -65,10 +70,11 @@ public class DraftController {
     public Map<String, Object> create(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @RequestBody Map<String, Object> body) {
         String name = (String) body.getOrDefault("name", "Untitled");
         validateName(userId, name, null);
-        return repo.create(userId, name);
+        return repo.create(userId, com.github.wf.server.web.GroupScope.currentGroup(request), name);
     }
 
     @PutMapping("/{id}")
@@ -80,18 +86,21 @@ public class DraftController {
     public Map<String, Object> update(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Draft ID") @PathVariable("id") String id,
             @RequestBody Map<String, Object> body) {
-        var d = repo.findById(userId, id);
+        var groups = com.github.wf.server.web.GroupScope.groups(request);
+        var d = repo.findVisibleById(userId, groups, id);
+        if (d == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
         if (body.containsKey("name")) {
             String name = (String) body.get("name");
             validateName(userId, name, id);
-            repo.updateName(userId, id, name);
+            repo.updateName(userId, groups, id, name);
             d.put("name", name);
         }
-        if (body.containsKey("nodes")) { repo.updateNodes(userId, id, body.get("nodes")); d.put("nodes", body.get("nodes")); }
-        if (body.containsKey("edges")) { repo.updateEdges(userId, id, body.get("edges")); d.put("edges", body.get("edges")); }
-        if (body.containsKey("version")) { repo.updateVersion(userId, id, (int) body.get("version")); d.put("version", body.get("version")); }
+        if (body.containsKey("nodes")) { repo.updateNodesById(id, body.get("nodes")); d.put("nodes", body.get("nodes")); }
+        if (body.containsKey("edges")) { repo.updateEdgesById(id, body.get("edges")); d.put("edges", body.get("edges")); }
+        if (body.containsKey("version")) { repo.updateVersionById(id, (int) body.get("version")); d.put("version", body.get("version")); }
         return d;
     }
 
@@ -102,8 +111,9 @@ public class DraftController {
     public void delete(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Draft ID") @PathVariable("id") String id) {
-        repo.delete(userId, id);
+        repo.deleteVisible(userId, com.github.wf.server.web.GroupScope.groups(request), id);
     }
 
     @PostMapping("/{id}/copy")
@@ -114,8 +124,10 @@ public class DraftController {
     public Map<String, Object> copy(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @Parameter(description = "Source draft ID") @PathVariable("id") String id) {
-        var original = repo.findById(userId, id);
+        var original = repo.findVisibleById(userId, com.github.wf.server.web.GroupScope.groups(request), id);
+        if (original == null) throw new com.github.wf.server.web.NotFoundException("Not found: " + id);
         String name = original.get("name") + " (Copy)";
         int n = 2;
         while (repo.nameExists(userId, name, null)) name = original.get("name") + " (Copy " + n++ + ")";
@@ -129,6 +141,7 @@ public class DraftController {
     public Map<String, Object> importYaml(
             @Parameter(description = "User ID for multi-tenant isolation", required = true)
             @RequestHeader("X-User-Id") String userId,
+            jakarta.servlet.http.HttpServletRequest request,
             @RequestBody Map<String, Object> body) {
         String name = (String) body.getOrDefault("name", "Imported");
         String finalName = name;

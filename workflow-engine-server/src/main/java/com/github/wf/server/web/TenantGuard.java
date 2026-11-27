@@ -21,8 +21,24 @@ public final class TenantGuard {
      * (via the {@code _userId} instance variable written at start time).
      */
     public static ProcessInstance requireOwnedInstance(WorkflowEngine engine, String userId, String instanceId) {
+        return requireOwnedInstance(engine, userId, java.util.List.of(), instanceId);
+    }
+
+    /** Group-aware visibility: owner OR member of the instance's group. */
+    public static ProcessInstance requireOwnedInstance(WorkflowEngine engine, String userId,
+                                                       java.util.Collection<String> groups, String instanceId) {
         ProcessInstance inst = engine.instanceRepository.findById(instanceId);
-        if (inst == null || !userId.equals(inst.getVariable("_userId"))) {
+        if (!GroupScope.isVisible(inst, userId, groups)) {
+            throw new NotFoundException("Not found: " + instanceId);
+        }
+        return inst;
+    }
+
+    /** Terminate/recover: owner or administrator of the instance's group. */
+    public static ProcessInstance requireAdminInstance(WorkflowEngine engine, String userId,
+                                                       java.util.Collection<String> adminGroups, String instanceId) {
+        ProcessInstance inst = engine.instanceRepository.findById(instanceId);
+        if (inst == null || !GroupScope.isAdmin(inst, userId, adminGroups)) {
             throw new NotFoundException("Not found: " + instanceId);
         }
         return inst;
@@ -33,6 +49,12 @@ public final class TenantGuard {
      * or the owner of the parent instance.
      */
     public static void requireTaskAccess(WorkflowEngine engine, String userId, String taskId) {
+        requireTaskAccess(engine, userId, java.util.List.of(), taskId);
+    }
+
+    /** Group-aware task access: assignee OR any member of the instance's group. */
+    public static void requireTaskAccess(WorkflowEngine engine, String userId,
+                                         java.util.Collection<String> groups, String taskId) {
         Task task = engine.taskRepository.findById(taskId);
         if (task == null) {
             throw new NotFoundException("Not found: " + taskId);
@@ -41,7 +63,7 @@ public final class TenantGuard {
             return;
         }
         ProcessInstance inst = engine.instanceRepository.findById(task.getInstanceId());
-        if (inst == null || !userId.equals(inst.getVariable("_userId"))) {
+        if (!GroupScope.isVisible(inst, userId, groups)) {
             throw new NotFoundException("Not found: " + taskId);
         }
     }

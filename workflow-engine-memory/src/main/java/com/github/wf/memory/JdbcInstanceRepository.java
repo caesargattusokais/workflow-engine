@@ -335,6 +335,29 @@ public class JdbcInstanceRepository implements InstanceRepository {
     }
 
     @Override
+    public Map<String, Map<String, Long>> getVisibleSummary(String userId, java.util.Collection<String> groupIds) {
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("SELECT definition_id, status, COUNT(*) c FROM process_instance");
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        visibilityWhere(userId, groupIds, sql, params);
+        sql.append(" GROUP BY definition_id, status");
+        jdbc.query(sql.toString(), (rs) -> {
+            String defId = rs.getString("definition_id");
+            String st = rs.getString("status");
+            long c = rs.getLong("c");
+            result.computeIfAbsent(defId, k -> {
+                var m = new LinkedHashMap<String, Long>();
+                m.put("running", 0L); m.put("total", 0L);
+                return m;
+            });
+            var m = result.get(defId);
+            m.put("total", m.get("total") + c);
+            if ("RUNNING".equals(st)) m.put("running", m.get("running") + c);
+        }, params.toArray());
+        return result;
+    }
+
+    @Override
     public void deleteById(String id) {
         instances.remove(id);
         jdbc.update("DELETE FROM execution WHERE instance_id = ?", id);
@@ -345,9 +368,9 @@ public class JdbcInstanceRepository implements InstanceRepository {
 
     private void writeToDb(ProcessInstance instance) {
         int updated = jdbc.update(
-            "UPDATE process_instance SET status=?, user_id=?, variables_json=?, active_node_ids_json=?, " +
+            "UPDATE process_instance SET status=?, user_id=?, group_id=?, variables_json=?, active_node_ids_json=?, " +
             "parent_instance_id=?, parent_execution_id=?, completed_at=? WHERE id=?",
-            instance.getStatus().name(), userIdOf(instance), gson.toJson(instance.getVariables()),
+            instance.getStatus().name(), userIdOf(instance), groupIdOf(instance), gson.toJson(instance.getVariables()),
             gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
             instance.getParentInstanceId(),
             instance.getParentExecutionId(),
@@ -356,11 +379,11 @@ public class JdbcInstanceRepository implements InstanceRepository {
         if (updated == 0) {
             jdbc.update(
                 "INSERT INTO process_instance (id, definition_id, definition_version, status, " +
-                "user_id, variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
+                "user_id, group_id, variables_json, active_node_ids_json, parent_instance_id, parent_execution_id, " +
                 "created_at, completed_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 instance.getId(), instance.getDefinitionId(), instance.getDefinitionVersion(),
-                instance.getStatus().name(), userIdOf(instance), gson.toJson(instance.getVariables()),
+                instance.getStatus().name(), userIdOf(instance), groupIdOf(instance), gson.toJson(instance.getVariables()),
                 gson.toJson(new ArrayList<>(instance.getActiveNodeIds())),
                 instance.getParentInstanceId(),
                 instance.getParentExecutionId(),
@@ -373,6 +396,77 @@ public class JdbcInstanceRepository implements InstanceRepository {
     static String userIdOf(ProcessInstance instance) {
         Object uid = instance.getVariable("_userId");
         return uid != null ? uid.toString() : null;
+    }
+
+    /** Group tag extracted from the {@code _groupId} variable (SQL-filterable copy). */
+    static String groupIdOf(ProcessInstance instance) {
+        Object gid = instance.getVariable(com.github.wf.engine.InternalVars.GROUP_KEY);
+        return gid != null ? gid.toString() : null;
+    }
+
+    /** Builds the shared visibility predicate: owner OR one of the caller's groups. */
+    static String visibilityWhere(String userId, java.util.Collection<String> groupIds, StringBuilder sql,
+                                  java.util.List<Object> params) {
+        sql.append(" WHERE (user_id = ?");
+        params.add(userId);
+        if (groupIds != null && !groupIds.isEmpty()) {
+            String marks = String.join(",", java.util.Collections.nCopies(groupIds.size(), "?"));
+            sql.append(" OR group_id IN (").append(marks).append(")");
+            params.addAll(groupIds);
+        }
+        sql.append(")");
+        return sql.toString();
+    }
+
+    @Override
+    public List<ProcessInstance> findVisiblePaginated(String userId, java.util.Collection<String> groupIds,
+                                                      String definitionId, int page, int size, String status) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM process_instance");
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        if (definitionId != null && !definitionId.isEmpty()) {
+            sql.append(" WHERE definition_id = ?");
+            params.add(definitionId);
+            // Append the visibility predicate to the existing WHERE.
+            StringBuilder vis = new StringBuilder();
+            java.util.List<Object> visParams = new java.util.ArrayList<>();
+            visibilityWhere(userId, groupIds, vis, visParams);
+            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            params.addAll(visParams);
+        } else {
+            visibilityWhere(userId, groupIds, sql, params);
+        }
+        if (status != null && !status.isEmpty()) {
+            sql.append(" AND status = ?");
+            params.add(status);
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT ? OFFSET ?");
+        params.add(size);
+        params.add((long) (page - 1) * size);
+        return jdbc.query(sql.toString(), (rs, rowNum) -> mapInstance(rs), params.toArray());
+    }
+
+    @Override
+    public long countVisible(String userId, java.util.Collection<String> groupIds,
+                             String definitionId, String status) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM process_instance");
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        if (definitionId != null && !definitionId.isEmpty()) {
+            sql.append(" WHERE definition_id = ?");
+            params.add(definitionId);
+            StringBuilder vis = new StringBuilder();
+            java.util.List<Object> visParams = new java.util.ArrayList<>();
+            visibilityWhere(userId, groupIds, vis, visParams);
+            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            params.addAll(visParams);
+        } else {
+            visibilityWhere(userId, groupIds, sql, params);
+        }
+        if (status != null && !status.isEmpty()) {
+            sql.append(" AND status = ?");
+            params.add(status);
+        }
+        Long c = jdbc.queryForObject(sql.toString(), Long.class, params.toArray());
+        return c != null ? c : 0;
     }
 
     // ── Execution ────────────────────────

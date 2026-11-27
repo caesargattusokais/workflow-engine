@@ -26,6 +26,9 @@ public final class DbIndexInitializer {
         "CREATE INDEX idx_pi_def_status_created ON process_instance (definition_id, status, created_at)",
         "CREATE INDEX idx_pi_status ON process_instance (status)",
         "CREATE INDEX idx_pi_user_status ON process_instance (user_id, status)",
+        "CREATE INDEX idx_pi_group_status ON process_instance (group_id, status)",
+        "CREATE INDEX idx_draft_group ON draft (group_id, name)",
+        "CREATE INDEX idx_def_group ON definition (group_id, id)",
         // execution — instance detail view, recover() pending scan
         "CREATE INDEX idx_exec_instance ON execution (instance_id)",
         "CREATE INDEX idx_exec_status_retry ON execution (status, retry_state)",
@@ -52,6 +55,9 @@ public final class DbIndexInitializer {
     private static final String[][] COLUMN_DDL = {
         // table, column, definition
         {"process_instance", "user_id",             "VARCHAR(64) NULL"},
+        {"process_instance", "group_id",            "VARCHAR(64) NULL"},
+        {"draft",             "group_id",            "VARCHAR(64) NULL"},
+        {"definition",        "group_id",            "VARCHAR(64) NULL"},
         {"process_instance", "definition_version",  "INT NOT NULL DEFAULT 0"},
         {"process_instance", "active_node_ids_json","TEXT"},
         {"process_instance", "parent_instance_id",  "VARCHAR(64) NULL"},

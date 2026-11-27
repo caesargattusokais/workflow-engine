@@ -18,6 +18,12 @@ public final class CurrentUser {
 
     /** A synthetic principal for the legacy X-User-Id compatibility path. */
     public static CurrentUser fromHeader(String userId) {
-        return new CurrentUser(new AuthUser(userId, userId, null, java.util.List.of(), true), "header");
+        return fromHeader(userId, java.util.List.of(), java.util.List.of());
+    }
+
+    public static CurrentUser fromHeader(String userId, java.util.List<String> groups,
+                                         java.util.List<String> adminGroups) {
+        return new CurrentUser(new AuthUser(userId, userId, null, java.util.List.of(),
+                groups, adminGroups, true), "header");
     }
 }

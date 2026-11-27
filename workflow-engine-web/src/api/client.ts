@@ -4,8 +4,21 @@ function userId(): string {
   return localStorage.getItem('userId') || 'anonymous';
 }
 
+/** Current data-sharing group, chosen in the header. Empty = private workspace. */
+export function currentGroup(): string {
+  return localStorage.getItem('groupId') || '';
+}
+
+export function setCurrentGroup(groupId: string): void {
+  if (groupId) localStorage.setItem('groupId', groupId);
+  else localStorage.removeItem('groupId');
+}
+
 function authHeaders(extra?: Record<string,string>): Record<string,string> {
-  return { 'X-User-Id': userId(), ...(extra || {}) };
+  const h: Record<string,string> = { 'X-User-Id': userId() };
+  const group = currentGroup();
+  if (group) h['X-Group-Id'] = group;
+  return { ...h, ...(extra || {}) };
 }
 
 /** Parse error response body for a meaningful message */
@@ -174,7 +187,7 @@ export async function diagnoseInstance(instanceId: string) {
 // The session token lives in an HttpOnly cookie set by the server, so fetch
 // sends it automatically (same-origin via the nginx proxy). The token is also
 // returned in the body for clients that prefer Authorization: Bearer.
-export interface LoginUser { username: string; displayName: string; email?: string | null; roles: string[] }
+export interface LoginUser { username: string; displayName: string; email?: string | null; roles: string[]; groups?: string[]; adminGroups?: string[] }
 export interface LoginResult { token: string; user: LoginUser; expiresInSeconds: number }
 
 export async function login(username: string, password: string): Promise<LoginResult> {

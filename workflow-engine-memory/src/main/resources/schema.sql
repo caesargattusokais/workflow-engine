@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS process_instance (
   definition_version INT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'RUNNING',
   user_id VARCHAR(64) NULL,
+  group_id VARCHAR(64) NULL,
   variables_json MEDIUMTEXT,
   active_node_ids_json TEXT,
   parent_instance_id VARCHAR(64) NULL,
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS task (
 CREATE TABLE IF NOT EXISTS draft (
   id VARCHAR(8) PRIMARY KEY,
   user_id VARCHAR(64) NOT NULL,
+  group_id VARCHAR(64) NULL,
   name VARCHAR(255) NOT NULL,
   nodes_json MEDIUMTEXT,
   edges_json MEDIUMTEXT,
@@ -58,6 +60,7 @@ CREATE TABLE IF NOT EXISTS definition (
   id VARCHAR(255) NOT NULL,
   version INT NOT NULL,
   user_id VARCHAR(64) NOT NULL,
+  group_id VARCHAR(64) NULL,
   name VARCHAR(255),
   positions_json TEXT,
   PRIMARY KEY (user_id, id, version)

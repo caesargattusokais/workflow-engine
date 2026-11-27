@@ -114,6 +114,103 @@ public class JdbcDraftRepository implements DraftRepository {
         return c != null ? c : 0;
     }
 
+    // ── Group sharing ────────────────────────────────────────────────────
+
+    private static String visibility(String userId, List<String> groups, List<Object> params) {
+        StringBuilder sb = new StringBuilder("(user_id = ?");
+        params.add(userId);
+        if (groups != null && !groups.isEmpty()) {
+            sb.append(" OR group_id IN (")
+              .append(String.join(",", Collections.nCopies(groups.size(), "?"))).append(")");
+            params.addAll(groups);
+        }
+        return sb.append(")").toString();
+    }
+
+    @Override
+    public Map<String, Object> create(String userId, String groupId, String name) {
+        String id = UUID.randomUUID().toString().substring(0, 8);
+        long now = System.currentTimeMillis();
+        jdbc.update(
+            "INSERT INTO draft (id, user_id, group_id, name, nodes_json, edges_json, version, created_at) " +
+            "VALUES (?, ?, ?, ?, '[]', '[]', 1, ?)", id, userId, groupId, name, now);
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("id", id); d.put("name", name);
+        d.put("nodes", List.of()); d.put("edges", List.of());
+        d.put("version", 1); d.put("createdAt", now);
+        return d;
+    }
+
+    @Override
+    public List<Map<String, Object>> listVisible(String userId, List<String> groupIds) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        return jdbc.query(
+            "SELECT id, name, nodes_json, edges_json, version, created_at FROM draft WHERE " + vis + " ORDER BY created_at",
+            (rs, rowNum) -> mapDraft(rs), params.toArray());
+    }
+
+    @Override
+    public List<Map<String, Object>> listVisiblePaginated(String userId, List<String> groupIds, int page, int size) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        params.add(size); params.add((long) (page - 1) * size);
+        return jdbc.query(
+            "SELECT id, name, nodes_json, edges_json, version, created_at FROM draft WHERE " + vis +
+            " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (rs, rowNum) -> mapDraft(rs), params.toArray());
+    }
+
+    @Override
+    public long countVisible(String userId, List<String> groupIds) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        Long c = jdbc.queryForObject("SELECT COUNT(*) FROM draft WHERE " + vis, Long.class, params.toArray());
+        return c != null ? c : 0;
+    }
+
+    @Override
+    public Map<String, Object> findVisibleById(String userId, List<String> groupIds, String id) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        params.add(id);
+        List<Map<String, Object>> list = jdbc.query(
+            "SELECT id, name, nodes_json, edges_json, version, created_at FROM draft WHERE " + vis + " AND id = ?",
+            (rs, rowNum) -> mapDraft(rs), params.toArray());
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    @Override
+    public void updateName(String userId, List<String> groupIds, String id, String name) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        params.add(0, name); params.add(id);
+        jdbc.update("UPDATE draft SET name = ? WHERE " + vis + " AND id = ?", params.toArray());
+    }
+
+    @Override
+    public void deleteVisible(String userId, List<String> groupIds, String id) {
+        List<Object> params = new ArrayList<>();
+        String vis = visibility(userId, groupIds, params);
+        params.add(id);
+        jdbc.update("DELETE FROM draft WHERE " + vis + " AND id = ?", params.toArray());
+    }
+
+    @Override
+    public void updateNodesById(String id, Object nodes) {
+        jdbc.update("UPDATE draft SET nodes_json = ? WHERE id = ?", gson.toJson(nodes), id);
+    }
+
+    @Override
+    public void updateEdgesById(String id, Object edges) {
+        jdbc.update("UPDATE draft SET edges_json = ? WHERE id = ?", gson.toJson(edges), id);
+    }
+
+    @Override
+    public void updateVersionById(String id, int version) {
+        jdbc.update("UPDATE draft SET version = ? WHERE id = ?", version, id);
+    }
+
     private Map<String, Object> mapDraft(java.sql.ResultSet rs) throws java.sql.SQLException {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("id", rs.getString("id"));

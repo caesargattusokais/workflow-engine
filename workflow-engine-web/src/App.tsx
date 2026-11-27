@@ -8,7 +8,7 @@ import AiConfigModal from './designer/AiConfigModal';
 import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import { useToasts, ToastContainer, showToast } from './api/toast';
-import { getAiConfig, getAuthMe, getAuthStatus, logout, onUnauthorized, type LoginUser } from './api/client';
+import { getAiConfig, getAuthMe, getAuthStatus, logout, onUnauthorized, currentGroup, setCurrentGroup, type LoginUser } from './api/client';
 
 export default function App() {
   const [tab, setTab] = useState<'designer' | 'monitor' | 'dashboard'>('designer');
@@ -19,6 +19,7 @@ export default function App() {
   // ── Auth gate ──────────────────────────────────────────────────────────
   // undefined = checking session; null = show login; AuthUser = signed in.
   const [currentUser, setCurrentUser] = useState<LoginUser | null | undefined>(undefined);
+  const [groupId, setGroupId] = useState<string>(currentGroup());
   const [authView, setAuthView] = useState<'login' | 'register'>('login');
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const { t, lang } = useT();
@@ -34,7 +35,14 @@ export default function App() {
 
   useEffect(() => {
     getAuthMe().then(me => {
-      if (me.authenticated && me.user) setCurrentUser(me.user);
+      if (me.authenticated && me.user) {
+        setCurrentUser(me.user);
+        const groups = me.user.groups || [];
+        const selected = currentGroup();
+        const next = groups.includes(selected) ? selected : (groups[0] || '');
+        setCurrentGroup(next);
+        setGroupId(next);
+      }
       else if (hasLegacyIdentity()) setCurrentUser({ username: localStorage.getItem('userId')!, displayName: localStorage.getItem('userId')!, roles: [] });
       else setCurrentUser(null);
     }).catch(() => {
@@ -112,6 +120,15 @@ export default function App() {
           {t.app.dashboard}
         </button>
         <div className="flex-1" />
+        {/* Data-sharing group selector */}
+        {!!currentUser.groups?.length && (
+          <select value={groupId} onChange={e => { setCurrentGroup(e.target.value); setGroupId(e.target.value); }}
+            title={lang === 'zh' ? '当前共享群（新数据归属此群）' : 'Current sharing group'}
+            className="mr-2 px-2 py-1 rounded-md bg-gray-800 border border-gray-700 text-[11px] text-slate-200 outline-none focus:border-blue-500">
+            <option value="">{lang === 'zh' ? '私有空间' : 'Private'}</option>
+            {(currentUser.groups || []).map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        )}
         {/* Current user + logout */}
         <div className="flex items-center gap-1.5 mr-1 px-2 py-1 rounded-md bg-gray-800/70 border border-gray-700/60">
           <span className="w-5 h-5 rounded-md bg-gradient-to-br from-accent to-blue-500 flex items-center justify-center text-[10px] font-semibold text-white">

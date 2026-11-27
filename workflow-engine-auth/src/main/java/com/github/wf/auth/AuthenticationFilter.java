@@ -57,7 +57,7 @@ public class AuthenticationFilter extends OncePerRequestFilter {
                 if (stored != null && stored.user().isEnabled()) {
                     CurrentUser cu = new CurrentUser(stored.user(), "token");
                     request.setAttribute(CurrentUser.ATTRIBUTE, cu);
-                    chain.doFilter(new AuthenticatedRequestWrapper(request, stored.user().getUsername()), response);
+                    chain.doFilter(new AuthenticatedRequestWrapper(request, stored.user()), response);
                     return;
                 }
             } catch (TokenService.InvalidTokenException ignored) {
@@ -70,12 +70,25 @@ public class AuthenticationFilter extends OncePerRequestFilter {
         String headerUser = request.getHeader("X-User-Id");
         if (props.isHeaderCompatEnabled() && headerUser != null && !headerUser.isBlank()) {
             String uid = headerUser.trim();
-            request.setAttribute(CurrentUser.ATTRIBUTE, CurrentUser.fromHeader(uid));
+            // In explicit compat mode service callers may declare their own
+            // group scope; no token is present to make it authoritative.
+            request.setAttribute(CurrentUser.ATTRIBUTE, CurrentUser.fromHeader(uid,
+                    csv(request.getHeader("X-Group-Ids")), csv(request.getHeader("X-Admin-Group-Ids"))));
             chain.doFilter(request, response);
             return;
         }
 
         respondUnauthorized(response);
+    }
+
+    private static java.util.List<String> csv(String value) {
+        if (value == null || value.isBlank()) return java.util.List.of();
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String part : value.split(",")) {
+            String s = part.trim();
+            if (!s.isEmpty()) out.add(s);
+        }
+        return java.util.List.copyOf(out);
     }
 
     private void respondUnauthorized(HttpServletResponse response) throws IOException {

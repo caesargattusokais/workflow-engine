@@ -30,11 +30,15 @@ auth:
       display-name: 系统管理员
       email: admin@flowforge.local
       roles: [ADMIN]
+      # Data-sharing groups; admin-groups grant terminate/recover rights.
+      groups: [group-alpha, group-beta]
+      admin-groups: [group-alpha, group-beta]
     - username: testuser
       password: test123
       display-name: 测试用户
       email: testuser@flowforge.local
       roles: [USER]
+      groups: [group-alpha]
 
 # Secrets are NOT stored in git. Provide them via environment variables or a
 # local override file: create application-local.yml next to this file (it is

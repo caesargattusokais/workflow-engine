@@ -10,8 +10,11 @@ export const API_BASE = 'http://localhost:8080/api';
 export class ApiClient {
   private headers: Record<string, string>;
 
-  constructor(userId = TEST_USER) {
+  /** groupIds are the caller's memberships; currentGroup tags newly created data. */
+  constructor(userId = TEST_USER, groupIds: string[] = [], currentGroup?: string) {
     this.headers = { 'X-User-Id': userId, 'Content-Type': 'application/json' };
+    if (groupIds.length) this.headers['X-Group-Ids'] = groupIds.join(',');
+    if (currentGroup) this.headers['X-Group-Id'] = currentGroup;
   }
 
   private async request(method: string, url: string, body?: unknown) {

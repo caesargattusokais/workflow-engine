@@ -62,8 +62,9 @@ public class WsAuthInterceptor implements HandshakeInterceptor {
         String path = servlet.getRequestURI();
         if (path != null && path.startsWith("/ws/instance/")) {
             String instanceId = path.substring("/ws/instance/".length()).split("/")[0];
+            java.util.List<String> groups = resolveGroups(servlet, userId);
             var inst = engine.instanceRepository.findById(instanceId);
-            if (inst == null || !userId.equals(inst.getVariable("_userId"))) {
+            if (!com.github.wf.server.web.GroupScope.isVisible(inst, userId, groups)) {
                 log.warn("WS handshake rejected: instance {} not owned by {}", instanceId, userId);
                 return false;
             }
@@ -76,6 +77,30 @@ public class WsAuthInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {}
+
+    /** Group membership from the authenticated principal (or compat headers). */
+    private java.util.List<String> resolveGroups(HttpServletRequest req, String userId) {
+        String token = null;
+        Cookie[] cookies = req.getCookies();
+        if (cookies != null) {
+            for (Cookie c : cookies) {
+                if (props.getCookieName().equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+                    token = c.getValue(); break;
+                }
+            }
+        }
+        if (token == null) {
+            String auth = req.getHeader("Authorization");
+            if (auth != null && auth.startsWith("Bearer ")) token = auth.substring(7).trim();
+        }
+        if (token != null) {
+            try {
+                var stored = authService.findUser(authService.verifyToken(token).username());
+                if (stored != null) return stored.user().getGroups();
+            } catch (TokenService.InvalidTokenException ignored) { }
+        }
+        return com.github.wf.server.web.GroupScope.groups(req);
+    }
 
     private String resolveUser(HttpServletRequest req) {
         // 1) signed token (cookie first, then Bearer)
