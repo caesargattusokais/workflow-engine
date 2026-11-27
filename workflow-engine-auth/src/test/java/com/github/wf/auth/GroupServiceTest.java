@@ -114,19 +114,30 @@ class GroupServiceTest {
     }
 
     @Test
-    void globalAdminAppointsAndRevokesGroupAdmins() {
-        service.setAdmin(admin, "g1", "outsider", true);
+    void groupAdminsAndGlobalAdminsAppointAndRevokeAdmins() {
+        // ordinary members cannot grant admin rights
+        assertThat(errorOf(() -> service.setAdmin(member, "g1", "outsider", true)).status()).isEqualTo(403);
+
+        // a group admin cannot demote themselves while they are the only admin
+        GroupException lastAdmin = errorOf(() -> service.setAdmin(groupAdmin, "g1", "gadmin", false));
+        assertThat(lastAdmin.status()).isEqualTo(409);
+        assertThat(lastAdmin.getMessage()).contains("至少保留一名管理员");
+
+        // a group admin can appoint another member as group admin (auto-joins)
+        service.setAdmin(groupAdmin, "g1", "outsider", true);
         AuthUser promoted = users.findByUsername("outsider").orElseThrow().user();
         assertThat(promoted.getAdminGroups()).contains("g1");
-        assertThat(promoted.getGroups()).contains("g1"); // auto-joined
+        assertThat(promoted.getGroups()).contains("g1");
 
-        service.setAdmin(admin, "g1", "outsider", false);
-        AuthUser demoted = users.findByUsername("outsider").orElseThrow().user();
+        // with two admins, self-demotion (退位) is allowed and keeps membership
+        service.setAdmin(groupAdmin, "g1", "gadmin", false);
+        AuthUser demoted = users.findByUsername("gadmin").orElseThrow().user();
         assertThat(demoted.getAdminGroups()).doesNotContain("g1");
-        assertThat(demoted.getGroups()).contains("g1"); // keeps membership
+        assertThat(demoted.getGroups()).contains("g1");
 
-        GroupException e = errorOf(() -> service.setAdmin(groupAdmin, "g1", "member", true));
-        assertThat(e.status()).isEqualTo(403);
+        // the global ADMIN may always demote, even the last remaining admin
+        service.setAdmin(admin, "g1", "outsider", false);
+        assertThat(users.findByUsername("outsider").orElseThrow().user().getAdminGroups()).doesNotContain("g1");
     }
 
     @Test

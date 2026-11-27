@@ -15,8 +15,9 @@ import java.util.Set;
  * <ul>
  *   <li>Any signed-in user: create a group and become its first group admin.</li>
  *   <li>Creator or global ADMIN: delete a group once it is empty (no members/data).</li>
- *   <li>Global ADMIN: appoint/revoke group admins, manage every group.</li>
- *   <li>Group admin: add/remove ordinary members of their own group only.</li>
+ *   <li>Group admin or global ADMIN: add members directly (no consent needed),
+ *       remove ordinary members, and appoint/revoke group admins — a group must
+ *       always keep at least one admin.</li>
  *   <li>Member: see the group and its members, leave voluntarily.</li>
  * </ul>
  *
@@ -175,10 +176,10 @@ public class GroupService {
         update(actor.getUsername(), gs, ag);
     }
 
-    /** Appoint or revoke a group admin. Global ADMIN only. */
+    /** Appoint or revoke a group admin: any admin of this group or the global ADMIN. */
     public void setAdmin(AuthUser actor, String groupId, String username, boolean admin) {
-        requireAdmin(actor);
         String id = normalize(groupId);
+        requireGroupAdmin(actor, id);
         String target = normalizeUser(username);
         Stored targetUser = requireUser(target);
         List<String> gs = new ArrayList<>(lower(targetUser.user().getGroups()));
@@ -187,6 +188,12 @@ public class GroupService {
             if (!gs.contains(id)) gs.add(id);
             if (!ag.contains(id)) ag.add(id);
         } else {
+            if (!ag.contains(id)) return; // not an admin of this group — nothing to revoke
+            // Keep at least one group admin so the group never becomes unmanageable.
+            // The global ADMIN may bypass this: they can manage every group anyway.
+            if (!isAdmin(actor) && adminCount(id) <= 1) {
+                throw GroupException.conflict("群内至少保留一名管理员，请先任命其他管理员");
+            }
             ag.remove(id); // keeps membership; only the admin privilege is revoked
         }
         update(target, gs, ag);
@@ -253,9 +260,11 @@ public class GroupService {
         if (actor == null) throw GroupException.forbidden("请先登录");
     }
 
-    private void requireAdmin(AuthUser actor) {
-        requireAuthenticated(actor);
-        if (!isAdmin(actor)) throw GroupException.forbidden("只有全局管理员可以执行此操作");
+    /** Number of users holding the group-admin privilege for {@code groupId}. */
+    private long adminCount(String groupId) {
+        return users.listAll().stream()
+                .filter(u -> lower(u.getAdminGroups()).contains(groupId))
+                .count();
     }
 
     private void requireGroupAdmin(AuthUser actor, String groupId) {

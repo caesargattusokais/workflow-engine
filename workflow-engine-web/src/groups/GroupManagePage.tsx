@@ -171,7 +171,7 @@ export default function GroupManagePage({ currentUser, onMembershipChanged }: Pr
                         <div key={m.username} className="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-800/60 text-xs">
                           <span className="flex-1 text-slate-200">{m.displayName} <span className="text-slate-500">({m.username})</span></span>
                           {m.groupAdmin && <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">{t.groups.roleAdmin}</span>}
-                          {isGlobalAdmin && (
+                          {canManage(g) && (
                             <button disabled={busy} title={m.groupAdmin ? t.groups.revokeAdmin : t.groups.makeAdmin}
                               onClick={() => run(() => setGroupAdmin(g.group.id, m.username, !m.groupAdmin), t.groups.adminUpdated)}
                               className="p-1 rounded hover:bg-gray-700 text-slate-400 hover:text-amber-300">

@@ -304,7 +304,7 @@ const en: Translations = {
   },
   groups: {
     title: 'Groups',
-    subtitle: 'Members share definitions, drafts and instances; group admins can terminate/recover group instances',
+    subtitle: 'Members share definitions, drafts and instances; group admins add people directly and appoint other admins',
     refresh: 'Refresh',
     create: 'Create group',
     id: 'Group ID',

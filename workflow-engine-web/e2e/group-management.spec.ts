@@ -80,20 +80,33 @@ test('group admin manages members; members can only leave', async () => {
   const gmView = await (await gmApi.get('/api/groups')).json();
   expect(gmView.find((v: any) => v.group.id === id)?.groupAdmin).toBe(true);
 
-  // Group admin can add members but cannot appoint another group admin.
+  // Group admin can add members directly (no consent needed) and appoint
+  // another group admin — appointing is no longer a global-admin-only operation.
   expect((await gmApi.post(`/api/groups/${id}/members`, { data: { username: mem } })).status()).toBe(200);
-  expect((await gmApi.put(`/api/groups/${id}/admin`, { data: { username: mem, admin: true } })).status()).toBe(403);
+  expect((await gmApi.put(`/api/groups/${id}/admin`, { data: { username: mem, admin: true } })).status()).toBe(200);
 
   const memToken = await login(anon, mem);
   const memApi = await api(memToken);
-  expect((await memApi.post(`/api/groups/${id}/members`, { data: { username: outsider } })).status()).toBe(403);
+  // The newly appointed admin can also pull people in directly.
+  expect((await memApi.post(`/api/groups/${id}/members`, { data: { username: outsider } })).status()).toBe(200);
 
-  // Removal by a group admin is allowed for ordinary members; self-leave works too.
+  const outToken = await login(anon, outsider);
+  const outApi = await api(outToken);
+  // An ordinary member still cannot manage members.
+  expect((await outApi.post(`/api/groups/${id}/members`, { data: { username: mem } })).status()).toBe(403);
+
+  // A group admin cannot remove another group admin — demote first.
+  expect((await gmApi.delete(`/api/groups/${id}/members/${mem}`)).status()).toBe(403);
+  expect((await gmApi.put(`/api/groups/${id}/admin`, { data: { username: mem, admin: false } })).status()).toBe(200);
   expect((await gmApi.delete(`/api/groups/${id}/members/${mem}`)).status()).toBe(200);
   expect((await memApi.post(`/api/groups/${id}/leave`)).status()).toBe(404);
+
+  // Self-demotion works while another admin remains (the creator is one).
+  expect((await gmApi.put(`/api/groups/${id}/admin`, { data: { username: gm, admin: false } })).status()).toBe(200);
   expect((await gmApi.post(`/api/groups/${id}/leave`)).status()).toBe(200);
 
-  // Empty group can now be removed (the creator auto-joined, so leave first).
+  // Cleanup: remove the remaining ordinary member, then empty the group.
+  expect((await admin.delete(`/api/groups/${id}/members/${outsider}`)).status()).toBe(200);
   expect((await admin.post(`/api/groups/${id}/leave`)).status()).toBe(200);
   expect((await admin.delete(`/api/groups/${id}`)).status()).toBe(200);
   const remaining: any[] = await (await admin.get('/api/groups')).json();
