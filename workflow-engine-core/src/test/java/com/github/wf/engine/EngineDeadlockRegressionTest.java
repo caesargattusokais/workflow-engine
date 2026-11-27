@@ -478,6 +478,46 @@ class EngineDeadlockRegressionTest {
                 .noneMatch(Execution::isSuspended);
     }
 
+    /**
+     * Same tiered-countersign scenario as the inclusive test, but with a
+     * PARALLEL join routed straight to the two ends. The parallel fork/join
+     * discrimination is `incoming<=1 && outgoing>1`, so a join tolerates
+     * conditional + default outgoing edges directly — no intermediate
+     * exclusive gateway needed (unlike inclusive, whose `||` discrimination
+     * would misread a multi-outgoing join as a fork). Release routing goes
+     * through TransitionSelector, so a rejected branch lands the instance on
+     * the reject end instead of silently completing as success.
+     */
+    @Test
+    void parallelJoinRoutesToRejectEndWhenBranchRejected() {
+        WorkflowEngine copyEngine = engineWithCopySemanticsInstanceRepo();
+
+        List<Node> nodes = List.of(new StartEvent("start"),
+                new ParallelGateway("fork"),
+                new UserTask("a", "A", "a", null, null, null, null),
+                new UserTask("b", "B", "b", null, null, null, null),
+                new ParallelGateway("join"),
+                new EndEvent("reject-end"),
+                new EndEvent("end"));
+        processRepo().save(new ProcessDefinition("parallel-reject-route", "parallel-reject-route", 1, nodes,
+                List.of(Transition.direct("start", "fork"),
+                        Transition.direct("fork", "a"),
+                        Transition.direct("fork", "b"),
+                        Transition.direct("a", "join"),
+                        Transition.direct("b", "join"),
+                        Transition.conditional("join", Condition.expression("_hasReject == true")).withTo("reject-end"),
+                        Transition.direct("join", "end"))));
+
+        ProcessInstance instance = copyEngine.start("parallel-reject-route", Map.of());
+        copyEngine.completeTask(pendingTasks(instance.getId(), "a").get(0).getId(), Map.of(), "ok");
+        copyEngine.rejectTask(pendingTasks(instance.getId(), "b").get(0).getId(), "不行");
+
+        assertThat(instances.get(instance.getId()).getStatus()).isEqualTo(InstanceStatus.COMPLETED);
+        assertThat(instances.get(instance.getId()).getVariable(InternalVars.HAS_REJECT)).isEqualTo(Boolean.TRUE);
+        assertThat(copyEngine.instanceRepository.findActiveExecutions(instance.getId()))
+                .noneMatch(Execution::isSuspended);
+    }
+
     @Test
     void serviceTaskWithoutMatchingRouteSuspendsInsteadOfSpinning() {        deploy("svc-no-route",
                 List.of(new StartEvent("start"),
