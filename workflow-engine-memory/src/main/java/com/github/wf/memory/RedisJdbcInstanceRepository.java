@@ -1,6 +1,7 @@
 package com.github.wf.memory;
 
 import com.github.wf.engine.Execution;
+import com.github.wf.engine.InternalVars;
 
 import com.github.wf.model.*;
 import com.github.wf.spi.InstanceRepository;
@@ -248,12 +249,23 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
     @Override
     public ProcessInstance findById(String id) {
         String json = redis.opsForValue().get(INST_PREFIX + id);
-        if (json != null) return gson.fromJson(json, ProcessInstance.class);
+        if (json != null) return ensureGroupVariable(id, gson.fromJson(json, ProcessInstance.class));
         // DB fallback for non-RUNNING
         List<ProcessInstance> list = jdbc.query(
             "SELECT * FROM process_instance WHERE id = ?",
             (rs, rowNum) -> mapInstance(rs), id);
-        return list.isEmpty() ? null : list.get(0);
+        return list.isEmpty() ? null : ensureGroupVariable(id, list.get(0));
+    }
+
+    /** Backfilled rows may have group_id in DB but no _groupId in the cached JSON. */
+    private ProcessInstance ensureGroupVariable(String id, ProcessInstance instance) {
+        if (instance == null || instance.getVariable(InternalVars.GROUP_KEY) != null) return instance;
+        String groupId = jdbc.query("SELECT group_id FROM process_instance WHERE id = ?",
+                rs -> rs.next() ? rs.getString(1) : null, id);
+        if (groupId != null && !groupId.isBlank()) {
+            instance.setVariable(InternalVars.GROUP_KEY, groupId);
+        }
+        return instance;
     }
 
     @Override
@@ -328,6 +340,109 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
         if (status == null || status.isEmpty()) return count();
         Long c = jdbc.queryForObject("SELECT COUNT(*) FROM process_instance WHERE status = ?", Long.class, status);
         return c != null ? c : 0;
+    }
+
+    // ── Group-shared visibility ──────────────────────────────────────────
+    // Redis cache only holds RUNNING instances and pre-backfill JSON may lack
+    // _groupId, so visibility queries are pushed to the authoritative DB rows.
+
+    private void appendVisibility(StringBuilder sql, List<Object> params, String userId,
+                                  java.util.Collection<String> groupIds, String definitionId) {
+        if (definitionId != null && !definitionId.isEmpty()) {
+            sql.append(" WHERE definition_id = ?");
+            params.add(definitionId);
+            StringBuilder vis = new StringBuilder();
+            List<Object> visParams = new ArrayList<>();
+            JdbcInstanceRepository.visibilityWhere(userId, groupIds, vis, visParams);
+            sql.append(vis.substring(vis.indexOf("WHERE") + 5));
+            params.addAll(visParams);
+        } else {
+            JdbcInstanceRepository.visibilityWhere(userId, groupIds, sql, params);
+        }
+    }
+
+    @Override
+    public List<ProcessInstance> findVisible(String userId, java.util.Collection<String> groupIds, String definitionId) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM process_instance");
+        List<Object> params = new ArrayList<>();
+        appendVisibility(sql, params, userId, groupIds, definitionId);
+        sql.append(" ORDER BY created_at DESC");
+        return jdbc.query(sql.toString(), (rs, rowNum) -> mapInstance(rs), params.toArray());
+    }
+
+    @Override
+    public List<ProcessInstance> findVisiblePaginated(String userId, java.util.Collection<String> groupIds,
+                                                      String definitionId, int page, int size, String status) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM process_instance");
+        List<Object> params = new ArrayList<>();
+        appendVisibility(sql, params, userId, groupIds, definitionId);
+        if (status != null && !status.isEmpty()) {
+            sql.append(" AND status = ?");
+            params.add(status);
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT ? OFFSET ?");
+        params.add(size);
+        params.add((long) (page - 1) * size);
+        return jdbc.query(sql.toString(), (rs, rowNum) -> mapInstance(rs), params.toArray());
+    }
+
+    @Override
+    public long countVisible(String userId, java.util.Collection<String> groupIds,
+                             String definitionId, String status) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM process_instance");
+        List<Object> params = new ArrayList<>();
+        appendVisibility(sql, params, userId, groupIds, definitionId);
+        if (status != null && !status.isEmpty()) {
+            sql.append(" AND status = ?");
+            params.add(status);
+        }
+        Long c = jdbc.queryForObject(sql.toString(), Long.class, params.toArray());
+        return c != null ? c : 0;
+    }
+
+    @Override
+    public InstanceStats getVisibleStats(String userId, java.util.Collection<String> groupIds, String definitionId) {
+        InstanceStats s = new InstanceStats();
+        for (ProcessInstance i : findVisible(userId, groupIds, definitionId)) {
+            s.setTotal(s.getTotal() + 1);
+            switch (i.getStatus()) {
+                case RUNNING -> s.setRunning(s.getRunning() + 1);
+                case COMPLETED -> s.setCompleted(s.getCompleted() + 1);
+                case SUSPENDED -> s.setSuspended(s.getSuspended() + 1);
+                case TERMINATED -> s.setTerminated(s.getTerminated() + 1);
+            }
+            s.getByDefinition().computeIfAbsent(i.getDefinitionId(), k -> new LinkedHashMap<>())
+                    .merge(i.getStatus().name(), 1L, Long::sum);
+            if (i.getCompletedAt() != null) {
+                long dur = i.getCompletedAt().toEpochMilli() - i.getCreatedAt().toEpochMilli();
+                double old = s.getAvgDurationMs();
+                s.setAvgDurationMs(old == 0 ? dur : (old + dur) / 2);
+            }
+        }
+        return s;
+    }
+
+    @Override
+    public Map<String, Map<String, Long>> getVisibleSummary(String userId, java.util.Collection<String> groupIds) {
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("SELECT definition_id, status, COUNT(*) c FROM process_instance");
+        List<Object> params = new ArrayList<>();
+        appendVisibility(sql, params, userId, groupIds, null);
+        sql.append(" GROUP BY definition_id, status");
+        jdbc.query(sql.toString(), rs -> {
+            String defId = rs.getString("definition_id");
+            String st = rs.getString("status");
+            long c = rs.getLong("c");
+            result.computeIfAbsent(defId, k -> {
+                var m = new LinkedHashMap<String, Long>();
+                m.put("running", 0L); m.put("total", 0L);
+                return m;
+            });
+            var m = result.get(defId);
+            m.put("total", m.get("total") + c);
+            if ("RUNNING".equals(st)) m.put("running", m.get("running") + c);
+        }, params.toArray());
+        return result;
     }
 
     @Override
@@ -577,6 +692,10 @@ public class RedisJdbcInstanceRepository implements InstanceRepository {
         if (varsJson != null && !varsJson.isEmpty()) {
             Map<String, Object> parsed = gson.fromJson(varsJson, new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType());
             if (parsed != null) vars = parsed;
+        }
+        String groupId = rs.getString("group_id");
+        if (groupId != null && !groupId.isBlank() && !vars.containsKey(InternalVars.GROUP_KEY)) {
+            vars.put(InternalVars.GROUP_KEY, groupId);
         }
         String parentInstId = rs.getString("parent_instance_id");
         String parentExecId = rs.getString("parent_execution_id");

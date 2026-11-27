@@ -1,6 +1,7 @@
 package com.github.wf.memory;
 
 import com.github.wf.engine.Execution;
+import com.github.wf.engine.InternalVars;
 import com.github.wf.model.*;
 import com.github.wf.spi.InstanceRepository;
 import com.google.gson.Gson;
@@ -547,6 +548,13 @@ public class JdbcInstanceRepository implements InstanceRepository {
         if (varsJson != null && !varsJson.isEmpty()) {
             Map<String, Object> parsed = gson.fromJson(varsJson, new TypeToken<Map<String, Object>>() {}.getType());
             if (parsed != null) vars = parsed;
+        }
+        // Legacy rows can carry group_id in the column without the internal
+        // variable (e.g. backfilled data). Keep the in-memory view consistent
+        // so detail/history/task permission checks use the same group.
+        String groupId = rs.getString("group_id");
+        if (groupId != null && !groupId.isBlank() && !vars.containsKey(InternalVars.GROUP_KEY)) {
+            vars.put(InternalVars.GROUP_KEY, groupId);
         }
         String parentInstId = rs.getString("parent_instance_id");
         String parentExecId = rs.getString("parent_execution_id");
